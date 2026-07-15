@@ -1,0 +1,21 @@
+version: "2"
+
+linters:
+  default: standard        # errcheck, govet, staticcheck, ineffassign, unused
+  enable:
+    - revive               # doc comments on exported names (#15)
+    - misspell
+    - unconvert
+    - gocritic
+  settings:
+    govet:
+      enable:
+        - shadow           # variable shadowing — mistake #1
+    revive:
+      rules:
+        - name: exported
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
