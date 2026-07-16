@@ -12,7 +12,7 @@ import (
 )
 
 // Storage is what the hiker service needs from persistence.
-// Implemented by postgres.HikerStore.
+// Implemented by postgres.go.HikerStore.
 type Storage interface {
 	CreateHiker(ctx context.Context, h *Hiker) error
 	GetHikerByEmail(ctx context.Context, email string) (*Hiker, error)
