@@ -9,7 +9,15 @@ import (
 
 // Config holds all runtime configuration for the muster server.
 type Config struct {
-	Database DatabaseConfig
+	App      *AppConfig
+	Database *DatabaseConfig
+	JWT      *JWTConfig
+}
+
+// AppConfig holds app configurations. platform, env, port etc.
+type AppConfig struct {
+	Env  string
+	Port string
 }
 
 // DatabaseConfig holds connection settings and pool tuning for Postgres.
@@ -23,10 +31,49 @@ type DatabaseConfig struct {
 	ConnectTimeout    time.Duration
 }
 
+// JWTConfig holds secrets and expirations
+type JWTConfig struct {
+	AccessSecret       string
+	RefreshSecret      string
+	AccessTokenExpiry  time.Duration
+	RefreshTokenExpiry time.Duration
+	Issuer             string
+	Audience           string
+}
+
 // Load reads configuration from the environment, applying defaults for
 // optional values. It returns an error if a required variable is missing
 // or any present value fails to parse.
 func Load() (*Config, error) {
+
+	appConfig, err := loadAppConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	databaseConfig, err := loadDatabaseConfig()
+	if err != nil {
+		return nil, err
+	}
+	jwtConfig, err := loadJWTConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Config{App: appConfig, Database: databaseConfig, JWT: jwtConfig}, nil
+}
+
+func loadAppConfig() (*AppConfig, error) {
+	env := getEnv("APP_ENV", "dev")
+	port := getEnv("APP_PORT", "8088")
+	return &AppConfig{
+		Env:  env,
+		Port: port,
+	}, nil
+}
+
+// loadDatabaseConfig loads database env variables
+func loadDatabaseConfig() (*DatabaseConfig, error) {
 	dsn := getEnv("DATABASE_URL", "")
 	if dsn == "" {
 		return nil, fmt.Errorf("DATABASE_URL is not set")
@@ -55,11 +102,11 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	connectTimeout, err = getEnvDuration("DB_CONNECT_TIMEOUT", 10*time.Second)
+	connectTimeout, err = getEnvDuration("DB_CONN_TIMEOUT", 10*time.Second)
 	if err != nil {
 		return nil, err
 	}
-	return &Config{Database: DatabaseConfig{
+	return &DatabaseConfig{
 		DSN:               dsn,
 		MinConns:          minConns,
 		MaxConns:          maxConns,
@@ -67,7 +114,39 @@ func Load() (*Config, error) {
 		MaxConnIdleTime:   maxConnIdleTime,
 		HealthCheckPeriod: healthCheckPeriod,
 		ConnectTimeout:    connectTimeout,
-	}}, nil
+	}, nil
+}
+
+func loadJWTConfig() (*JWTConfig, error) {
+	accessSecret := getEnv("JWT_ACCESS_SECRET", "")
+	if accessSecret == "" {
+		return nil, fmt.Errorf("access secret cannot be empty or nil")
+	}
+	refreshSecret := getEnv("JWT_REFRESH_SECRET", "")
+	if refreshSecret == "" {
+		return nil, fmt.Errorf("refresh secret cannot be empty or nil")
+	}
+	if accessSecret == refreshSecret {
+		return nil, fmt.Errorf("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must differ")
+	}
+	accessTokenExpiry, err := getEnvDuration("JWT_ACCESS_TOKEN_EXPIRY", 15*time.Minute)
+	if err != nil {
+		return nil, err
+	}
+	refreshTokenExpiry, err := getEnvDuration("JWT_REFRESH_TOKEN_EXPIRY", 7*24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
+	issuer := getEnv("JWT_ISSUER", "muster")
+	audience := getEnv("JWT_AUDIENCE", "muster-api")
+	return &JWTConfig{
+		AccessSecret:       accessSecret,
+		RefreshSecret:      refreshSecret,
+		AccessTokenExpiry:  accessTokenExpiry,
+		RefreshTokenExpiry: refreshTokenExpiry,
+		Issuer:             issuer,
+		Audience:           audience,
+	}, nil
 }
 
 func getEnv(key, def string) string {
