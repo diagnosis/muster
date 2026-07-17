@@ -6,7 +6,6 @@ CREATE TABLE hikers (
         password_hash TEXT NOT NULL,
         name          TEXT NOT NULL,
         experience    TEXT NOT NULL CHECK (experience IN ('beginner','intermediate','experienced')),
-        pace          TEXT NOT NULL CHECK (pace IN ('relaxed','moderate','fast')),
         home_area     TEXT,
         bio           TEXT,
         gender        TEXT,

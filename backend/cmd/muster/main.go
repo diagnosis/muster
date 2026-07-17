@@ -3,10 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/diagnosis/go-toolkit/v2/logger"
+	"github.com/diagnosis/go-toolkit/v2/secure"
+	"github.com/diagnosis/muster/internal/api"
 	"github.com/diagnosis/muster/internal/config"
+	"github.com/diagnosis/muster/internal/hiker"
+	"github.com/diagnosis/muster/internal/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
@@ -34,11 +40,37 @@ func run() error {
 	}
 	defer pool.Close()
 
-	if err := pool.Ping(ctx); err != nil {
+	if err = pool.Ping(ctx); err != nil {
 		return fmt.Errorf("db ping: %w", err)
 	}
 	logger.Info(ctx, "muster connected")
-	return nil
+
+	hikerStore := postgres.NewHikerStore(pool)
+
+	signer, err := secure.NewJWTSigner(secure.JWTConfig{
+		AccessSecret:       cfg.JWT.AccessSecret,
+		RefreshSecret:      cfg.JWT.RefreshSecret,
+		AccessTokenExpiry:  cfg.JWT.AccessTokenExpiry,
+		RefreshTokenExpiry: cfg.JWT.RefreshTokenExpiry,
+		Issuer:             cfg.JWT.Issuer,
+		Audience:           cfg.JWT.Audience,
+		Leeway:             0,
+	})
+	if err != nil {
+		return fmt.Errorf("signer err: %w", err)
+	}
+
+	hikers := hiker.NewService(hikerStore, signer)
+	srv := api.NewServer(cfg, hikers, signer)
+
+	logger.Info(ctx, "muster listening", "port", cfg.App.Port)
+	return (&http.Server{
+		Addr:              ":" + cfg.App.Port,
+		Handler:           srv.Routes(),
+		ReadHeaderTimeout: 10 * time.Second,
+		WriteTimeout:      0,
+		IdleTimeout:       120 * time.Second,
+	}).ListenAndServe()
 }
 
 func openPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {

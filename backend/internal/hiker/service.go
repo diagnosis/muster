@@ -116,7 +116,7 @@ func (s *Service) Login(ctx context.Context, email, password string, platform Pl
 	}
 	emailN := strings.ToLower(strings.TrimSpace(email))
 
-	hiker, err := s.store.GetHikerByEmail(ctx, emailN)
+	h, err := s.store.GetHikerByEmail(ctx, emailN)
 	if err != nil {
 		if se, ok := apperr.AsStatusErr(err); ok && se.Status == apperr.CodeNotFound {
 			return nil, apperr.InvalidCredentials("invalid login credentials", "no hiker for email")
@@ -124,7 +124,7 @@ func (s *Service) Login(ctx context.Context, email, password string, platform Pl
 		return nil, err
 	}
 
-	ok, err := secure.VerifyPassword(password, hiker.PasswordHash)
+	ok, err := secure.VerifyPassword(password, h.PasswordHash)
 	if err != nil {
 		return nil, apperr.InvalidCredentials("invalid login credentials", "failed to verify password", err)
 	}
@@ -132,7 +132,7 @@ func (s *Service) Login(ctx context.Context, email, password string, platform Pl
 		return nil, apperr.InvalidCredentials("invalid login credentials", "password not match")
 	}
 
-	return s.mintSession(ctx, hiker, platform)
+	return s.mintSession(ctx, h, platform)
 }
 
 // Logout revokes the hiker's stored refresh token for the given
@@ -168,18 +168,24 @@ func (s *Service) Refresh(ctx context.Context, rawToken string, platform Platfor
 		return nil, apperr.InvalidCredentials("invalid credentials", "platform mismatch")
 	}
 
-	hiker, err := s.store.GetHikerByID(ctx, rt.HikerID)
+	h, err := s.store.GetHikerByID(ctx, rt.HikerID)
 	if err != nil {
 		if se, ok := apperr.AsStatusErr(err); ok && se.Status == apperr.CodeNotFound {
 			return nil, apperr.InvalidCredentials("invalid credentials", "unknown refresh token")
 		}
 		return nil, err
 	}
-	return s.mintSession(ctx, hiker, platform)
+	return s.mintSession(ctx, h, platform)
 
 }
-func (s *Service) mintSession(ctx context.Context, hiker *Hiker, platform Platform) (*Session, error) {
-	accessToken, err := s.jwt.SignAccess(hiker.ID.String())
+
+// GetByID returns the hiker with the given id.
+func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*Hiker, error) {
+	return s.store.GetHikerByID(ctx, id)
+}
+
+func (s *Service) mintSession(ctx context.Context, h *Hiker, platform Platform) (*Session, error) {
+	accessToken, err := s.jwt.SignAccess(h.ID.String())
 	if err != nil {
 		return nil, apperr.Internal("could not create session", "access token signing failed", err)
 	}
@@ -190,20 +196,20 @@ func (s *Service) mintSession(ctx context.Context, hiker *Hiker, platform Platfo
 
 	newRt := &RefreshToken{
 		ID:        uuid.New(),
-		HikerID:   hiker.ID,
+		HikerID:   h.ID,
 		TokenHash: secure.HashRefreshToken(newRawRefresh),
 		Platform:  platform,
 		ExpiresAt: time.Now().Add(s.jwt.RefreshExpiry()),
 	}
 	// v0 policy: one session per platform...
-	if err := s.store.DeleteRefreshTokens(ctx, hiker.ID, platform); err != nil {
+	if err := s.store.DeleteRefreshTokens(ctx, h.ID, platform); err != nil {
 		return nil, err
 	}
 	if err := s.store.SaveRefreshToken(ctx, newRt); err != nil {
 		return nil, err
 	}
 	return &Session{
-		Hiker:        hiker,
+		Hiker:        h,
 		AccessToken:  accessToken,
 		RefreshToken: newRawRefresh,
 	}, nil
