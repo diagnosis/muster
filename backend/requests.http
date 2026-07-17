@@ -1,5 +1,31 @@
-### GET request to example server
-GET https://examples.http-client.intellij.net/get
-    ?generated-in=GoLand
+### Signup
+POST http://localhost:8088/api/auth/signup
+Content-Type: application/json
 
-###
+{
+  "Email": "safa@example.com",
+  "Password": "Secure123",
+  "Name": "Safa",
+  "Experience": "experienced"
+}
+
+### Login
+POST http://localhost:8088/api/auth/login
+Content-Type: application/json
+
+{
+  "Email": "safa@example.com",
+  "Password": "Secure123"
+}
+
+### Me (needs cookies from login)
+GET http://localhost:8088/api/auth/me
+
+### Refresh — cookie values should CHANGE
+POST http://localhost:8088/api/auth/refresh
+
+### Logout
+POST http://localhost:8088/api/auth/logout
+
+### Refresh after logout — MUST be 401
+POST http://localhost:8088/api/auth/refresh
