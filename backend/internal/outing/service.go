@@ -115,3 +115,74 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 	return o, s.store.CreateOuting(ctx, o)
 
 }
+
+// JoinInput carries a hiker's request to join an outing.
+type JoinInput struct {
+	Role         Role
+	SeatsOffered int
+	Guests       int
+	Note         *string
+}
+
+// RequestJoin asks to join an outing. Declined is terminal; withdrawn may re-request; capacity is checked at acceptance, not here.
+func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, in JoinInput) (*JoinRequest, error) {
+	if !in.Role.Valid() {
+		return nil, apperr.BadRequest("invalid role", "invalid role")
+	}
+	if in.Role == RoleRider && in.SeatsOffered != 0 {
+		return nil, apperr.BadRequest("rider cannot offer seats", "rider cannot offer seats")
+	}
+	if in.Role == RoleDriver && in.SeatsOffered < 1 {
+		return nil, apperr.BadRequest("driver needs to offer at least one seat", "one seat needs to be offered as driver")
+	}
+	if in.Guests < 0 || in.Guests > 3 {
+		return nil, apperr.BadRequest("number of guests should be between 0-3", "number guest violation")
+	}
+	o, err := s.store.GetOuting(ctx, outingID)
+	if err != nil {
+		return nil, err
+	}
+	if o.Status != StatusOpen {
+		return nil, apperr.Conflict("outing is not open", "outing closed or cancelled")
+	}
+	if time.Until(o.StartsAt) <= 0 {
+		return nil, apperr.Conflict("outing already started", "past outing")
+	}
+	if o.HostID == hikerID {
+		return nil, apperr.BadRequest("cannot join the event you created", "host cannot join the event they created")
+	}
+
+	joinRequest, err := s.store.GetJoinRequestByHiker(ctx, o.ID, hikerID)
+	if err != nil {
+		if se, ok := apperr.AsStatusErr(err); ok && se.Status == apperr.CodeNotFound {
+			joinRequest = &JoinRequest{
+				ID:           uuid.New(),
+				OutingID:     o.ID,
+				HikerID:      hikerID,
+				Status:       RequestStatusRequested,
+				Role:         in.Role,
+				SeatsOffered: in.SeatsOffered,
+				Guests:       in.Guests,
+				Note:         in.Note,
+			}
+			if err = s.store.CreateJoinRequest(ctx, joinRequest); err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+	} else {
+		switch joinRequest.Status {
+		case RequestStatusWithdrawn:
+			if err := s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusRequested); err != nil {
+				return nil, err
+			}
+			joinRequest.Status = RequestStatusRequested
+		case RequestStatusDeclined:
+			return nil, apperr.Conflict("your request was declined", "declined is terminal")
+		default: // requested or accepted
+			return nil, apperr.Conflict("you already have an active request", "duplicate request")
+		}
+	}
+	return joinRequest, nil
+}
