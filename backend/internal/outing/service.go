@@ -15,10 +15,17 @@ import (
 type Storage interface {
 	CreateOuting(ctx context.Context, o *Outing) error
 	GetOuting(ctx context.Context, id uuid.UUID) (*Outing, error)
-	GetJoinRequestByHiker(ctx context.Context, outingID, hikerID uuid.UUID) (*JoinRequest, error)
 
 	CreateJoinRequest(ctx context.Context, r *JoinRequest) error
-	SetJoinRequestStatus(ctx context.Context, id uuid.UUID, s RequestStatus) error // for the withdrawn→requested flip
+	GetJoinRequest(ctx context.Context, id uuid.UUID) (*JoinRequest, error)
+	GetJoinRequestByHiker(ctx context.Context, outingID, hikerID uuid.UUID) (*JoinRequest, error)
+	SetJoinRequestStatus(ctx context.Context, id uuid.UUID, s RequestStatus) error
+
+	// AcceptIfCapacity flips a request from requested to accepted only if
+	// it fits, atomically: a driver needs cap room (people + 1 + guests
+	// <= max_size); a rider needs cap room AND seat room (people + 1 +
+	// guests <= min(seat capacity, max_size)). Full => apperr.Conflict.
+	AcceptIfCapacity(ctx context.Context, requestID uuid.UUID) error
 }
 
 // Service implements outing business rules over a Storage.
@@ -28,10 +35,19 @@ type Service struct {
 
 // NewService returns a Service backed by store.
 func NewService(store Storage) *Service {
-	return &Service{
-		store: store,
-	}
+	return &Service{store: store}
 }
+
+// minLeadTime is how far in advance an outing must be scheduled —
+// people need time to muster. leadGrace absorbs clock skew and
+// form-filling time.
+const (
+	minLeadTime = 24 * time.Hour
+	leadGrace   = 5 * time.Minute
+)
+
+// maxGuests caps the unregistered +1s one member may bring.
+const maxGuests = 3
 
 // CreateInput carries the fields required to schedule an outing.
 type CreateInput struct {
@@ -49,19 +65,11 @@ type CreateInput struct {
 	Notes            *string    `json:"notes,omitempty"`
 }
 
-// minLeadTime is how far in advance an outing must be scheduled —
-// people need time to muster. leadGrace absorbs clock skew and
-// form-filling time.
-const (
-	minLeadTime = 24 * time.Hour
-	leadGrace   = 5 * time.Minute
-)
-
-// Create schedules a new outing hosted by hostID. Outings must start
-// at least 24 hours in the future so people have time to muster, and
-// max_size counts the host.
+// Create schedules a new outing hosted by hostID. Outings must start at
+// least 24 hours in the future so people have time to muster. MaxSize
+// caps total headcount including the host; HostSeats may be 0 (the
+// host needs a ride); cost is display-only in v0.
 func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) (*Outing, error) {
-
 	title := strings.TrimSpace(in.Title)
 	destination := strings.TrimSpace(in.Destination)
 	meetLabel := strings.TrimSpace(in.MeetLabel)
@@ -70,8 +78,7 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 	v.Required("title", title)
 	v.Required("destination", destination)
 	v.Required("meet_label", meetLabel)
-	verr := v.Errors()
-	if verr != nil {
+	if verr := v.Errors(); verr != nil {
 		return nil, verr
 	}
 
@@ -104,16 +111,15 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 		MeetLng:          in.MeetLng,
 		StartsAt:         in.StartsAt,
 		MaxSize:          in.MaxSize,
+		HostSeats:        in.HostSeats,
+		CostPerSeatCents: in.CostPerSeatCents,
 		Difficulty:       in.Difficulty,
 		Pace:             in.Pace,
 		Notes:            in.Notes,
 		Status:           StatusOpen,
-		HostSeats:        in.HostSeats,
-		CostPerSeatCents: in.CostPerSeatCents,
 	}
 
 	return o, s.store.CreateOuting(ctx, o)
-
 }
 
 // JoinInput carries a hiker's request to join an outing.
@@ -124,7 +130,11 @@ type JoinInput struct {
 	Note         *string
 }
 
-// RequestJoin asks to join an outing. Declined is terminal; withdrawn may re-request; capacity is checked at acceptance, not here.
+// RequestJoin asks to join an outing. A first request creates a row in
+// requested; a withdrawn request may re-request; declined is terminal;
+// an active request conflicts. Hosts cannot join their own outing.
+// Capacity is deliberately NOT checked here — it gates acceptance,
+// not asking.
 func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, in JoinInput) (*JoinRequest, error) {
 	if !in.Role.Valid() {
 		return nil, apperr.BadRequest("invalid role", "invalid role")
@@ -135,9 +145,10 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 	if in.Role == RoleDriver && in.SeatsOffered < 1 {
 		return nil, apperr.BadRequest("driver needs to offer at least one seat", "one seat needs to be offered as driver")
 	}
-	if in.Guests < 0 || in.Guests > 3 {
-		return nil, apperr.BadRequest("number of guests should be between 0-3", "number guest violation")
+	if in.Guests < 0 || in.Guests > maxGuests {
+		return nil, apperr.BadRequest("number of guests should be between 0-3", "guest count violation")
 	}
+
 	o, err := s.store.GetOuting(ctx, outingID)
 	if err != nil {
 		return nil, err
@@ -149,7 +160,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 		return nil, apperr.Conflict("outing already started", "past outing")
 	}
 	if o.HostID == hikerID {
-		return nil, apperr.BadRequest("cannot join the event you created", "host cannot join the event they created")
+		return nil, apperr.BadRequest("cannot join the event you created", "host self-join")
 	}
 
 	joinRequest, err := s.store.GetJoinRequestByHiker(ctx, o.ID, hikerID)
@@ -168,21 +179,96 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 			if err = s.store.CreateJoinRequest(ctx, joinRequest); err != nil {
 				return nil, err
 			}
-		} else {
+			return joinRequest, nil
+		}
+		return nil, err
+	}
+
+	switch joinRequest.Status {
+	case RequestStatusWithdrawn:
+		// Re-requesting is legal. v0 keeps the original role/seats/guests.
+		if err = s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusRequested); err != nil {
 			return nil, err
 		}
-	} else {
-		switch joinRequest.Status {
-		case RequestStatusWithdrawn:
-			if err := s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusRequested); err != nil {
-				return nil, err
-			}
-			joinRequest.Status = RequestStatusRequested
-		case RequestStatusDeclined:
-			return nil, apperr.Conflict("your request was declined", "declined is terminal")
-		default: // requested or accepted
-			return nil, apperr.Conflict("you already have an active request", "duplicate request")
-		}
+		joinRequest.Status = RequestStatusRequested
+		return joinRequest, nil
+	case RequestStatusDeclined:
+		return nil, apperr.Conflict("your request to this outing was declined", "declined is terminal")
+	default: // requested or accepted
+		return nil, apperr.Conflict("you already have an active request", "duplicate request")
 	}
-	return joinRequest, nil
+}
+
+// loadForHostAction fetches a request and its outing, verifying the
+// caller is the host and the outing is open.
+func (s *Service) loadForHostAction(ctx context.Context, hostID, requestID uuid.UUID) (*JoinRequest, *Outing, error) {
+	joinRequest, err := s.store.GetJoinRequest(ctx, requestID)
+	if err != nil {
+		return nil, nil, err
+	}
+	o, err := s.store.GetOuting(ctx, joinRequest.OutingID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if hostID != o.HostID {
+		return nil, nil, apperr.Forbidden("only the event host can do this", "forbidden: host required")
+	}
+	if o.Status != StatusOpen {
+		return nil, nil, apperr.Conflict("event is closed", "event is closed")
+	}
+	return joinRequest, o, nil
+}
+
+// Accept approves a pending join request. Host-only; capacity is
+// checked atomically in the store — a rider needs a seat and cap room,
+// a driver only cap room.
+func (s *Service) Accept(ctx context.Context, hostID, requestID uuid.UUID) error {
+	joinRequest, _, err := s.loadForHostAction(ctx, hostID, requestID)
+	if err != nil {
+		return err
+	}
+	if joinRequest.Status != RequestStatusRequested {
+		return apperr.Conflict("request is not pending", "accept requires requested status")
+	}
+	return s.store.AcceptIfCapacity(ctx, requestID)
+}
+
+// Decline rejects a pending join request. Host-only; declined is
+// terminal for this outing.
+func (s *Service) Decline(ctx context.Context, hostID, requestID uuid.UUID) error {
+	joinRequest, _, err := s.loadForHostAction(ctx, hostID, requestID)
+	if err != nil {
+		return err
+	}
+	if joinRequest.Status != RequestStatusRequested {
+		return apperr.Conflict("request is not pending", "decline requires requested status")
+	}
+	return s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusDeclined)
+}
+
+// Withdraw pulls the caller's own request, whether pending or already
+// accepted. A withdrawing driver takes their seats — the shortage
+// shows in Detail; the host resolves it.
+func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) error {
+	joinRequest, err := s.store.GetJoinRequestByHiker(ctx, outingID, hikerID)
+	if err != nil {
+		return err
+	}
+	if joinRequest.Status != RequestStatusRequested && joinRequest.Status != RequestStatusAccepted {
+		return apperr.Conflict("nothing to withdraw", "withdraw requires requested or accepted")
+	}
+	return s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusWithdrawn)
+}
+
+// RemoveMember removes an accepted member from the roster. Host-only;
+// v0 reuses the withdrawn status for host removals.
+func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID) error {
+	joinRequest, _, err := s.loadForHostAction(ctx, hostID, requestID)
+	if err != nil {
+		return err
+	}
+	if joinRequest.Status != RequestStatusAccepted {
+		return apperr.Conflict("member is not on the roster", "remove requires accepted status")
+	}
+	return s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusWithdrawn)
 }
