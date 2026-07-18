@@ -9,21 +9,35 @@ import (
 	"github.com/google/uuid"
 )
 
+// --- helper methods --
+func seedOuting(maxSize, hostSeats int, status Status, hostID uuid.UUID, f *fakeStore) *Outing {
+	o := &Outing{ID: uuid.New(), HostID: hostID, StartsAt: time.Now().Add(48 * time.Hour), MaxSize: maxSize, HostSeats: hostSeats, Status: status}
+	f.outings[o.ID] = o
+	return o
+}
+
+func wantStatus(t *testing.T, err error, want apperr.Status) {
+	t.Helper()
+	se, ok := apperr.AsStatusErr(err)
+	if !ok || se.Status != want {
+		t.Fatalf("got %v, want status %v", err, want)
+	}
+}
+
+func seedJoinRequest(outingID, hikerID uuid.UUID, status RequestStatus, role Role, f *fakeStore, guest int) *JoinRequest {
+	r := &JoinRequest{ID: uuid.New(), OutingID: outingID, HikerID: hikerID, Status: status, Guests: guest, Role: role}
+	f.requests[r.ID] = r
+	return r
+}
+
+// --- RequestJoin ---
+
 func TestRequestJoin_FirstRequestCreated(t *testing.T) {
 	f := newFakeStore()
 	svc := NewService(f)
 
 	hostID := uuid.New()
-	o := &Outing{
-		ID:        uuid.New(),
-		HostID:    hostID,
-		StartsAt:  time.Now().Add(48 * time.Hour),
-		MaxSize:   6,
-		HostSeats: 4,
-		Status:    StatusOpen,
-	}
-	f.outings[o.ID] = o
-
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
 	hiker := uuid.New()
 	r, err := svc.RequestJoin(context.Background(), hiker, o.ID, JoinInput{Role: RoleRider})
 	if err != nil {
@@ -42,15 +56,7 @@ func TestRequestJoin_HostCannotSelfJoin(t *testing.T) {
 	svc := NewService(f)
 
 	hostID := uuid.New()
-	o := &Outing{
-		ID:        uuid.New(),
-		HostID:    hostID,
-		StartsAt:  time.Now().Add(48 * time.Hour),
-		MaxSize:   6,
-		HostSeats: 4,
-		Status:    StatusOpen,
-	}
-	f.outings[o.ID] = o
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
 
 	_, err := svc.RequestJoin(context.Background(), hostID, o.ID, JoinInput{Role: RoleRider})
 
@@ -64,16 +70,7 @@ func TestRequestJoin_RiderWithSeats(t *testing.T) {
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
-	o := &Outing{
-		ID:        uuid.New(),
-		HostID:    hostID,
-		StartsAt:  time.Now().Add(48 * time.Hour),
-		MaxSize:   6,
-		HostSeats: 4,
-		Status:    StatusOpen,
-	}
-
-	f.outings[o.ID] = o
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
 
 	_, err := svc.RequestJoin(context.Background(), hikerID, o.ID, JoinInput{Role: RoleRider, SeatsOffered: 2})
 
@@ -87,15 +84,7 @@ func TestRequestJoin_DriverZeroSeats(t *testing.T) {
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
-	o := &Outing{
-		ID:        uuid.New(),
-		HostID:    hostID,
-		StartsAt:  time.Now().Add(48 * time.Hour),
-		MaxSize:   6,
-		HostSeats: 4,
-		Status:    StatusOpen,
-	}
-	f.outings[o.ID] = o
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
 	_, err := svc.RequestJoin(context.Background(), hikerID, o.ID, JoinInput{Role: RoleDriver, SeatsOffered: 0})
 
 	wantStatus(t, err, apperr.CodeBadRequest)
@@ -108,15 +97,7 @@ func TestRequestJoin_TooManyGuests(t *testing.T) {
 	hostID := uuid.New()
 	hikerID := uuid.New()
 
-	o := &Outing{
-		ID:        uuid.New(),
-		HostID:    hostID,
-		StartsAt:  time.Now().Add(48 * time.Hour),
-		MaxSize:   6,
-		HostSeats: 4,
-		Status:    StatusOpen,
-	}
-	f.outings[o.ID] = o
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
 
 	_, err := svc.RequestJoin(context.Background(), hikerID, o.ID, JoinInput{Role: RoleRider, Guests: 4})
 
@@ -130,15 +111,7 @@ func TestRequestJoin_CancelledOuting(t *testing.T) {
 	hostID := uuid.New()
 	hikerID := uuid.New()
 
-	o := &Outing{
-		ID:        uuid.New(),
-		HostID:    hostID,
-		StartsAt:  time.Now().Add(48 * time.Hour),
-		MaxSize:   6,
-		HostSeats: 4,
-		Status:    StatusCancelled,
-	}
-	f.outings[o.ID] = o
+	o := seedOuting(6, 4, StatusCancelled, hostID, f)
 
 	_, err := svc.RequestJoin(context.Background(), hikerID, o.ID, JoinInput{Role: RoleRider, Guests: 2})
 
@@ -152,15 +125,7 @@ func TestRequestJoin_DeclinedIsTerminal(t *testing.T) {
 	hostID := uuid.New()
 	hikerID := uuid.New()
 
-	o := &Outing{
-		ID:        uuid.New(),
-		HostID:    hostID,
-		StartsAt:  time.Now().Add(48 * time.Hour),
-		MaxSize:   6,
-		HostSeats: 4,
-		Status:    StatusOpen,
-	}
-	f.outings[o.ID] = o
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
 
 	r, err := svc.RequestJoin(context.Background(), hikerID, o.ID, JoinInput{Role: RoleRider})
 	if err != nil {
@@ -179,15 +144,7 @@ func TestRequestJoin_DuplicateActive(t *testing.T) {
 	hostID := uuid.New()
 	hikerID := uuid.New()
 
-	o := &Outing{
-		ID:        uuid.New(),
-		HostID:    hostID,
-		StartsAt:  time.Now().Add(48 * time.Hour),
-		MaxSize:   6,
-		HostSeats: 4,
-		Status:    StatusOpen,
-	}
-	f.outings[o.ID] = o
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
 
 	_, err := svc.RequestJoin(context.Background(), hikerID, o.ID, JoinInput{Role: RoleRider})
 	if err != nil {
@@ -205,15 +162,7 @@ func TestRequestJoin_WithdrawnMayRequest(t *testing.T) {
 	hostID := uuid.New()
 	hikerID := uuid.New()
 
-	o := &Outing{
-		ID:        uuid.New(),
-		HostID:    hostID,
-		StartsAt:  time.Now().Add(48 * time.Hour),
-		MaxSize:   6,
-		HostSeats: 4,
-		Status:    StatusOpen,
-	}
-	f.outings[o.ID] = o
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
 
 	r, err := svc.RequestJoin(context.Background(), hikerID, o.ID, JoinInput{Role: RoleRider})
 	if err != nil {
@@ -232,61 +181,6 @@ func TestRequestJoin_WithdrawnMayRequest(t *testing.T) {
 	if f.requests[r.ID].Status != RequestStatusRequested {
 		t.Errorf("stored status = %q, want %q", f.requests[r.ID].Status, RequestStatusRequested)
 	}
-}
-
-type fakeStore struct {
-	outings  map[uuid.UUID]*Outing
-	requests map[uuid.UUID]*JoinRequest
-}
-
-func newFakeStore() *fakeStore {
-	return &fakeStore{
-		outings:  map[uuid.UUID]*Outing{},
-		requests: map[uuid.UUID]*JoinRequest{},
-	}
-}
-
-func (f *fakeStore) GetOuting(ctx context.Context, id uuid.UUID) (*Outing, error) {
-	o, ok := f.outings[id]
-	if !ok {
-		return nil, apperr.NotFound("outing not found", "fake: no outing")
-	}
-	return o, nil
-}
-func (f *fakeStore) CreateOuting(ctx context.Context, o *Outing) error {
-	f.outings[o.ID] = o
-	return nil
-}
-func (f *fakeStore) CreateJoinRequest(ctx context.Context, r *JoinRequest) error {
-	f.requests[r.ID] = r
-	return nil
-}
-
-func (f *fakeStore) GetJoinRequest(ctx context.Context, id uuid.UUID) (*JoinRequest, error) {
-	r, ok := f.requests[id]
-	if !ok {
-		return nil, apperr.NotFound("request not found", "fake: no request")
-	}
-	return r, nil
-}
-
-func (f *fakeStore) GetJoinRequestByHiker(ctx context.Context, outingID, hikerID uuid.UUID) (*JoinRequest, error) {
-	for _, r := range f.requests {
-		if r.OutingID == outingID && r.HikerID == hikerID {
-			return r, nil
-		}
-	}
-	return nil, apperr.NotFound("request not found", "fake: no request for hiker")
-
-}
-
-func (f *fakeStore) SetJoinRequestStatus(ctx context.Context, id uuid.UUID, s RequestStatus) error {
-	r, ok := f.requests[id]
-	if !ok {
-		return apperr.NotFound("request not found", "fake: no request")
-	}
-	r.Status = s
-	return nil
 }
 
 func TestAccept_Capacity(t *testing.T) {
@@ -347,6 +241,21 @@ func TestAccept_Capacity(t *testing.T) {
 			candidate: JoinRequest{Role: RoleRider, Status: RequestStatusRequested, Guests: 1},
 			wantErr:   false,
 		},
+		{
+			name:      "capacity zero accepts driver",
+			maxSize:   6,
+			hostSeats: 0,
+			candidate: JoinRequest{Role: RoleDriver, SeatsOffered: 4, Status: RequestStatusRequested},
+			wantErr:   false,
+		},
+		{
+			name:       "capacity zero rejects rider",
+			maxSize:    6,
+			hostSeats:  0,
+			candidate:  JoinRequest{Role: RoleRider, Status: RequestStatusRequested},
+			wantErr:    true,
+			wantStatus: apperr.CodeConflict,
+		},
 	}
 
 	for _, tc := range cases {
@@ -384,44 +293,159 @@ func TestAccept_Capacity(t *testing.T) {
 	}
 }
 
-func (f *fakeStore) AcceptIfCapacity(ctx context.Context, requestID uuid.UUID) error {
-	r, ok := f.requests[requestID]
-	if !ok {
-		return apperr.NotFound("request not found", "request not found")
-	}
-	o, ok := f.outings[r.OutingID]
-	if !ok {
-		return apperr.NotFound("outing not found", "outing not found")
-	}
-	people, seatCap := 0, 0
-	for _, req := range f.requests {
-		if req.OutingID == r.OutingID && req.Status == RequestStatusAccepted {
-			people += 1 + req.Guests
-			if req.Role == RoleDriver {
-				seatCap += req.SeatsOffered
-			}
-		}
-	}
-	people += 1            // the host
-	seatCap += o.HostSeats // the host's car
+func TestAccept_NonHostForbidden(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
 
-	need := people + 1 + r.Guests
-	if need > o.MaxSize {
-		return apperr.Conflict("outing is full", "cap exceeded")
-	}
-	if r.Role == RoleRider && need > seatCap {
-		return apperr.Conflict("not enough seats", "seat capacity exceeded")
-	}
-	r.Status = RequestStatusAccepted
-	return nil
+	hostID := uuid.New()
+	random := uuid.New()
+	hikerID := uuid.New()
+
+	o := &Outing{ID: uuid.New(), HostID: hostID, StartsAt: time.Now().Add(48 * time.Hour), MaxSize: 6, HostSeats: 2, Status: StatusOpen}
+	r := &JoinRequest{ID: uuid.New(), HikerID: hikerID, Guests: 1, Status: RequestStatusRequested, OutingID: o.ID}
+	f.outings[o.ID] = o
+	f.requests[r.ID] = r
+
+	err := svc.Accept(context.Background(), random, r.ID)
+	wantStatus(t, err, apperr.CodeForbidden)
+
 }
 
-var _ Storage = (*fakeStore)(nil)
+func Test_Withdraw_AcceptedMayWithdraw(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
 
-func wantStatus(t *testing.T, err error, want apperr.Status) {
-	t.Helper()
-	se, ok := apperr.AsStatusErr(err)
-	if !ok || se.Status != want {
-		t.Fatalf("got %v, want status %v", err, want)
+	hostID := uuid.New()
+	hikerID := uuid.New()
+
+	o := &Outing{ID: uuid.New(), HostID: hostID, StartsAt: time.Now().Add(48 * time.Hour), MaxSize: 6, HostSeats: 2, Status: StatusOpen}
+	f.outings[o.ID] = o
+	r := &JoinRequest{ID: uuid.New(), OutingID: o.ID, HikerID: hikerID, Status: RequestStatusAccepted}
+	f.requests[r.ID] = r
+
+	err := svc.Withdraw(context.Background(), hikerID, o.ID)
+	if err != nil {
+		t.Fatalf("Withdraw: unexpected error: %v", err)
 	}
+	if r.Status != RequestStatusWithdrawn {
+		t.Errorf("stored status = %q, want %q", r.Status, RequestStatusWithdrawn)
+	}
+}
+
+func Test_Withdraw_RequestedOK(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+
+	hostID := uuid.New()
+	hikerID := uuid.New()
+
+	o := &Outing{ID: uuid.New(), HostID: hostID, StartsAt: time.Now().Add(48 * time.Hour), MaxSize: 6, HostSeats: 2, Status: StatusOpen}
+	f.outings[o.ID] = o
+	r := &JoinRequest{ID: uuid.New(), OutingID: o.ID, HikerID: hikerID, Status: RequestStatusRequested}
+	f.requests[r.ID] = r
+
+	err := svc.Withdraw(context.Background(), hikerID, o.ID)
+	if err != nil {
+		t.Fatalf("Withdraw: unexpected error: %v", err)
+	}
+	if r.Status != RequestStatusWithdrawn {
+		t.Errorf("stored status = %q, want %q", r.Status, RequestStatusWithdrawn)
+	}
+}
+func Test_Withdraw_DeclinedConflicts(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+
+	hostID := uuid.New()
+	hikerID := uuid.New()
+
+	o := &Outing{ID: uuid.New(), HostID: hostID, StartsAt: time.Now().Add(48 * time.Hour), MaxSize: 6, HostSeats: 2, Status: StatusOpen}
+	f.outings[o.ID] = o
+	r := &JoinRequest{ID: uuid.New(), OutingID: o.ID, HikerID: hikerID, Status: RequestStatusDeclined}
+	f.requests[r.ID] = r
+
+	err := svc.Withdraw(context.Background(), hikerID, o.ID)
+	wantStatus(t, err, apperr.CodeConflict)
+}
+
+func Test_Decline_PendingWorks(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+
+	hostID := uuid.New()
+	hikerID := uuid.New()
+
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
+	r := seedJoinRequest(o.ID, hikerID, RequestStatusRequested, RoleRider, f, 2)
+
+	err := svc.Decline(context.Background(), hostID, r.ID)
+	if err != nil {
+		t.Fatalf("found an error %v", err)
+	}
+	if r.Status != RequestStatusDeclined {
+		t.Errorf("expected %v got %v", RequestStatusDeclined, r.Status)
+	}
+}
+
+func Test_Decline_AcceptedConflicts(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+
+	hostID := uuid.New()
+	hikerID := uuid.New()
+
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
+	r := seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, RoleRider, f, 2)
+
+	err := svc.Decline(context.Background(), hostID, r.ID)
+	wantStatus(t, err, apperr.CodeConflict)
+}
+
+func Test_Accept_AlreadyAcceptedConflicts(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+
+	hostID := uuid.New()
+	hikerID := uuid.New()
+
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
+	r := seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, RoleRider, f, 1)
+
+	err := svc.Accept(context.Background(), hostID, r.ID)
+	wantStatus(t, err, apperr.CodeConflict)
+}
+
+func Test_RemoveMember_AcceptedWorks(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+
+	hostID := uuid.New()
+	hikerID := uuid.New()
+
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
+	r := seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, RoleRider, f, 1)
+
+	err := svc.RemoveMember(context.Background(), hostID, r.ID)
+	if err != nil {
+		t.Errorf("expected to remove but got error: %v", err)
+	}
+	if r.Status != RequestStatusWithdrawn {
+		t.Errorf("expected %v got %v", RequestStatusWithdrawn, r.Status)
+	}
+
+}
+
+func Test_RemoveMember_PendingConflicts(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+
+	hostID := uuid.New()
+	hikerID := uuid.New()
+
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
+	r := seedJoinRequest(o.ID, hikerID, RequestStatusRequested, RoleRider, f, 1)
+
+	err := svc.RemoveMember(context.Background(), hostID, r.ID)
+	wantStatus(t, err, apperr.CodeConflict)
+
 }
