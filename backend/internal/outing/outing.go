@@ -8,6 +8,25 @@ import (
 	"github.com/google/uuid"
 )
 
+// Role is a member's transport role on an outing. Seats offered by a
+// driver include the driver's own seat.
+type Role string
+
+// Known roles, mirroring the join_requests.role CHECK constraint.
+const (
+	RoleRider  Role = "rider"
+	RoleDriver Role = "driver"
+)
+
+// Valid reports whether r is a known role.
+func (r Role) Valid() bool {
+	switch r {
+	case RoleRider, RoleDriver:
+		return true
+	}
+	return false
+}
+
 // Difficulty is the physical difficulty a host assigns to an outing.
 type Difficulty string
 
@@ -47,8 +66,8 @@ func (p Pace) Valid() bool {
 	return false
 }
 
-// Status is the lifecycle state of an outing. "Past" is derived
-// from StartsAt, never stored as a status.
+// Status is the lifecycle state of an outing. "Past" is derived from
+// StartsAt, never stored as a status.
 type Status string
 
 // Known outing statuses, mirroring the outings.status CHECK constraint.
@@ -57,7 +76,7 @@ const (
 	StatusCancelled Status = "cancelled"
 )
 
-// Valid reports whether o is a known outing status.
+// Valid reports whether s is a known outing status.
 func (s Status) Valid() bool {
 	switch s {
 	case StatusOpen, StatusCancelled:
@@ -91,35 +110,42 @@ func (rs RequestStatus) Valid() bool {
 
 // Outing is a planned group hike: a convergence of hikers on a meeting
 // point at a start time. The host is not represented in join_requests;
-// roster = host + accepted requests.
+// roster = host + accepted requests. Two independent constraints govern
+// joining: seats (can everyone get there) and MaxSize (how big the
+// event may be).
 type Outing struct {
-	ID          uuid.UUID  `json:"id"`
-	HostID      uuid.UUID  `json:"host_id"`
-	Title       string     `json:"title"`
-	Destination string     `json:"destination"`
-	MeetLabel   string     `json:"meet_label"`
-	MeetLat     *float64   `json:"meet_lat,omitempty"`
-	MeetLng     *float64   `json:"meet_lng,omitempty"`
-	StartsAt    time.Time  `json:"starts_at"`
-	MaxSize     int        `json:"max_size"` // total headcount, host included
-	Difficulty  Difficulty `json:"difficulty"`
-	Pace        Pace       `json:"pace"`
-	Notes       *string    `json:"notes,omitempty"`
-	Status      Status     `json:"status"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID               uuid.UUID  `json:"id"`
+	HostID           uuid.UUID  `json:"host_id"`
+	Title            string     `json:"title"`
+	Destination      string     `json:"destination"`
+	MeetLabel        string     `json:"meet_label"`
+	MeetLat          *float64   `json:"meet_lat,omitempty"`
+	MeetLng          *float64   `json:"meet_lng,omitempty"`
+	StartsAt         time.Time  `json:"starts_at"`
+	MaxSize          int        `json:"max_size"`   // hard cap on total headcount, host included — independent of seats
+	HostSeats        int        `json:"host_seats"` // seats the host provides, incl. their own; 0 = host needs a ride
+	CostPerSeatCents int        `json:"cost_per_seat_cents"`
+	Difficulty       Difficulty `json:"difficulty"`
+	Pace             Pace       `json:"pace"`
+	Notes            *string    `json:"notes,omitempty"`
+	Status           Status     `json:"status"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 // JoinRequest links a hiker to an outing. It only exists as that link;
 // all rules governing it are outing rules.
 type JoinRequest struct {
-	ID        uuid.UUID     `json:"id"`
-	OutingID  uuid.UUID     `json:"outing_id"`
-	HikerID   uuid.UUID     `json:"hiker_id"`
-	Status    RequestStatus `json:"status"`
-	Note      *string       `json:"note,omitempty"`
-	CreatedAt time.Time     `json:"created_at"`
-	UpdatedAt time.Time     `json:"updated_at"`
+	ID           uuid.UUID     `json:"id"`
+	OutingID     uuid.UUID     `json:"outing_id"`
+	HikerID      uuid.UUID     `json:"hiker_id"`
+	Status       RequestStatus `json:"status"`
+	Role         Role          `json:"role"`
+	SeatsOffered int           `json:"seats_offered"` // incl. the driver's own seat; always 0 for riders
+	Guests       int           `json:"guests"`        // unregistered +1s this member brings; they consume seats and count against MaxSize.
+	Note         *string       `json:"note,omitempty"`
+	CreatedAt    time.Time     `json:"created_at"`
+	UpdatedAt    time.Time     `json:"updated_at"`
 }
 
 // Member is a roster read-model: the public slice of a hiker as seen
@@ -130,13 +156,22 @@ type Member struct {
 	Experience string    `json:"experience"`
 }
 
-// Detail is the full view of one outing for one viewer.
+// Detail is the full view of one outing for one viewer. The seat math
+// is derived, never stored:
+//
+//	SeatCapacity = HostSeats + Σ accepted drivers' SeatsOffered
+//	PeopleCount  = 1 (host) + Σ over accepted of (1 + guests)
+//	SeatsShort   = max(0, PeopleCount − SeatCapacity)
+//	SpotsLeft    = max(0, min(SeatCapacity, MaxSize) − PeopleCount)
 type Detail struct {
-	Outing    Outing       `json:"outing"`
-	Host      Member       `json:"host"`
-	Roster    []Member     `json:"roster"` // accepted only; host NOT included
-	MyRequest *JoinRequest `json:"my_request,omitempty"`
-	SpotsLeft int          `json:"spots_left"` // max_size - (accepted + 1)
+	Outing       Outing       `json:"outing"`
+	Host         Member       `json:"host"`
+	Roster       []Member     `json:"roster"` // accepted only; host NOT included
+	MyRequest    *JoinRequest `json:"my_request,omitempty"`
+	SeatCapacity int          `json:"seat_capacity"`
+	PeopleCount  int          `json:"people_count"`
+	SeatsShort   int          `json:"seats_short"`
+	SpotsLeft    int          `json:"spots_left"`
 }
 
 // MyOutings groups the outings a hiker hosts and the ones they joined.
