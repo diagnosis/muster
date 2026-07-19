@@ -12,6 +12,7 @@ import (
 	"github.com/diagnosis/muster/internal/api"
 	"github.com/diagnosis/muster/internal/config"
 	"github.com/diagnosis/muster/internal/hiker"
+	"github.com/diagnosis/muster/internal/outing"
 	"github.com/diagnosis/muster/internal/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -46,6 +47,7 @@ func run() error {
 	logger.Info(ctx, "muster connected")
 
 	hikerStore := postgres.NewHikerStore(pool)
+	outingsStore := postgres.NewOutingStore(pool)
 
 	signer, err := secure.NewJWTSigner(secure.JWTConfig{
 		AccessSecret:       cfg.JWT.AccessSecret,
@@ -61,7 +63,8 @@ func run() error {
 	}
 
 	hikers := hiker.NewService(hikerStore, signer)
-	srv := api.NewServer(cfg, hikers, signer)
+	outings := outing.NewService(outingsStore)
+	srv := api.NewServer(cfg, hikers, signer, outings)
 
 	logger.Info(ctx, "muster listening", "port", cfg.App.Port)
 	return (&http.Server{

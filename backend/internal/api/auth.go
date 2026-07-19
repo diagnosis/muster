@@ -59,20 +59,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (s *Server) setSessionCookies(w http.ResponseWriter, sess *hiker.Session) {
-	secure := s.cfg.App.Env != "dev" // hardcoded true would eat cookies on localhost http
-	http.SetCookie(w, &http.Cookie{
-		Name: "access_token", Value: sess.AccessToken, Path: "/",
-		HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
-		MaxAge: int(s.cfg.JWT.AccessTokenExpiry.Seconds()),
-	})
-	http.SetCookie(w, &http.Cookie{
-		Name: "refresh_token", Value: sess.RefreshToken, Path: "/",
-		HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
-		MaxAge: int(s.cfg.JWT.RefreshTokenExpiry.Seconds()),
-	})
-}
-
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	correlationID, _ := logger.GetCorrelationID(r.Context())
 	// validate if refresh is fine
@@ -138,6 +124,21 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	responder.JSON(w, http.StatusOK, h, correlationID)
+
+}
+
+func (s *Server) setSessionCookies(w http.ResponseWriter, sess *hiker.Session) {
+	secure := s.cfg.App.Env != "dev" // hardcoded true would eat cookies on localhost http
+	http.SetCookie(w, &http.Cookie{
+		Name: "access_token", Value: sess.AccessToken, Path: "/",
+		HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
+		MaxAge: int(s.cfg.JWT.AccessTokenExpiry.Seconds()),
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name: "refresh_token", Value: sess.RefreshToken, Path: "/",
+		HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
+		MaxAge: int(s.cfg.JWT.RefreshTokenExpiry.Seconds()),
+	})
 
 }
 

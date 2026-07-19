@@ -124,10 +124,10 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 
 // JoinInput carries a hiker's request to join an outing.
 type JoinInput struct {
-	Role         Role
-	SeatsOffered int
-	Guests       int
-	Note         *string
+	Role         Role    `json:"role"`
+	SeatsOffered int     `json:"seats_offered"`
+	Guests       int     `json:"guests"`
+	Note         *string `json:"note"`
 }
 
 // RequestJoin asks to join an outing. A first request creates a row in

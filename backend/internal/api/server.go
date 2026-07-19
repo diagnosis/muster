@@ -3,26 +3,31 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/diagnosis/go-toolkit/v2/middleware"
 	"github.com/diagnosis/go-toolkit/v2/secure"
 	"github.com/diagnosis/muster/internal/config"
 	"github.com/diagnosis/muster/internal/hiker"
+	"github.com/diagnosis/muster/internal/outing"
+	"golang.org/x/time/rate"
 )
 
 // Server wires HTTP routes to the domain services.
 type Server struct {
-	hikers *hiker.Service
-	jwt    *secure.JWTSigner
-	cfg    *config.Config
+	hikers  *hiker.Service
+	jwt     *secure.JWTSigner
+	cfg     *config.Config
+	outings *outing.Service
 }
 
 // NewServer returns a Server serving the given services.
-func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner) *Server {
+func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner, outings *outing.Service) *Server {
 	return &Server{
-		hikers: hikers,
-		jwt:    jwt,
-		cfg:    cfg,
+		hikers:  hikers,
+		jwt:     jwt,
+		cfg:     cfg,
+		outings: outings,
 	}
 }
 
@@ -37,8 +42,16 @@ func (s *Server) Routes() http.Handler {
 	requireAuth := middleware.RequireAuth(s.authFromCookie)
 	mux.Handle("POST /api/auth/logout", requireAuth(http.HandlerFunc(s.handleLogout)))
 	mux.Handle("GET /api/auth/me", requireAuth(http.HandlerFunc(s.handleMe)))
+	// protected outing routes
+	mux.Handle("POST /api/outings", requireAuth(http.HandlerFunc(s.handleCreateOuting)))
+	mux.Handle("POST /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handleRequestJoin)))
+	mux.Handle("DELETE /api/outings/{id}/requests/me", requireAuth(http.HandlerFunc(s.handleWithdraw)))
+	mux.Handle("POST /api/requests/{id}/accept", requireAuth(http.HandlerFunc(s.handleAccept)))
+	mux.Handle("POST /api/requests/{id}/decline", requireAuth(http.HandlerFunc(s.handleDecline)))
+	mux.Handle("DELETE /api/requests/{id}/member", requireAuth(http.HandlerFunc(s.handleRemoveMember)))
 
 	var h http.Handler = mux
+	h = middleware.RateLimit(rate.Limit(10), 20, 5*time.Minute)(h)
 	h = middleware.CorrelationID()(h)
 	return h
 }

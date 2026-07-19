@@ -1,15 +1,34 @@
-PHONY: lint run migrate-up migrate-down migrate-status migrate-create
+.PHONY: fmt lint build test check run psql migrate-up migrate-down migrate-status migrate-create
 
 -include .env
 export
 
-# linting
+# format all Go code
+fmt:
+	gofmt -w ./cmd ./internal
+
+# vet + lint
 lint:
 	golangci-lint run ./...
+
+# build everything
+build:
+	go build ./...
+
+# run all tests
+test:
+	go test ./...
+
+# the full pre-commit gate
+check: fmt lint build test
 
 # running app
 run:
 	go run cmd/muster/main.go
+
+# open a psql shell against the configured database
+psql:
+	@psql "$(DATABASE_URL)"
 
 # run migrations
 migrate-up:
