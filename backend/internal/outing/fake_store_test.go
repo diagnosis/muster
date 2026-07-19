@@ -96,3 +96,12 @@ func (f *fakeStore) AcceptIfCapacity(ctx context.Context, requestID uuid.UUID) e
 	r.Status = RequestStatusAccepted
 	return nil
 }
+
+func (f *fakeStore) SetOutingStatus(ctx context.Context, outingID uuid.UUID, status Status) error {
+	o, ok := f.outings[outingID]
+	if !ok {
+		return apperr.NotFound("outing not found", "outing not found")
+	}
+	o.Status = status
+	return nil
+}

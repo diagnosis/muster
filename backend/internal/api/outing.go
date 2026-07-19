@@ -191,3 +191,27 @@ func (s *Server) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
 	)
 
 }
+
+// handleCancelOuting cancels the outing ({id} = outing id). Host-only,
+// enforced by the service.
+func (s *Server) handleCancelOuting(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	hostID, err := getAuthenticatedUserID(r)
+	if err != nil {
+		logger.Warn(r.Context(), "outing: auth failed on cancel", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	outingID, err := pathUUID(r, "id")
+	if err != nil {
+		logger.Warn(r.Context(), "outing: invalid outing id on cancel", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	if err = s.outings.Cancel(r.Context(), hostID, outingID); err != nil {
+		logger.Warn(r.Context(), "outing: cancel failed", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	responder.JSON(w, http.StatusOK, map[string]string{"message": "outing cancelled"}, correlationID)
+}

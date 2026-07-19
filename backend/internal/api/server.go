@@ -49,6 +49,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/requests/{id}/accept", requireAuth(http.HandlerFunc(s.handleAccept)))
 	mux.Handle("POST /api/requests/{id}/decline", requireAuth(http.HandlerFunc(s.handleDecline)))
 	mux.Handle("DELETE /api/requests/{id}/member", requireAuth(http.HandlerFunc(s.handleRemoveMember)))
+	mux.Handle("POST /api/outings/{id}/cancel", requireAuth(http.HandlerFunc(s.handleCancelOuting)))
 
 	var h http.Handler = mux
 	h = middleware.RateLimit(rate.Limit(10), 20, 5*time.Minute)(h)

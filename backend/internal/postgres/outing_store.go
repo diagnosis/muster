@@ -216,6 +216,27 @@ RETURNING r.updated_at;
 	return apperr.Conflict("outing is full or request is not pending", "capacity or status condition failed")
 }
 
+// SetOutingStatus sets the outing's status unconditionally; transition
+// validity is the service's responsibility.
+func (s *OutingStore) SetOutingStatus(ctx context.Context, id uuid.UUID, status outing.Status) error {
+	q := `
+		UPDATE outings
+		SET status = $2,
+		    updated_at = now()
+		WHERE id = $1
+		RETURNING updated_at`
+
+	var updatedAt time.Time
+	err := s.pool.QueryRow(ctx, q, id, status).Scan(&updatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.NotFound("outing not found", "no row for id")
+		}
+		return apperr.Database("could not update outing", "update outings by id failed", err)
+	}
+	return nil
+}
+
 func scanOuting(row pgx.Row) (*outing.Outing, error) {
 	o := &outing.Outing{}
 	err := row.Scan(

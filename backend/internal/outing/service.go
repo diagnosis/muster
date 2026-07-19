@@ -15,6 +15,7 @@ import (
 type Storage interface {
 	CreateOuting(ctx context.Context, o *Outing) error
 	GetOuting(ctx context.Context, id uuid.UUID) (*Outing, error)
+	SetOutingStatus(ctx context.Context, id uuid.UUID, s Status) error
 
 	CreateJoinRequest(ctx context.Context, r *JoinRequest) error
 	GetJoinRequest(ctx context.Context, id uuid.UUID) (*JoinRequest, error)
@@ -120,6 +121,25 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 	}
 
 	return o, s.store.CreateOuting(ctx, o)
+}
+
+// Cancel marks an open, future outing as cancelled. Host-only. Past
+// outings cannot be cancelled — they're history, not state.
+func (s *Service) Cancel(ctx context.Context, hostID, outingID uuid.UUID) error {
+	o, err := s.store.GetOuting(ctx, outingID)
+	if err != nil {
+		return err
+	}
+	if o.HostID != hostID {
+		return apperr.Forbidden("only the host can cancel this outing", "forbidden: host required")
+	}
+	if o.Status == StatusCancelled {
+		return apperr.Conflict("outing is already cancelled", "already cancelled")
+	}
+	if o.StartsAt.Before(time.Now()) {
+		return apperr.BadRequest("cannot cancel a past outing", "outing already started")
+	}
+	return s.store.SetOutingStatus(ctx, outingID, StatusCancelled)
 }
 
 // JoinInput carries a hiker's request to join an outing.

@@ -29,3 +29,106 @@ POST http://localhost:8088/api/auth/logout
 
 ### Refresh after logout — MUST be 401
 POST http://localhost:8088/api/auth/refresh
+
+
+
+### ── OUTING CEREMONY ──────────────────────────────
+
+### 0. Signup mika (once)
+POST http://localhost:8088/api/auth/signup
+Content-Type: application/json
+
+{
+  "Email": "mika@example.com",
+  "Password": "Secure123",
+  "Name": "Mika",
+  "Experience": "beginner"
+}
+
+### 1. Login as SAFA (host)
+POST http://localhost:8088/api/auth/login
+Content-Type: application/json
+
+{ "Email": "safa@example.com", "Password": "Secure123" }
+
+### 2. safa creates outing → 201, COPY the outing id
+POST http://localhost:8088/api/outings
+Content-Type: application/json
+
+{
+  "title": "Rattlesnake Ledge sunrise",
+  "destination": "Rattlesnake Ledge",
+  "meet_label": "Upper lot, Rattlesnake Lake",
+  "starts_at": "2026-07-21T06:00:00Z",
+  "max_size": 3,
+  "host_seats": 3,
+  "cost_per_seat_cents": 0,
+  "difficulty": "moderate",
+  "pace": "relaxed"
+}
+
+### 3. Login as MIKA
+POST http://localhost:8088/api/auth/login
+Content-Type: application/json
+
+{ "Email": "mika@example.com", "Password": "Secure123" }
+
+### 4. mika requests join → 201, COPY the request id
+POST http://localhost:8088/api/outings/f46f8f13-965b-4247-af89-302e29955cbc/requests
+Content-Type: application/json
+
+{ "role": "rider", "seats_offered": 0, "guests": 1 }
+
+### 5. Login as SAFA
+POST http://localhost:8088/api/auth/login
+Content-Type: application/json
+
+{ "Email": "safa@example.com", "Password": "Secure123" }
+
+### 6. safa accepts → 200  (headcount 3/3 — exactly full)
+POST http://localhost:8088/api/requests/78f545d6-fb93-4a00-8cca-13a229c5f79f/accept
+
+### 7. safa accepts AGAIN → 409 not pending
+POST http://localhost:8088/api/requests/REQUEST_ID_HERE/accept
+
+### 8. Login as MIKA
+POST http://localhost:8088/api/auth/login
+Content-Type: application/json
+
+{ "Email": "mika@example.com", "Password": "Secure123" }
+
+### 9. mika withdraws → 200
+DELETE http://localhost:8088/api/outings/356317fd-a413-4baf-8ea3-fbdcc9e3702e/requests/me
+
+### 10. mika re-requests → 201  (withdrawn→requested flip!)
+POST http://localhost:8088/api/outings/356317fd-a413-4baf-8ea3-fbdcc9e3702e/requests
+Content-Type: application/json
+
+{ "role": "rider", "seats_offered": 0, "guests": 1 }
+
+### 11. mika tries to accept HIMSELF → 403 host-only
+POST http://localhost:8088/api/requests/78f545d6-fb93-4a00-8cca-13a229c5f79f/accept
+
+### 12. Login as SAFA
+POST http://localhost:8088/api/auth/login
+Content-Type: application/json
+
+{ "Email": "safa@example.com", "Password": "Secure123" }
+
+### 13. safa declines → 200
+POST http://localhost:8088/api/requests/78f545d6-fb93-4a00-8cca-13a229c5f79f/decline
+
+### 14. Login as MIKA + re-request → 409 declined is terminal
+POST http://localhost:8088/api/auth/login
+Content-Type: application/json
+
+{ "Email": "mika@example.com", "Password": "Secure123" }
+
+### 14b.
+POST http://localhost:8088/api/outings/356317fd-a413-4baf-8ea3-fbdcc9e3702e/requests
+Content-Type: application/json
+
+{ "role": "rider", "seats_offered": 0, "guests": 1 }
+
+### 15. Garbage UUID → 400
+POST http://localhost:8088/api/requests/not-a-uuid/accept

@@ -449,3 +449,49 @@ func Test_RemoveMember_PendingConflicts(t *testing.T) {
 	wantStatus(t, err, apperr.CodeConflict)
 
 }
+
+func Test_Cancel_HostCancelsOpen(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+	o := seedOuting(6, 2, StatusOpen, hostID, f)
+
+	if err := svc.Cancel(context.Background(), hostID, o.ID); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
+	if f.outings[o.ID].Status != StatusCancelled {
+		t.Errorf("stored status = %q, want cancelled", f.outings[o.ID].Status)
+	}
+}
+
+func Test_Cancel_HostCancelsCancelled(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+	o := seedOuting(6, 2, StatusCancelled, hostID, f)
+
+	err := svc.Cancel(context.Background(), hostID, o.ID)
+	wantStatus(t, err, apperr.CodeConflict)
+}
+
+func Test_Cancel_HostCancelsPastEvent(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+	o := &Outing{ID: uuid.New(), HostID: hostID, StartsAt: time.Now().Add(-2 * time.Hour), MaxSize: 6, HostSeats: 2, Status: StatusOpen}
+	f.outings[o.ID] = o
+
+	err := svc.Cancel(context.Background(), hostID, o.ID)
+	wantStatus(t, err, apperr.CodeBadRequest)
+}
+
+func Test_Cancel_RandomCancelsEvent(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+	randomID := uuid.New()
+	o := seedOuting(6, 2, StatusOpen, hostID, f)
+
+	err := svc.Cancel(context.Background(), randomID, o.ID)
+	wantStatus(t, err, apperr.CodeForbidden)
+}
