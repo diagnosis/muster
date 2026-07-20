@@ -2,6 +2,8 @@ package outing
 
 import (
 	"context"
+	"sort"
+	"time"
 
 	"github.com/diagnosis/go-toolkit/v2/apperr"
 	"github.com/google/uuid"
@@ -104,4 +106,31 @@ func (f *fakeStore) SetOutingStatus(ctx context.Context, outingID uuid.UUID, sta
 	}
 	o.Status = status
 	return nil
+}
+
+func (f *fakeStore) ListUpcoming(ctx context.Context, now time.Time) ([]Outing, error) {
+	upcoming := []Outing{}
+	for _, o := range f.outings {
+		if o.Status == StatusOpen && o.StartsAt.After(now) {
+			upcoming = append(upcoming, *o)
+		}
+	}
+	sort.Slice(upcoming, func(i, j int) bool {
+		return upcoming[i].StartsAt.Before(upcoming[j].StartsAt)
+	})
+	return upcoming, nil
+}
+
+func (f *fakeStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, status RequestStatus) ([]JoinRequest, error) {
+	jrs := []JoinRequest{}
+
+	for _, r := range f.requests {
+		if r.OutingID == outingID && r.Status == status {
+			jrs = append(jrs, *r)
+		}
+	}
+	sort.Slice(jrs, func(i, j int) bool {
+		return jrs[i].CreatedAt.Before(jrs[j].CreatedAt)
+	})
+	return jrs, nil
 }

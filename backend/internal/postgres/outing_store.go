@@ -67,6 +67,65 @@ func (s *OutingStore) GetOuting(ctx context.Context, id uuid.UUID) (*outing.Outi
 	return o, nil
 }
 
+// ListUpcoming returns open outings starting after now, soonest first.
+func (s *OutingStore) ListUpcoming(ctx context.Context, now time.Time) ([]outing.Outing, error) {
+	q := `
+	SELECT id, host_id, title, destination, meet_label, meet_lat, meet_lng,
+			starts_at, max_size, host_seats, cost_per_seat_cents, difficulty, pace, notes, status,
+			created_at, updated_at
+		FROM outings
+	WHERE status = 'open' AND starts_at > $1
+	ORDER BY starts_at
+`
+	rows, err := s.pool.Query(ctx, q, now)
+	if err != nil {
+		return nil, apperr.Database("failed to list outings", "select upcoming outings failed", err)
+	}
+	defer rows.Close()
+
+	outings := []outing.Outing{}
+	for rows.Next() {
+		o, err := scanOuting(rows)
+		if err != nil {
+			return nil, apperr.Database("failed to list outings", "scan upcoming outing failed", err)
+		}
+		outings = append(outings, *o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, apperr.Database("failed to list outings", "iterate upcoming outings failed", err)
+	}
+	return outings, nil
+}
+
+// ListJoinRequests returns the outing's requests with the given status, oldest first.
+func (s *OutingStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, status outing.RequestStatus) ([]outing.JoinRequest, error) {
+	q := `
+	SELECT id, outing_id, hiker_id, status, role, seats_offered, guests, note, created_at, updated_at	
+		FROM join_requests 
+		WHERE outing_id = $1 AND status = $2
+	ORDER BY created_at
+`
+	rows, err := s.pool.Query(ctx, q, outingID, status)
+	if err != nil {
+		return nil, apperr.Database("failed to list requests", "select join requests failed", err)
+	}
+	defer rows.Close()
+
+	jrs := []outing.JoinRequest{}
+
+	for rows.Next() {
+		jr, err := scanJoinRequest(rows)
+		if err != nil {
+			return nil, apperr.Database("failed to list requests", "scan join requests failed", err)
+		}
+		jrs = append(jrs, *jr)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, apperr.Database("failed to list requests", "iterate join requests failed", err)
+	}
+	return jrs, nil
+}
+
 // CreateJoinRequest inserts new join requests to table.
 func (s *OutingStore) CreateJoinRequest(ctx context.Context, r *outing.JoinRequest) error {
 	q := `

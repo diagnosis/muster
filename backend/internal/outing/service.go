@@ -16,12 +16,13 @@ type Storage interface {
 	CreateOuting(ctx context.Context, o *Outing) error
 	GetOuting(ctx context.Context, id uuid.UUID) (*Outing, error)
 	SetOutingStatus(ctx context.Context, id uuid.UUID, s Status) error
+	ListUpcoming(ctx context.Context, now time.Time) ([]Outing, error)
 
 	CreateJoinRequest(ctx context.Context, r *JoinRequest) error
 	GetJoinRequest(ctx context.Context, id uuid.UUID) (*JoinRequest, error)
 	GetJoinRequestByHiker(ctx context.Context, outingID, hikerID uuid.UUID) (*JoinRequest, error)
 	SetJoinRequestStatus(ctx context.Context, id uuid.UUID, s RequestStatus) error
-
+	ListJoinRequests(ctx context.Context, outingID uuid.UUID, status RequestStatus) ([]JoinRequest, error)
 	// AcceptIfCapacity flips a request from requested to accepted only if
 	// it fits, atomically: a driver needs cap room (people + 1 + guests
 	// <= max_size); a rider needs cap room AND seat room (people + 1 +
@@ -291,4 +292,25 @@ func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID)
 		return apperr.Conflict("member is not on the roster", "remove requires accepted status")
 	}
 	return s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusWithdrawn)
+}
+
+// ListUpcoming returns open outings that start in the future, soonest
+// first. The service owns the clock; the store just filters against
+// the time it's given.
+func (s *Service) ListUpcoming(ctx context.Context) ([]Outing, error) {
+	return s.store.ListUpcoming(ctx, time.Now())
+}
+
+// PendingRequests returns the outing's pending join requests, oldest
+// first — the host's inbox, host-only. No outing-state gate: reads
+// return history regardless of cancelled/past status.
+func (s *Service) PendingRequests(ctx context.Context, hostID, outingID uuid.UUID) ([]JoinRequest, error) {
+	o, err := s.store.GetOuting(ctx, outingID)
+	if err != nil {
+		return nil, err
+	}
+	if o.HostID != hostID {
+		return nil, apperr.Forbidden("only the host can view pending requests", "forbidden: non-host listing pending requests")
+	}
+	return s.store.ListJoinRequests(ctx, outingID, RequestStatusRequested)
 }

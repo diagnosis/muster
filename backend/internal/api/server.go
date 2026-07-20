@@ -42,6 +42,9 @@ func (s *Server) Routes() http.Handler {
 	requireAuth := middleware.RequireAuth(s.authFromCookie)
 	mux.Handle("POST /api/auth/logout", requireAuth(http.HandlerFunc(s.handleLogout)))
 	mux.Handle("GET /api/auth/me", requireAuth(http.HandlerFunc(s.handleMe)))
+
+	// public outing routes
+	mux.HandleFunc("GET /api/outings", s.handleListUpcoming)
 	// protected outing routes
 	mux.Handle("POST /api/outings", requireAuth(http.HandlerFunc(s.handleCreateOuting)))
 	mux.Handle("POST /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handleRequestJoin)))
@@ -50,6 +53,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/requests/{id}/decline", requireAuth(http.HandlerFunc(s.handleDecline)))
 	mux.Handle("DELETE /api/requests/{id}/member", requireAuth(http.HandlerFunc(s.handleRemoveMember)))
 	mux.Handle("POST /api/outings/{id}/cancel", requireAuth(http.HandlerFunc(s.handleCancelOuting)))
+	mux.Handle("GET /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handlePendingRequests)))
 
 	var h http.Handler = mux
 	h = middleware.RateLimit(rate.Limit(10), 20, 5*time.Minute)(h)
@@ -57,7 +61,9 @@ func (s *Server) Routes() http.Handler {
 	return h
 }
 
-// v0 only uses cookie. mobile will need header
+// authFromCookie authenticates a request from the access_token cookie,
+// returning the verified user id (JWT sub claim). v0 is cookie-only;
+// mobile clients will need an Authorization-header path alongside this.
 func (s *Server) authFromCookie(r *http.Request) (string, error) {
 	c, err := r.Cookie("access_token")
 	if err != nil {

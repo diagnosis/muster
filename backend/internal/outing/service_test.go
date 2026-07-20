@@ -29,6 +29,11 @@ func seedJoinRequest(outingID, hikerID uuid.UUID, status RequestStatus, role Rol
 	f.requests[r.ID] = r
 	return r
 }
+func seedJoinRequestWithCreatedAt(outingID, hikerID uuid.UUID, status RequestStatus, role Role, f *fakeStore, guest int, createdAt time.Time) *JoinRequest {
+	r := &JoinRequest{ID: uuid.New(), OutingID: outingID, HikerID: hikerID, Status: status, Guests: guest, Role: role, CreatedAt: createdAt}
+	f.requests[r.ID] = r
+	return r
+}
 
 // --- RequestJoin ---
 
@@ -494,4 +499,113 @@ func Test_Cancel_RandomCancelsEvent(t *testing.T) {
 
 	err := svc.Cancel(context.Background(), randomID, o.ID)
 	wantStatus(t, err, apperr.CodeForbidden)
+}
+
+func Test_ListUpcoming_SortedOpenFuture(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	host := uuid.New()
+
+	late := seedOuting(6, 2, StatusOpen, host, f)
+
+	far := &Outing{ID: uuid.New(), HostID: host, StartsAt: time.Now().Add(64 * time.Hour), MaxSize: 6, HostSeats: 2, Status: StatusOpen}
+	soon := &Outing{ID: uuid.New(), HostID: host, StartsAt: time.Now().Add(12 * time.Hour), MaxSize: 6, HostSeats: 2, Status: StatusOpen}
+	f.outings[far.ID], f.outings[soon.ID] = far, soon
+
+	got, err := svc.ListUpcoming(context.Background())
+	if err != nil {
+		t.Fatalf("ListUpcoming: %v", err)
+	}
+	if len(got) != 3 {
+		t.Errorf("expected 3 outings, got %d", len(got))
+	}
+
+	wantOrder := []uuid.UUID{soon.ID, late.ID, far.ID}
+	for i, id := range wantOrder {
+		if got[i].ID != id {
+			t.Errorf("position %d: got %s, want %s", i, got[i].ID, id)
+		}
+	}
+
+}
+
+func Test_PendingRequests_QueueOrder(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+
+	o := seedOuting(7, 2, StatusOpen, hostID, f)
+	r1 := seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now())
+	r2 := seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
+	r3 := seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
+
+	pendingRequests, err := svc.PendingRequests(context.Background(), hostID, o.ID)
+	if err != nil {
+		t.Fatalf("ListUpcomingRequest: %v", err)
+	}
+	if len(pendingRequests) != 3 {
+		t.Errorf("expected 3 outings, got %d", len(pendingRequests))
+	}
+	wantOrder := []uuid.UUID{r2.ID, r1.ID, r3.ID}
+	for i, r := range wantOrder {
+		if pendingRequests[i].ID != r {
+			t.Errorf("position %d: got %s, want %s", i, pendingRequests[i].ID, r)
+		}
+	}
+
+}
+
+func Test_PendingRequests_Leaked(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+
+	o := seedOuting(7, 2, StatusOpen, hostID, f)
+	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusAccepted, RoleDriver, f, 1, time.Now())
+	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusDeclined, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
+	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
+
+	pendingRequests, err := svc.PendingRequests(context.Background(), hostID, o.ID)
+	if err != nil {
+		t.Fatalf("ListUpcomingRequest: %v", err)
+	}
+	if len(pendingRequests) != 1 {
+		t.Errorf("expected 1 outings, got %d", len(pendingRequests))
+	}
+	if pendingRequests[0].Status != RequestStatusRequested {
+		t.Errorf("expected StatusRequested got%v", pendingRequests[0].Status)
+	}
+
+}
+
+func Test_PendingRequests_Forbidden(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+
+	o := seedOuting(7, 2, StatusOpen, hostID, f)
+	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now())
+	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
+	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
+	unknownHost := uuid.New()
+	_, err := svc.PendingRequests(context.Background(), unknownHost, o.ID)
+	wantStatus(t, err, apperr.CodeForbidden)
+
+}
+func Test_PendingRequests_EmptyNotNil(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+	o := seedOuting(7, 2, StatusOpen, hostID, f)
+
+	got, err := svc.PendingRequests(context.Background(), hostID, o.ID)
+	if err != nil {
+		t.Fatalf("PendingRequests: %v", err)
+	}
+	if got == nil {
+		t.Error("expected empty slice, got nil — list contract is [] never null")
+	}
+	if len(got) != 0 {
+		t.Errorf("expected 0 requests, got %d", len(got))
+	}
 }
