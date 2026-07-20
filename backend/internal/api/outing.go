@@ -270,3 +270,23 @@ func (s *Server) handlePendingRequests(w http.ResponseWriter, r *http.Request) {
 
 	responder.JSON(w, http.StatusOK, jrs, correlationID)
 }
+
+// handleMyOutings returns the caller's hosted and joined outings, each soonest first
+func (s *Server) handleMyOutings(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	hikerID, err := getAuthenticatedUserID(r)
+	if err != nil {
+		logger.Warn(r.Context(), "outings: auth failed on my outings", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	myOutings, err := s.outings.MyOutings(r.Context(), hikerID)
+	if err != nil {
+		logger.Warn(r.Context(), "outings: my outings failed", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	responder.JSON(w, http.StatusOK, myOutings, correlationID)
+}

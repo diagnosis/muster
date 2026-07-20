@@ -296,6 +296,66 @@ func (s *OutingStore) SetOutingStatus(ctx context.Context, id uuid.UUID, status 
 	return nil
 }
 
+// ListForHiker returns the outings the hiker hosts and the ones they've joined (accepted requests only), each soonest first.
+func (s *OutingStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*outing.MyOutings, error) {
+	hostingQuery := `
+	SELECT id, host_id, title, destination, meet_label, meet_lat, meet_lng,
+			starts_at, max_size, host_seats, cost_per_seat_cents, difficulty, pace, notes, status,
+			created_at, updated_at
+		FROM outings
+		WHERE host_id = $1 
+		ORDER BY starts_at
+`
+	joinedQuery := `
+	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat,
+			o.meet_lng, o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents,
+			o.difficulty, o.pace, o.notes, o.status, o.created_at, o.updated_at
+		FROM outings o 
+		JOIN join_requests jr ON jr.outing_id = o.id
+		WHERE jr.hiker_id = $1 AND jr.status = 'accepted'
+		ORDER BY o.starts_at
+`
+	myOutings := &outing.MyOutings{
+		Hosting: []outing.Outing{},
+		Joined:  []outing.Outing{},
+	}
+
+	rowsHosting, err := s.pool.Query(ctx, hostingQuery, hikerID)
+	if err != nil {
+		return nil, apperr.Database("failed to list hosting outings", "my_outings: select hosting outings failed", err)
+	}
+	defer rowsHosting.Close()
+	for rowsHosting.Next() {
+		hostingOuting, scanErr := scanOuting(rowsHosting)
+		if scanErr != nil {
+			return nil, apperr.Database("failed to list hosting outings", "my_outings: scan hosting outings failed", scanErr)
+		}
+		myOutings.Hosting = append(myOutings.Hosting, *hostingOuting)
+	}
+	if err = rowsHosting.Err(); err != nil {
+		return nil, apperr.Database("failed to list hosting outings", "my_outings: iterate hosting outings failed", err)
+	}
+
+	rowsJoined, err := s.pool.Query(ctx, joinedQuery, hikerID)
+	if err != nil {
+		return nil, apperr.Database("failed to list joined outings", "my_outings: select joined outings failed", err)
+	}
+	defer rowsJoined.Close()
+
+	for rowsJoined.Next() {
+		joinedOuting, scanErr := scanOuting(rowsJoined)
+		if scanErr != nil {
+			return nil, apperr.Database("failed to list joined outings", "my_outings: scan joined outings failed", scanErr)
+		}
+		myOutings.Joined = append(myOutings.Joined, *joinedOuting)
+	}
+	if err = rowsJoined.Err(); err != nil {
+		return nil, apperr.Database("failed to list joined outings", "my_outings: iterate joined outings failed", err)
+	}
+
+	return myOutings, nil
+}
+
 func scanOuting(row pgx.Row) (*outing.Outing, error) {
 	o := &outing.Outing{}
 	err := row.Scan(

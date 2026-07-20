@@ -17,6 +17,7 @@ type Storage interface {
 	GetOuting(ctx context.Context, id uuid.UUID) (*Outing, error)
 	SetOutingStatus(ctx context.Context, id uuid.UUID, s Status) error
 	ListUpcoming(ctx context.Context, now time.Time) ([]Outing, error)
+	ListForHiker(ctx context.Context, hikerID uuid.UUID) (*MyOutings, error)
 
 	CreateJoinRequest(ctx context.Context, r *JoinRequest) error
 	GetJoinRequest(ctx context.Context, id uuid.UUID) (*JoinRequest, error)
@@ -313,4 +314,9 @@ func (s *Service) PendingRequests(ctx context.Context, hostID, outingID uuid.UUI
 		return nil, apperr.Forbidden("only the host can view pending requests", "forbidden: non-host listing pending requests")
 	}
 	return s.store.ListJoinRequests(ctx, outingID, RequestStatusRequested)
+}
+
+// MyOutings returns the outings the hiker hosts and the ones they've joined (accepted only), each soonest first.
+func (s *Service) MyOutings(ctx context.Context, hikerID uuid.UUID) (*MyOutings, error) {
+	return s.store.ListForHiker(ctx, hikerID)
 }

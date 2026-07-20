@@ -134,3 +134,32 @@ func (f *fakeStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, st
 	})
 	return jrs, nil
 }
+
+func (f *fakeStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*MyOutings, error) {
+	myOutings := &MyOutings{
+		Hosting: []Outing{},
+		Joined:  []Outing{},
+	}
+	for _, o := range f.outings {
+		if o.HostID == hikerID {
+			myOutings.Hosting = append(myOutings.Hosting, *o)
+		}
+	}
+	for _, r := range f.requests {
+		if r.HikerID == hikerID && r.Status == RequestStatusAccepted {
+			o, err := f.GetOuting(ctx, r.OutingID)
+			if err != nil {
+				return nil, err
+			}
+			myOutings.Joined = append(myOutings.Joined, *o)
+		}
+	}
+	sort.Slice(myOutings.Hosting, func(i, j int) bool {
+		return myOutings.Hosting[i].StartsAt.Before(myOutings.Hosting[j].StartsAt)
+	})
+	sort.Slice(myOutings.Joined, func(i, j int) bool {
+		return myOutings.Joined[i].StartsAt.Before(myOutings.Joined[j].StartsAt)
+	})
+
+	return myOutings, nil
+}

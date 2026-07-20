@@ -15,6 +15,11 @@ func seedOuting(maxSize, hostSeats int, status Status, hostID uuid.UUID, f *fake
 	f.outings[o.ID] = o
 	return o
 }
+func seedOutingWithStartTime(maxSize, hostSeats int, status Status, hostID uuid.UUID, f *fakeStore, startTime time.Time) *Outing {
+	o := &Outing{ID: uuid.New(), HostID: hostID, StartsAt: startTime, MaxSize: maxSize, HostSeats: hostSeats, Status: status}
+	f.outings[o.ID] = o
+	return o
+}
 
 func wantStatus(t *testing.T, err error, want apperr.Status) {
 	t.Helper()
@@ -541,7 +546,7 @@ func Test_PendingRequests_QueueOrder(t *testing.T) {
 
 	pendingRequests, err := svc.PendingRequests(context.Background(), hostID, o.ID)
 	if err != nil {
-		t.Fatalf("ListUpcomingRequest: %v", err)
+		t.Fatalf("PendingRequests: %v", err)
 	}
 	if len(pendingRequests) != 3 {
 		t.Errorf("expected 3 outings, got %d", len(pendingRequests))
@@ -608,4 +613,91 @@ func Test_PendingRequests_EmptyNotNil(t *testing.T) {
 	if len(got) != 0 {
 		t.Errorf("expected 0 requests, got %d", len(got))
 	}
+}
+
+func Test_MyOutings_Buckets(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hikerID := uuid.New()
+	_ = seedOuting(6, 2, StatusOpen, hikerID, f)
+	_ = seedOuting(4, 2, StatusCancelled, hikerID, f)
+	approvedJoin := seedOuting(6, 3, StatusOpen, uuid.New(), f)
+	_ = seedJoinRequest(approvedJoin.ID, hikerID, RequestStatusAccepted, RoleRider, f, 0)
+	pendingJoin := seedOuting(5, 3, StatusOpen, uuid.New(), f)
+	_ = seedJoinRequest(pendingJoin.ID, hikerID, RequestStatusRequested, RoleDriver, f, 0)
+	declinedJoin := seedOuting(5, 3, StatusOpen, uuid.New(), f)
+	_ = seedJoinRequest(declinedJoin.ID, hikerID, RequestStatusDeclined, RoleRider, f, 1)
+	withDrawnJoin := seedOuting(7, 4, StatusOpen, uuid.New(), f)
+	_ = seedJoinRequest(withDrawnJoin.ID, hikerID, RequestStatusWithdrawn, RoleRider, f, 1)
+
+	myOutings, err := svc.MyOutings(context.Background(), hikerID)
+	if err != nil {
+		t.Fatalf("MyOutings: %v", err)
+	}
+	if len(myOutings.Hosting) != 2 {
+		t.Errorf("hosting: len = %d, want 2", len(myOutings.Hosting))
+	}
+	if len(myOutings.Joined) != 1 {
+		t.Errorf("joined: len = %d, want 1", len(myOutings.Joined))
+	}
+	if len(myOutings.Joined) == 1 && myOutings.Joined[0].ID != approvedJoin.ID {
+		t.Errorf("joined[0] = %s, want %s", myOutings.Joined[0].ID, approvedJoin.ID)
+	}
+}
+func Test_MyOutings_Sorted(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hikerID := uuid.New()
+	earlySelf := seedOutingWithStartTime(6, 4, StatusOpen, hikerID, f, time.Now().Add(24*time.Hour))
+	lateSelf := seedOutingWithStartTime(6, 4, StatusOpen, hikerID, f, time.Now().Add(7*24*time.Hour))
+
+	earlyOther := seedOutingWithStartTime(6, 4, StatusOpen, uuid.New(), f, time.Now().Add(2*24*time.Hour))
+	_ = seedJoinRequest(earlyOther.ID, hikerID, RequestStatusAccepted, RoleRider, f, 1)
+	lateOther := seedOutingWithStartTime(6, 4, StatusOpen, uuid.New(), f, time.Now().Add(10*24*time.Hour))
+	_ = seedJoinRequest(lateOther.ID, hikerID, RequestStatusAccepted, RoleDriver, f, 1)
+
+	myOutings, err := svc.MyOutings(context.Background(), hikerID)
+	if err != nil {
+		t.Fatalf("MyOutings: %v", err)
+	}
+	wantedOrderSelf := []uuid.UUID{earlySelf.ID, lateSelf.ID}
+	for i, id := range wantedOrderSelf {
+		if myOutings.Hosting[i].ID != id {
+			t.Errorf("expected %s got %s", id, myOutings.Hosting[i].ID)
+		}
+	}
+	wantedOrderOther := []uuid.UUID{earlyOther.ID, lateOther.ID}
+	for i, id := range wantedOrderOther {
+		if myOutings.Joined[i].ID != id {
+			t.Errorf("expected %s got %s", id, myOutings.Joined[i].ID)
+		}
+	}
+
+}
+
+func Test_MyOutings_EmptyNotNil(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hikerID := uuid.New()
+
+	myOutings, err := svc.MyOutings(context.Background(), hikerID)
+	if err != nil {
+		t.Fatalf("MyOutings: %v", err)
+	}
+
+	gotHosting := myOutings.Hosting
+	gotJoined := myOutings.Joined
+	if gotHosting == nil {
+		t.Error("expected empty slice, got nil — list contract is [] never null")
+	}
+	if len(gotHosting) != 0 {
+		t.Errorf("expected 0 requests, got %d", len(gotHosting))
+	}
+	if gotJoined == nil {
+		t.Error("expected empty slice, got nil — list contract is [] never null")
+	}
+	if len(gotJoined) != 0 {
+		t.Errorf("expected 0 requests, got %d", len(gotJoined))
+	}
+
 }
