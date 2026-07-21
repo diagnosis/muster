@@ -29,6 +29,9 @@ type Storage interface {
 	// <= max_size); a rider needs cap room AND seat room (people + 1 +
 	// guests <= min(seat capacity, max_size)). Full => apperr.Conflict.
 	AcceptIfCapacity(ctx context.Context, requestID uuid.UUID) error
+
+	Roster(ctx context.Context, outingID uuid.UUID) ([]Member, error)
+	HostMember(ctx context.Context, hikerID uuid.UUID) (*Member, error)
 }
 
 // Service implements outing business rules over a Storage.
@@ -319,4 +322,57 @@ func (s *Service) PendingRequests(ctx context.Context, hostID, outingID uuid.UUI
 // MyOutings returns the outings the hiker hosts and the ones they've joined (accepted only), each soonest first.
 func (s *Service) MyOutings(ctx context.Context, hikerID uuid.UUID) (*MyOutings, error) {
 	return s.store.ListForHiker(ctx, hikerID)
+}
+
+// Detail assembles the full view of one outing for one viewer: outing, host card, accepted roster, derived seat math, and — when viewerID is non-nil — the viewer's own request if any.
+func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid.UUID) (*Detail, error) {
+	o, err := s.store.GetOuting(ctx, outingID)
+	if err != nil {
+		return nil, err
+	}
+	host, err := s.store.HostMember(ctx, o.HostID)
+	if err != nil {
+		return nil, err
+	}
+	roster, err := s.store.Roster(ctx, outingID)
+	if err != nil {
+		return nil, err
+	}
+	acceptedRequests, err := s.store.ListJoinRequests(ctx, outingID, RequestStatusAccepted)
+	if err != nil {
+		return nil, err
+	}
+	var myReq *JoinRequest
+	if viewerID != nil {
+		myReq, err = s.store.GetJoinRequestByHiker(ctx, outingID, *viewerID)
+		if err != nil {
+			if se, ok := apperr.AsStatusErr(err); !ok || se.Status != apperr.CodeNotFound {
+				return nil, err
+			}
+			myReq = nil // no request — normal, page renders without it
+		}
+	}
+	peopleCount := 1
+	seatCapacity := o.HostSeats
+	for _, r := range acceptedRequests {
+		if r.Role == RoleDriver {
+			seatCapacity += r.SeatsOffered
+		}
+		peopleCount += 1 + r.Guests
+	}
+	seatsShort := max(0, peopleCount-seatCapacity)
+	spotsLeft := max(0, min(seatCapacity, o.MaxSize)-peopleCount)
+
+	detail := &Detail{
+		Outing:       *o,
+		Host:         *host,
+		Roster:       roster,
+		MyRequest:    myReq,
+		SeatCapacity: seatCapacity,
+		PeopleCount:  peopleCount,
+		SeatsShort:   seatsShort,
+		SpotsLeft:    spotsLeft,
+	}
+
+	return detail, nil
 }

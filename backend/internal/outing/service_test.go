@@ -20,6 +20,11 @@ func seedOutingWithStartTime(maxSize, hostSeats int, status Status, hostID uuid.
 	f.outings[o.ID] = o
 	return o
 }
+func seedMember(hikerID uuid.UUID, name, experience string, f *fakeStore) *Member {
+	m := &Member{HikerID: hikerID, Name: name, Experience: experience}
+	f.hikers[hikerID] = m
+	return m
+}
 
 func wantStatus(t *testing.T, err error, want apperr.Status) {
 	t.Helper()
@@ -31,6 +36,12 @@ func wantStatus(t *testing.T, err error, want apperr.Status) {
 
 func seedJoinRequest(outingID, hikerID uuid.UUID, status RequestStatus, role Role, f *fakeStore, guest int) *JoinRequest {
 	r := &JoinRequest{ID: uuid.New(), OutingID: outingID, HikerID: hikerID, Status: status, Guests: guest, Role: role}
+	f.requests[r.ID] = r
+	return r
+}
+
+func seedJoinRequestWithSeatsOffered(outingID, hikerID uuid.UUID, status RequestStatus, role Role, f *fakeStore, guest int, seatsOffered int) *JoinRequest {
+	r := &JoinRequest{ID: uuid.New(), OutingID: outingID, HikerID: hikerID, Status: status, Guests: guest, Role: role, SeatsOffered: seatsOffered}
 	f.requests[r.ID] = r
 	return r
 }
@@ -698,6 +709,142 @@ func Test_MyOutings_EmptyNotNil(t *testing.T) {
 	}
 	if len(gotJoined) != 0 {
 		t.Errorf("expected 0 requests, got %d", len(gotJoined))
+	}
+
+}
+
+func Test_Detail_FullAssembly(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+	driverHiker := uuid.New()
+	riderHiker := uuid.New()
+
+	o := seedOuting(8, 2, StatusOpen, hostID, f)
+	_ = seedMember(hostID, "Safa", "experienced", f)
+
+	_ = seedJoinRequestWithSeatsOffered(o.ID, driverHiker, RequestStatusAccepted, RoleDriver, f, 1, 4)
+	m1 := seedMember(driverHiker, "mahmut", "beginner", f)
+
+	_ = seedJoinRequest(o.ID, riderHiker, RequestStatusAccepted, RoleRider, f, 0)
+	m2 := seedMember(riderHiker, "celil", "intermediate", f)
+
+	detail, err := svc.Detail(context.Background(), o.ID, nil)
+	if err != nil {
+		t.Fatalf("Detail Full: %v", err)
+	}
+	if len(detail.Roster) != 2 {
+		t.Errorf("expected 2 got %d", len(detail.Roster))
+	}
+	if detail.PeopleCount != 4 {
+		t.Errorf("expected 4 got %d", detail.PeopleCount)
+	}
+	if detail.SeatCapacity != 6 {
+		t.Errorf("expected 6 got %d", detail.SeatCapacity)
+	}
+	if detail.SpotsLeft != 2 {
+		t.Errorf("expected 2 got %d", detail.SpotsLeft)
+	}
+	if detail.SeatsShort != 0 {
+		t.Errorf("expected 0 got %d", detail.SeatsShort)
+	}
+
+	if detail.Host.Name != "Safa" {
+		t.Errorf("expected Safa got %s", detail.Host.Name)
+	}
+
+	wantedRosterOrder := []uuid.UUID{m2.HikerID, m1.HikerID}
+	for i, idx := range wantedRosterOrder {
+		if detail.Roster[i].HikerID != idx {
+			t.Errorf("expected memberid: %s and got: %s", idx, detail.Roster[i].HikerID)
+		}
+	}
+
+}
+
+func Test_Detail_SeatsShortage(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+	o := seedOuting(10, 2, StatusOpen, hostID, f)
+	_ = seedMember(hostID, "hostman", "experienced", f)
+	r1 := seedJoinRequest(o.ID, uuid.New(), RequestStatusAccepted, RoleRider, f, 0)
+	_ = seedMember(r1.HikerID, "Yamal", "beginner", f)
+	r2 := seedJoinRequest(o.ID, uuid.New(), RequestStatusAccepted, RoleRider, f, 0)
+	_ = seedMember(r2.HikerID, "suluman", "beginner", f)
+
+	detail, err := svc.Detail(context.Background(), o.ID, nil)
+	if err != nil {
+		t.Fatalf("Detail Shortage Test: %v", err)
+	}
+	if detail.SeatsShort != 1 {
+		t.Errorf("expected seat shortage 1 but got %d", detail.SeatsShort)
+	}
+	if detail.SpotsLeft != 0 {
+		t.Errorf("expected 0 spots left in shortage, got %d", detail.SpotsLeft)
+	}
+}
+
+func Test_Detail_MyRequest(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+	o := seedOuting(10, 2, StatusOpen, hostID, f)
+	_ = seedMember(hostID, "hostest", "experienced", f)
+	r1 := seedJoinRequest(o.ID, uuid.New(), RequestStatusAccepted, RoleRider, f, 0)
+	_ = seedMember(r1.HikerID, "FreeMan", "beginner", f)
+
+	// viewer WITH a request → attached
+	detailOfRequester, err := svc.Detail(context.Background(), o.ID, &r1.HikerID)
+	if err != nil {
+		t.Fatalf("requester view: %v", err)
+	}
+	if detailOfRequester.MyRequest == nil {
+		t.Fatal("expected MyRequest populated for viewer with a request, got nil")
+	}
+	if detailOfRequester.MyRequest.ID != r1.ID {
+		t.Errorf("expected request %s got %s", r1.ID, detailOfRequester.MyRequest.ID)
+	}
+
+	// viewer WITHOUT a request → nil, and crucially no error (the swallow)
+	stranger := uuid.New()
+	detailOfStranger, err := svc.Detail(context.Background(), o.ID, &stranger)
+	if err != nil {
+		t.Fatalf("stranger view must not error: %v", err)
+	}
+	if detailOfStranger.MyRequest != nil {
+		t.Error("expected nil MyRequest for viewer without a request")
+	}
+}
+
+func Test_Detail_RosterExcludesNonAccepted(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hostID := uuid.New()
+	o := seedOuting(10, 2, StatusOpen, hostID, f)
+	seedMember(hostID, "combu", "experienced", f)
+	accepted := uuid.New()
+	requested := uuid.New()
+	declined := uuid.New()
+	_ = seedJoinRequest(o.ID, accepted, RequestStatusAccepted, RoleRider, f, 0)
+	seedMember(accepted, "javier", "experienced", f)
+	_ = seedJoinRequest(o.ID, declined, RequestStatusDeclined, RoleRider, f, 0)
+	seedMember(declined, "mazlum", "beginner", f)
+	_ = seedJoinRequest(o.ID, requested, RequestStatusRequested, RoleRider, f, 0)
+	seedMember(requested, "kalu", "intermediate", f)
+
+	detail, err := svc.Detail(context.Background(), o.ID, nil)
+	if err != nil {
+		t.Fatalf("error on detail:%v", err)
+	}
+	if detail.PeopleCount != 2 {
+		t.Errorf("expected people count was 2 but got %d", detail.PeopleCount)
+	}
+	if len(detail.Roster) != 1 {
+		t.Errorf("expected roster size was 1 but git %d", len(detail.Roster))
+	}
+	if len(detail.Roster) == 1 && detail.Roster[0].HikerID != accepted {
+		t.Errorf("roster[0] = %s, want the accepted hiker %s", detail.Roster[0].HikerID, accepted)
 	}
 
 }

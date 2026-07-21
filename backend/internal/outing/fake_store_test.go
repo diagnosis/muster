@@ -12,12 +12,14 @@ import (
 type fakeStore struct {
 	outings  map[uuid.UUID]*Outing
 	requests map[uuid.UUID]*JoinRequest
+	hikers   map[uuid.UUID]*Member
 }
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
 		outings:  map[uuid.UUID]*Outing{},
 		requests: map[uuid.UUID]*JoinRequest{},
+		hikers:   map[uuid.UUID]*Member{},
 	}
 }
 
@@ -162,4 +164,27 @@ func (f *fakeStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*MyOut
 	})
 
 	return myOutings, nil
+}
+
+func (f *fakeStore) Roster(ctx context.Context, outingID uuid.UUID) ([]Member, error) {
+	members := []Member{}
+	for _, r := range f.requests {
+		if r.OutingID == outingID && r.Status == RequestStatusAccepted {
+			if m, ok := f.hikers[r.HikerID]; ok {
+				members = append(members, *m)
+			}
+		}
+	}
+	sort.Slice(members, func(i, j int) bool {
+		return members[i].Name < members[j].Name
+	})
+	return members, nil
+}
+
+func (f *fakeStore) HostMember(ctx context.Context, hikerID uuid.UUID) (*Member, error) {
+	m, ok := f.hikers[hikerID]
+	if !ok {
+		return nil, apperr.NotFound("hiker not found", "fake: no member")
+	}
+	return m, nil
 }
