@@ -356,6 +356,57 @@ func (s *OutingStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*out
 	return myOutings, nil
 }
 
+// Roster returns the outing's accepted members, sorted by name.
+func (s *OutingStore) Roster(ctx context.Context, outingID uuid.UUID) ([]outing.Member, error) {
+	q := `SELECT h.id, h.name, h.experience 
+			FROM join_requests jr
+			JOIN hikers h ON h.id = jr.hiker_id
+			WHERE jr.outing_id = $1 AND jr.status = 'accepted'
+			ORDER BY h.name
+`
+	members := []outing.Member{}
+	rows, err := s.pool.Query(ctx, q, outingID)
+	if err != nil {
+		return nil, apperr.Database("failed to list Roster from Join request", "roster: select roster from join requests failed", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		m, merr := scanMember(rows)
+		if merr != nil {
+			return nil, apperr.Database("failed to list Roster from Join request", "roster: scan member into roster failed", merr)
+		}
+		members = append(members, *m)
+	}
+	if rows.Err() != nil {
+		return nil, apperr.Database("failed to list Roster from Join Request", "roster: iterate member for roster failed", rows.Err())
+	}
+	return members, nil
+}
+
+// HostMember returns the hiker's public member card.
+func (s *OutingStore) HostMember(ctx context.Context, hikerID uuid.UUID) (*outing.Member, error) {
+	q := `SELECT id, name, experience FROM hikers WHERE id = $1`
+
+	host, err := scanMember(s.pool.QueryRow(ctx, q, hikerID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperr.NotFound("hiker not found", "host_member: no row for id")
+		}
+		return nil, apperr.Database("failed to load host member", "host_member: select hikers by id failed", err)
+	}
+	return host, nil
+}
+
+func scanMember(row pgx.Row) (*outing.Member, error) {
+	m := &outing.Member{}
+	err := row.Scan(
+		&m.HikerID,
+		&m.Name,
+		&m.Experience,
+	)
+	return m, err
+}
+
 func scanOuting(row pgx.Row) (*outing.Outing, error) {
 	o := &outing.Outing{}
 	err := row.Scan(
