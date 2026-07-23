@@ -40,3 +40,18 @@ func pathUUID(r *http.Request, name string) (uuid.UUID, error) {
 	}
 	return id, nil
 }
+
+// optionalUserID extracts the authenticated user ID if a valid session
+// cookie is present. Unlike getAuthenticatedUserID, absence or invalidity
+// is not an error: public pages render anonymously for stale cookies.
+func optionalUserID(r *http.Request) (uuid.UUID, bool) {
+	idStr, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		return uuid.Nil, false
+	}
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return id, true
+}

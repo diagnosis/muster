@@ -38,6 +38,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/auth/signup", s.handleSignup)
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
 	mux.HandleFunc("POST /api/auth/refresh", s.handleRefresh)
+	// optionalAuth
+	optionalAuth := middleware.OptionalAuth(s.authFromCookie)
+
 	// protected auth routes
 	requireAuth := middleware.RequireAuth(s.authFromCookie)
 	mux.Handle("POST /api/auth/logout", requireAuth(http.HandlerFunc(s.handleLogout)))
@@ -45,6 +48,7 @@ func (s *Server) Routes() http.Handler {
 
 	// public outing routes
 	mux.HandleFunc("GET /api/outings", s.handleListUpcoming)
+	mux.Handle("GET /api/outings/{id}", optionalAuth(http.HandlerFunc(s.handleDetail)))
 	// protected outing routes
 	mux.Handle("POST /api/outings", requireAuth(http.HandlerFunc(s.handleCreateOuting)))
 	mux.Handle("POST /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handleRequestJoin)))
@@ -55,6 +59,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/outings/{id}/cancel", requireAuth(http.HandlerFunc(s.handleCancelOuting)))
 	mux.Handle("GET /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handlePendingRequests)))
 	mux.Handle("GET /api/me/outings", requireAuth(http.HandlerFunc(s.handleMyOutings)))
+
 	var h http.Handler = mux
 	h = middleware.RateLimit(rate.Limit(10), 20, 5*time.Minute)(h)
 	h = middleware.CorrelationID()(h)

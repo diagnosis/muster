@@ -6,6 +6,7 @@ import (
 	"github.com/diagnosis/go-toolkit/v2/logger"
 	"github.com/diagnosis/go-toolkit/v2/responder"
 	"github.com/diagnosis/muster/internal/outing"
+	"github.com/google/uuid"
 )
 
 // handleCreateOuting creates a new outing hosted by the authenticated
@@ -289,4 +290,29 @@ func (s *Server) handleMyOutings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	responder.JSON(w, http.StatusOK, myOutings, correlationID)
+}
+
+// handleDetail returns the full public view of one outing ({id} = outing id): host card, roster, seat math — personalized with my_request when a valid session rides along.
+func (s *Server) handleDetail(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	var viewerID *uuid.UUID
+	if id, ok := optionalUserID(r); ok {
+		viewerID = &id
+	}
+	outingID, err := pathUUID(r, "id")
+	if err != nil {
+		logger.Warn(r.Context(), "outing: invalid outing id on detail", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	detail, err := s.outings.Detail(r.Context(), outingID, viewerID)
+	if err != nil {
+		logger.Warn(r.Context(), "outing: detail failed", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	responder.JSON(w, http.StatusOK, detail, correlationID)
+
 }
