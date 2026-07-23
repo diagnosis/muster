@@ -67,6 +67,55 @@ func (s *OutingStore) GetOuting(ctx context.Context, id uuid.UUID) (*outing.Outi
 	return o, nil
 }
 
+// UpdateOuting persists the full outing row (12 patchable fields;
+// status and host are deliberately not in the SET list). NotFound
+// if the id matches no row.
+func (s *OutingStore) UpdateOuting(ctx context.Context, o *outing.Outing) error {
+	q := `
+		UPDATE outings
+		SET 
+			title = $1, 
+			destination = $2, 
+			meet_label = $3, 
+			meet_lat = $4, 
+			meet_lng = $5,
+			starts_at = $6, 
+			max_size = $7, 
+			host_seats = $8, 
+			cost_per_seat_cents = $9, 
+			difficulty = $10, 
+			pace = $11, 
+			notes = $12,
+			updated_at = NOW()
+		WHERE id = $13
+	`
+
+	cmdTag, err := s.pool.Exec(ctx, q,
+		o.Title,
+		o.Destination,
+		o.MeetLabel,
+		o.MeetLat,
+		o.MeetLng,
+		o.StartsAt,
+		o.MaxSize,
+		o.HostSeats,
+		o.CostPerSeatCents,
+		o.Difficulty,
+		o.Pace,
+		o.Notes,
+		o.ID,
+	)
+	if err != nil {
+		return apperr.Database("could not update outing", "update_outing: failed to execute statement", err)
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return apperr.NotFound("outing not found", "update_outing: no row matches id")
+	}
+
+	return nil
+}
+
 // ListUpcoming returns open outings starting after now, soonest first.
 func (s *OutingStore) ListUpcoming(ctx context.Context, now time.Time) ([]outing.Outing, error) {
 	q := `

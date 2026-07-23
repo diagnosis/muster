@@ -188,3 +188,11 @@ func (f *fakeStore) HostMember(ctx context.Context, hikerID uuid.UUID) (*Member,
 	}
 	return m, nil
 }
+
+func (f *fakeStore) UpdateOuting(ctx context.Context, o *Outing) error {
+	if _, ok := f.outings[o.ID]; !ok {
+		return apperr.NotFound("outing not found", "fake: no outing to update")
+	}
+	f.outings[o.ID] = o
+	return nil
+}

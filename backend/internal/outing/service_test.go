@@ -11,12 +11,26 @@ import (
 
 // --- helper methods --
 func seedOuting(maxSize, hostSeats int, status Status, hostID uuid.UUID, f *fakeStore) *Outing {
-	o := &Outing{ID: uuid.New(), HostID: hostID, StartsAt: time.Now().Add(48 * time.Hour), MaxSize: maxSize, HostSeats: hostSeats, Status: status}
+	o := &Outing{
+		ID: uuid.New(), HostID: hostID,
+		Title: "seeded outing", Destination: "seeded dest", MeetLabel: "seeded meet",
+		StartsAt: time.Now().Add(48 * time.Hour),
+		MaxSize:  maxSize, HostSeats: hostSeats,
+		Difficulty: DifficultyModerate, Pace: PaceRelaxed,
+		Status: status,
+	}
 	f.outings[o.ID] = o
 	return o
 }
 func seedOutingWithStartTime(maxSize, hostSeats int, status Status, hostID uuid.UUID, f *fakeStore, startTime time.Time) *Outing {
-	o := &Outing{ID: uuid.New(), HostID: hostID, StartsAt: startTime, MaxSize: maxSize, HostSeats: hostSeats, Status: status}
+	o := &Outing{
+		ID: uuid.New(), HostID: hostID,
+		Title: "seeded outing", Destination: "seeded dest", MeetLabel: "seeded meet",
+		StartsAt: startTime,
+		MaxSize:  maxSize, HostSeats: hostSeats,
+		Difficulty: DifficultyModerate, Pace: PaceRelaxed,
+		Status: status,
+	}
 	f.outings[o.ID] = o
 	return o
 }
@@ -847,4 +861,84 @@ func Test_Detail_RosterExcludesNonAccepted(t *testing.T) {
 		t.Errorf("roster[0] = %s, want the accepted hiker %s", detail.Roster[0].HikerID, accepted)
 	}
 
+}
+
+func Test_Update_HappyPatch(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	host := uuid.New()
+	o := seedOuting(6, 3, StatusOpen, host, f)
+	updatedTitle := "updated title"
+	updatedSize := 5
+	titleAndSizeUpdated, err := svc.Update(context.Background(), host, o.ID, UpdateInput{Title: &updatedTitle, MaxSize: &updatedSize})
+	if err != nil {
+		t.Fatalf("failed to update:%v", err)
+	}
+	if titleAndSizeUpdated.MaxSize != 5 {
+		t.Errorf("expected maxsize: %d, got %d", 5, titleAndSizeUpdated.MaxSize)
+	}
+	if titleAndSizeUpdated.Title != "updated title" {
+		t.Errorf("expected title: %s, got %s", "updated title", titleAndSizeUpdated.Title)
+	}
+
+}
+
+func Test_Update_NonHostForbidden(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	host := uuid.New()
+	o := seedOuting(6, 3, StatusOpen, host, f)
+	updatedTitle := "updated title"
+	updatedSize := 5
+	_, err := svc.Update(context.Background(), uuid.New(), o.ID, UpdateInput{Title: &updatedTitle, MaxSize: &updatedSize})
+	wantStatus(t, err, apperr.CodeForbidden)
+}
+
+func Test_Update_CancelledConflicts(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	host := uuid.New()
+	o := seedOuting(6, 3, StatusCancelled, host, f)
+	updatedTitle := "updated title"
+	updatedSize := 5
+	_, err := svc.Update(context.Background(), host, o.ID, UpdateInput{Title: &updatedTitle, MaxSize: &updatedSize})
+	wantStatus(t, err, apperr.CodeConflict)
+}
+
+func Test_Update_PastBadRequest(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	host := uuid.New()
+	o := seedOutingWithStartTime(6, 3, StatusOpen, host, f, time.Now().Add(-2*time.Hour))
+	updatedTitle := "won't matter"
+	_, err := svc.Update(context.Background(), host, o.ID, UpdateInput{Title: &updatedTitle})
+	wantStatus(t, err, apperr.CodeBadRequest)
+}
+
+func Test_Update_SeatShrinkAllowed(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	host := uuid.New()
+	o := seedOuting(6, 3, StatusOpen, host, f)
+	updatedHostSeats := 0
+	updated, err := svc.Update(context.Background(), host, o.ID, UpdateInput{HostSeats: &updatedHostSeats})
+	if err != nil {
+		t.Fatalf("failed to shrink seats: %v", err)
+	}
+	if updated.HostSeats != 0 {
+		t.Errorf("returned host seats = %d, want 0", updated.HostSeats)
+	}
+	if f.outings[o.ID].HostSeats != 0 {
+		t.Errorf("stored host seats = %d, want 0", f.outings[o.ID].HostSeats)
+	}
+}
+
+func Test_Update_InvalidPatchRejected(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	host := uuid.New()
+	o := seedOuting(6, 3, StatusOpen, host, f)
+	updateStart := time.Now().Add(1 * time.Hour)
+	_, err := svc.Update(context.Background(), host, o.ID, UpdateInput{StartsAt: &updateStart})
+	wantStatus(t, err, apperr.CodeBadRequest)
 }

@@ -18,6 +18,7 @@ type Storage interface {
 	SetOutingStatus(ctx context.Context, id uuid.UUID, s Status) error
 	ListUpcoming(ctx context.Context, now time.Time) ([]Outing, error)
 	ListForHiker(ctx context.Context, hikerID uuid.UUID) (*MyOutings, error)
+	UpdateOuting(ctx context.Context, o *Outing) error
 
 	CreateJoinRequest(ctx context.Context, r *JoinRequest) error
 	GetJoinRequest(ctx context.Context, id uuid.UUID) (*JoinRequest, error)
@@ -71,6 +72,54 @@ type CreateInput struct {
 	Notes            *string    `json:"notes,omitempty"`
 }
 
+// UpdateInput carries a partial patch for an outing; nil fields are left unchanged.
+type UpdateInput struct {
+	Title            *string     `json:"title"`
+	Destination      *string     `json:"destination"`
+	MeetLabel        *string     `json:"meet_label"`
+	MeetLat          *float64    `json:"meet_lat"`
+	MeetLng          *float64    `json:"meet_lng"`
+	StartsAt         *time.Time  `json:"starts_at"`
+	MaxSize          *int        `json:"max_size"`
+	HostSeats        *int        `json:"host_seats"`
+	CostPerSeatCents *int        `json:"cost_per_seat_cents"`
+	Difficulty       *Difficulty `json:"difficulty"`
+	Pace             *Pace       `json:"pace"`
+	Notes            *string     `json:"notes"`
+}
+
+// validateOuting checks the row-shape rules shared by Create and Update:
+// required text fields, 24h lead time, size/seat/cost bounds, enum validity.
+func validateOuting(o *Outing) error {
+
+	v := validator.New()
+	v.Required("title", o.Title)
+	v.Required("destination", o.Destination)
+	v.Required("meet_label", o.MeetLabel)
+	if verr := v.Errors(); verr != nil {
+		return verr
+	}
+	if time.Until(o.StartsAt) < minLeadTime-leadGrace {
+		return apperr.BadRequest("outing has to be at least 24 hours in advance", "under 24h lead time")
+	}
+	if o.MaxSize < 2 {
+		return apperr.BadRequest("outing size has to be at least 2", "min members violation")
+	}
+	if o.HostSeats < 0 {
+		return apperr.BadRequest("host seats cannot be negative", "negative host seats")
+	}
+	if !o.Pace.Valid() {
+		return apperr.BadRequest("invalid pace input", "invalid pace input")
+	}
+	if !o.Difficulty.Valid() {
+		return apperr.BadRequest("invalid difficulty input", "invalid difficulty")
+	}
+	if o.CostPerSeatCents < 0 {
+		return apperr.BadRequest("invalid cost per seat input", "invalid seat cost")
+	}
+	return nil
+}
+
 // Create schedules a new outing hosted by hostID. Outings must start at
 // least 24 hours in the future so people have time to muster. MaxSize
 // caps total headcount including the host; HostSeats may be 0 (the
@@ -79,33 +128,6 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 	title := strings.TrimSpace(in.Title)
 	destination := strings.TrimSpace(in.Destination)
 	meetLabel := strings.TrimSpace(in.MeetLabel)
-
-	v := validator.New()
-	v.Required("title", title)
-	v.Required("destination", destination)
-	v.Required("meet_label", meetLabel)
-	if verr := v.Errors(); verr != nil {
-		return nil, verr
-	}
-
-	if time.Until(in.StartsAt) < minLeadTime-leadGrace {
-		return nil, apperr.BadRequest("outing has to be at least 24 hours in advance", "under 24h lead time")
-	}
-	if in.MaxSize < 2 {
-		return nil, apperr.BadRequest("outing size has to be at least 2", "min members violation")
-	}
-	if in.HostSeats < 0 {
-		return nil, apperr.BadRequest("host seats cannot be negative", "negative host seats")
-	}
-	if !in.Pace.Valid() {
-		return nil, apperr.BadRequest("invalid pace input", "invalid pace input")
-	}
-	if !in.Difficulty.Valid() {
-		return nil, apperr.BadRequest("invalid difficulty input", "invalid difficulty")
-	}
-	if in.CostPerSeatCents < 0 {
-		return nil, apperr.BadRequest("invalid cost per seat input", "invalid seat cost")
-	}
 
 	o := &Outing{
 		ID:               uuid.New(),
@@ -125,7 +147,75 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 		Status:           StatusOpen,
 	}
 
+	err := validateOuting(o)
+	if err != nil {
+		return nil, err
+	}
+
 	return o, s.store.CreateOuting(ctx, o)
+}
+
+// Update patches the host's open, future outing. Nil fields are left
+// unchanged; a "notes": null cannot clear notes in v0 (indistinguishable
+// from omission). Capacity is NOT re-checked against the roster:
+// shrinking limits below commitments is allowed — the shortage surfaces
+// in Detail and the host resolves it.
+func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in UpdateInput) (*Outing, error) {
+	o, err := s.store.GetOuting(ctx, outingID)
+	if err != nil {
+		return nil, err
+	}
+	if o.HostID != hostID {
+		return nil, apperr.Forbidden("only the host can update this outing", "forbidden: host required")
+	}
+	if o.Status == StatusCancelled {
+		return nil, apperr.Conflict("outing is cancelled", "update on cancelled outing")
+	}
+	if o.StartsAt.Before(time.Now()) {
+		return nil, apperr.BadRequest("cannot update a past outing", "outing already started")
+	}
+
+	if in.Title != nil {
+		o.Title = strings.TrimSpace(*in.Title)
+	}
+	if in.Destination != nil {
+		o.Destination = strings.TrimSpace(*in.Destination)
+	}
+	if in.MeetLabel != nil {
+		o.MeetLabel = strings.TrimSpace(*in.MeetLabel)
+	}
+	if in.MeetLat != nil {
+		o.MeetLat = in.MeetLat
+	}
+	if in.MeetLng != nil {
+		o.MeetLng = in.MeetLng
+	}
+	if in.StartsAt != nil {
+		o.StartsAt = *in.StartsAt
+	}
+	if in.MaxSize != nil {
+		o.MaxSize = *in.MaxSize
+	}
+	if in.HostSeats != nil {
+		o.HostSeats = *in.HostSeats
+	}
+	if in.CostPerSeatCents != nil {
+		o.CostPerSeatCents = *in.CostPerSeatCents
+	}
+	if in.Difficulty != nil {
+		o.Difficulty = *in.Difficulty
+	}
+	if in.Pace != nil {
+		o.Pace = *in.Pace
+	}
+	if in.Notes != nil {
+		o.Notes = in.Notes
+	}
+
+	if verr := validateOuting(o); verr != nil {
+		return nil, verr
+	}
+	return o, s.store.UpdateOuting(ctx, o)
 }
 
 // Cancel marks an open, future outing as cancelled. Host-only. Past
