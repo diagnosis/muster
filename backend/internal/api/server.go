@@ -59,7 +59,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/outings/{id}/cancel", requireAuth(http.HandlerFunc(s.handleCancelOuting)))
 	mux.Handle("GET /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handlePendingRequests)))
 	mux.Handle("GET /api/me/outings", requireAuth(http.HandlerFunc(s.handleMyOutings)))
-
+	mux.Handle("PATCH /api/outings/{id}", requireAuth(http.HandlerFunc(s.handleUpdateOuting)))
 	var h http.Handler = mux
 	h = middleware.RateLimit(rate.Limit(10), 20, 5*time.Minute)(h)
 	h = middleware.CorrelationID()(h)

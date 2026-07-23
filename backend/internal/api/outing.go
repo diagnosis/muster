@@ -316,3 +316,39 @@ func (s *Server) handleDetail(w http.ResponseWriter, r *http.Request) {
 	responder.JSON(w, http.StatusOK, detail, correlationID)
 
 }
+
+// handleUpdateOuting patches the host's open, future outing ({id} = outing id). PATCH semantics: absent/null fields are left unchanged. Host-only, enforced by the service.
+func (s *Server) handleUpdateOuting(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+
+	hostID, err := getAuthenticatedUserID(r)
+	if err != nil {
+		logger.Warn(r.Context(), "outing: auth failed on updating outing", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	outingID, err := pathUUID(r, "id")
+	if err != nil {
+		logger.Warn(r.Context(), "outing: invalid outing id on update", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	var updateInput outing.UpdateInput
+	err = decodeJSON(r, &updateInput)
+	if err != nil {
+		logger.Warn(r.Context(), "outing: bad request from update input", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	updatedOuting, err := s.outings.Update(r.Context(), hostID, outingID, updateInput)
+	if err != nil {
+		logger.Warn(r.Context(), "outing: failed to update outing", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	responder.JSON(w, http.StatusOK, updatedOuting, correlationID)
+
+}
