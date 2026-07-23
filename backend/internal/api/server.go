@@ -46,6 +46,8 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/auth/logout", requireAuth(http.HandlerFunc(s.handleLogout)))
 	mux.Handle("GET /api/auth/me", requireAuth(http.HandlerFunc(s.handleMe)))
 
+	mux.Handle("PATCH /api/me/profile", requireAuth(http.HandlerFunc(s.handleUpdateProfile)))
+
 	// public outing routes
 	mux.HandleFunc("GET /api/outings", s.handleListUpcoming)
 	mux.Handle("GET /api/outings/{id}", optionalAuth(http.HandlerFunc(s.handleDetail)))
@@ -60,6 +62,10 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("GET /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handlePendingRequests)))
 	mux.Handle("GET /api/me/outings", requireAuth(http.HandlerFunc(s.handleMyOutings)))
 	mux.Handle("PATCH /api/outings/{id}", requireAuth(http.HandlerFunc(s.handleUpdateOuting)))
+
+	// hikers public routes
+	mux.HandleFunc("GET /api/hikers/{id}", s.handleGetHiker)
+
 	var h http.Handler = mux
 	h = middleware.RateLimit(rate.Limit(10), 20, 5*time.Minute)(h)
 	h = middleware.CorrelationID()(h)

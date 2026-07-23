@@ -126,6 +126,58 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	responder.JSON(w, http.StatusOK, h, correlationID)
 
 }
+func (s *Server) handleGetHiker(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+
+	hikerID, err := pathUUID(r, "id")
+	if err != nil {
+		logger.Warn(r.Context(), "hiker: invalid hiker id on get hiker", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	h, err := s.hikers.GetByID(r.Context(), hikerID)
+	if err != nil {
+		logger.Warn(r.Context(), "hiker: failed to fetch hiker", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	responder.JSON(w, http.StatusOK, map[string]any{
+		"id":         h.ID,
+		"name":       h.Name,
+		"experience": h.Experience,
+	}, correlationID)
+
+}
+
+func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+
+	hikerID, err := getAuthenticatedUserID(r)
+	if err != nil {
+		logger.Warn(r.Context(), "hiker: auth failed on updating hiker", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	var updated hiker.UpdateProfileInput
+	err = decodeJSON(r, &updated)
+	if err != nil {
+		logger.Warn(r.Context(), "hiker: bad request on update profile", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	updatedHiker, err := s.hikers.UpdateProfile(r.Context(), hikerID, updated)
+	if err != nil {
+		logger.Warn(r.Context(), "hiker: failed to update profile", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	responder.JSON(w, http.StatusOK, updatedHiker, correlationID)
+
+}
 
 func (s *Server) setSessionCookies(w http.ResponseWriter, sess *hiker.Session) {
 	secure := s.cfg.App.Env != "dev" // hardcoded true would eat cookies on localhost http
