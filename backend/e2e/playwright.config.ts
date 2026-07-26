@@ -6,9 +6,9 @@ dotenv.config({ path: '.env' });
 export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
-  fullyParallel: false,
-  workers: 1, // capacity/state-machine specs share DB state — keep it serial
-  retries: process.env.CI ? 1 : 0,
+  fullyParallel: true,
+  workers: 8, // safe: per-test actors + unique data, no shared state (TEST-DESIGN.md)
+  retries: 0,
 
   reporter: [
     ['list'],

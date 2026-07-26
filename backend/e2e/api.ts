@@ -23,3 +23,15 @@ export const requestJoin = (ctx: APIRequestContext, outingID: string, overrides 
 
 export const accept = (ctx: APIRequestContext, requestID: string) =>
     ctx.post(`/api/requests/${requestID}/accept`);
+
+export const withdraw  = (ctx: APIRequestContext, outingID: string)=>
+    ctx.delete(`/api/outings/${outingID}/requests/me`)
+
+export const decline = (ctx: APIRequestContext, requestID: string) =>
+    ctx.post(`/api/requests/${requestID}/decline`)
+
+export const removeMember= (ctx: APIRequestContext, requestID: string) =>
+    ctx.delete(`/api/requests/${requestID}/member`)
+
+export const getDetail = (ctx: APIRequestContext, outingID: string)=>
+    ctx.get(`/api/outings/${outingID}`)

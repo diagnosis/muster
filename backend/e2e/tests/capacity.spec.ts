@@ -1,61 +1,9 @@
 import {expect, test} from '@playwright/test'
 import {asUser} from "../fixtures";
 import {accept, createOuting, requestJoin} from "../api";
+import {JoinRequestResponse, OutingResponse} from "../types";
 
 const BASE = "http://localhost:8088"
-
-
-interface OutingRequest {
-    title: string
-    destination: string
-    meet_label: string
-    starts_at: string
-    max_size: number
-    host_seats: number
-    cost_per_seat_cents: number
-    difficulty: 'hard'|'easy'|'moderate'
-    pace: 'relaxed' | 'fast' | 'moderate'
-}
-
-interface OutingResponse {
-    id: string
-    host_id: string
-    title: string
-    destination: string
-    meet_label: string
-    starts_at: string
-    max_size: number
-    host_seats: number
-    cost_per_seat_cents: number
-    difficulty: 'hard'|'easy'|'moderate'
-    pace: 'relaxed' | 'fast' | 'moderate'
-}
-
-
-
-interface JoinRequest {
-    outing_id: string
-    role: 'rider'|'driver'
-    seats_offered: number
-    guests: number
-    note?: string
-}
-interface JoinRequestResponse {
-    id: string
-    outing_id: string
-    hiker_id: string
-    status: 'requested'|'accepted'|'declined'|'withdrawn'
-    role: 'rider'|'driver'
-    seats_offered: number
-    guests: number
-}
-
-interface MeResponse {
-    id: string
-    email: string
-    name: string
-    experience: string
-}
 
 test.describe('capacity', ()=> {
     test(`
