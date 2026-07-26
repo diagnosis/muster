@@ -1,3 +1,6 @@
 .env
 jar.txt
 .idea
+/backend/e2e/node_modules
+/backend/e2e/test-results
+/backend/e2e/playwright-report

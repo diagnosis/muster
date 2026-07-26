@@ -67,7 +67,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/hikers/{id}", s.handleGetHiker)
 
 	var h http.Handler = mux
-	h = middleware.RateLimit(rate.Limit(10), 20, 5*time.Minute)(h)
+	h = middleware.RateLimit(rate.Limit(s.cfg.RateLimiter.RPS), int(s.cfg.RateLimiter.Burst), 5*time.Minute)(h)
 	h = middleware.CorrelationID()(h)
 	return h
 }

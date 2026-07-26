@@ -1,4 +1,4 @@
-.PHONY: fmt lint build test check run psql migrate-up migrate-down migrate-status migrate-create
+.PHONY: fmt lint build test check run psql migrate-up migrate-down migrate-status migrate-create e2e
 
 -include .env
 export
@@ -42,3 +42,6 @@ migrate-status:
 
 migrate-create:
 	@goose -dir migrations create $(name) sql
+
+e2e:
+	cd e2e && npx playwright test
