@@ -40,3 +40,19 @@ export interface DetailResponse {
     seats_short: number
     spots_left: number
 }
+
+export interface UpdateInput {
+    title?: string
+    destination?: string
+    meet_label?: string
+    meet_lat?: number
+    meet_lng?: number
+    starts_at?:string
+    max_size?: number
+    host_seats?: number
+    cost_per_seat_cents?: number
+    difficulty?: 'easy' | 'moderate' | 'hard'
+    pace?: 'relaxed' | 'moderate' | 'fast'
+    notes?: string
+}
+

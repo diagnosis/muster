@@ -1,5 +1,6 @@
 // e2e/api.ts
 import { APIRequestContext } from '@playwright/test';
+import {UpdateInput} from "./types";
 
 export const defaultOuting = () => ({
     title: 'Red Mountain',
@@ -35,3 +36,10 @@ export const removeMember= (ctx: APIRequestContext, requestID: string) =>
 
 export const getDetail = (ctx: APIRequestContext, outingID: string)=>
     ctx.get(`/api/outings/${outingID}`)
+
+export const updateOuting = (ctx: APIRequestContext, outingID: string, data:UpdateInput)=>
+    ctx.patch(`/api/outings/${outingID}`, {data})
+
+export const cancelOuting = (ctx: APIRequestContext, outingID: string) =>
+    ctx.post(`/api/outings/${outingID}/cancel`)
+
