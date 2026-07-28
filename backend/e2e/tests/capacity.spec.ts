@@ -1,10 +1,9 @@
 import {expect, test} from '@playwright/test'
-import {asUser} from "../fixtures";
+import {asUser,BASE} from "../fixtures";
 import {accept, createOuting, getDetail, requestJoin} from "../api";
 import {DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
 import {unwrap} from "../envelope";
 
-const BASE = "http://localhost:8088"
 
 test.describe('capacity', ()=> {
     test(`

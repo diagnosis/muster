@@ -1,10 +1,9 @@
 import {expect, test} from '@playwright/test'
-import {asUser} from "../fixtures";
+import {asUser,BASE} from "../fixtures";
 import {cancelOuting, createOuting, updateOuting} from "../api";
 import {OutingResponse} from "../types";
 import {unwrap, unwrapError} from "../envelope";
 
-const BASE = "http://localhost:8088"
 
 test.describe("outing-crud actions", ()=> {
     test("create validation rejects bad inputs", async () =>{

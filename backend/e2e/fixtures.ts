@@ -3,8 +3,7 @@ import { request, APIRequestContext } from '@playwright/test'
 import {RegisterRequest} from "./types";
 
 
-
-
+export const BASE = process.env.BASE_URL ?? 'http://localhost:8088';
 export async function asUser(
     baseURL: string,
     overrides: Partial<RegisterRequest> = {},

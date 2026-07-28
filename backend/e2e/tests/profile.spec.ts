@@ -1,10 +1,9 @@
 import {expect, request, test} from '@playwright/test'
-import {asUser} from "../fixtures";
+import {asUser,BASE} from "../fixtures";
 import {createOuting, getDetail, getHiker, getMe, updateProfile} from "../api";
 import {DetailResponse, MemberCard, MeResponse, OutingResponse} from "../types";
 import {unwrap} from "../envelope";
 
-const BASE = "http://localhost:8088"
 test.describe("profile", ()=>{
     test('profile patch propagates to me and detail host card', async () => {
         const { ctx: ctxHost } = await asUser(BASE);

@@ -1,11 +1,9 @@
 import { test, expect } from '@playwright/test';
-import {asUser} from '../fixtures'
+import {asUser, BASE} from '../fixtures'
 import {unwrap} from "../envelope";
 import {getMe, login, logout, refresh, signup} from "../api";
 import {MeResponse, RegisterRequest} from "../types";
 
-
-const BASE = 'http://localhost:8088'
 
 
 

@@ -1,10 +1,9 @@
 import {expect, request, test} from '@playwright/test'
-import {asUser} from "../fixtures";
+import {asUser, BASE} from "../fixtures";
 import {accept, createOuting, getDetail, requestJoin, updateOuting} from "../api";
 import {DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
 import {unwrap} from "../envelope";
 
-const BASE = "http://localhost:8088"
 test.describe("detail", ()=>{
     test("anonymous full assembly", async () =>{
         const {ctx: ctxHost} = await asUser(BASE)
