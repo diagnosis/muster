@@ -1,0 +1,71 @@
+# .github/workflows/ci.yml
+name: CI
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: backend/go.mod }
+      - run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - run: go install github.com/pressly/goose/v3/cmd/goose@latest
+      - run: make check
+
+  e2e:
+    needs: check
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: backend/go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: 'lts/*' }
+      - run: go install github.com/pressly/goose/v3/cmd/goose@latest
+
+      - name: Create Neon branch
+        id: neon
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          parent: main
+          branch_name: ci-${{ github.run_id }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          username: ''
+
+      - name: Migrate
+        run: goose -dir ./migrations postgres "${{ steps.neon.outputs.db_url_with_pooler }}" up
+
+      - name: Boot server
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url_with_pooler }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          RATE_LIMIT_RPS: "100"
+          RATE_LIMIT_BURST: "200"
+        run: |
+          go build -o muster ./cmd/muster
+          ./muster &
+          curl --retry 15 --retry-delay 2 --retry-connrefused -sf http://localhost:8088/api/health
+
+      - name: Install e2e deps
+        run: npm ci
+        working-directory: backend/e2e
+
+      - name: Run suite
+        env: { BASE_URL: "http://localhost:8088" }
+        run: make e2e
+
+      - name: Delete Neon branch
+        if: always()
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch: ci-${{ github.run_id }}
+          api_key: ${{ secrets.NEON_API_KEY }}

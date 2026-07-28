@@ -45,3 +45,9 @@ migrate-create:
 
 e2e:
 	cd e2e && npx playwright test
+
+NEON_PROJECT_ID ?= cold-hall-53463147
+E2E_PARENT ?= main
+
+e2e-branch:  ## fresh 24h-TTL Neon branch + migrations; prints DATABASE_URL
+	sh scripts/e2e-branch.sh

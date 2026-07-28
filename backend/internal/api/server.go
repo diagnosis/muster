@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/diagnosis/go-toolkit/v2/logger"
 	"github.com/diagnosis/go-toolkit/v2/middleware"
+	"github.com/diagnosis/go-toolkit/v2/responder"
 	"github.com/diagnosis/go-toolkit/v2/secure"
 	"github.com/diagnosis/muster/internal/config"
 	"github.com/diagnosis/muster/internal/hiker"
@@ -34,6 +36,7 @@ func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner,
 // Routes returns the fully wired HTTP handler.
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", s.handleHealth)
 	// public auth routes
 	mux.HandleFunc("POST /api/auth/signup", s.handleSignup)
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
@@ -86,4 +89,12 @@ func (s *Server) authFromCookie(r *http.Request) (string, error) {
 	}
 	return claims.Sub, nil
 
+}
+
+// handleHealth reports liveness; used by CI's boot probe and the Playwright webServer block.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	responder.JSON(w, http.StatusOK, map[string]string{
+		"status": "ok",
+	}, correlationID)
 }
