@@ -13,7 +13,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with: { go-version-file: backend/go.mod }
-      - run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - name: Install golangci-lint v2
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin latest
       - run: go install github.com/pressly/goose/v3/cmd/goose@latest
       - run: make check
 
@@ -37,7 +38,7 @@ jobs:
           parent: main
           branch_name: ci-${{ github.run_id }}
           api_key: ${{ secrets.NEON_API_KEY }}
-          username: ''
+          username: neondb_owner
 
       - name: Migrate
         run: goose -dir ./migrations postgres "${{ steps.neon.outputs.db_url_with_pooler }}" up
