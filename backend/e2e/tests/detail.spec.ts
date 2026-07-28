@@ -2,63 +2,46 @@ import {expect, request, test} from '@playwright/test'
 import {asUser} from "../fixtures";
 import {accept, createOuting, getDetail, requestJoin, updateOuting} from "../api";
 import {DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
+import {unwrap} from "../envelope";
 
 const BASE = "http://localhost:8088"
 test.describe("detail", ()=>{
     test("anonymous full assembly", async () =>{
         const {ctx: ctxHost} = await asUser(BASE)
-        let res = await createOuting(ctxHost)
-        expect(res.status()).toBe(201)
-
-        const outingData: OutingResponse = (await res.json())['data']
+        const outing = await unwrap<OutingResponse>(createOuting(ctxHost), 201)
         const {ctx: ctxRider} = await asUser(BASE)
-        res = await requestJoin(ctxRider, outingData.id)
-        expect(res.status()).toBe(201)
-        const joinRequestData: JoinRequestResponse = (await res.json())['data']
+        const joinRequest = await unwrap<JoinRequestResponse>(requestJoin(ctxRider, outing.id), 201)
 
-        res = await accept(ctxHost, joinRequestData.id)
+        const res = await accept(ctxHost, joinRequest.id)
         expect(res.status()).toBe(200)
 
         const ctxAnonymous = await request.newContext({baseURL:BASE})
-        res = await getDetail(ctxAnonymous, outingData.id)
-        expect(res.status()).toBe(200)
-        const details: DetailResponse = (await res.json())['data']
+        const detail = await unwrap<DetailResponse>(getDetail(ctxAnonymous, outing.id), 200)
 
-        expect(details.roster.length).toBe(1)
-        expect(details.host.name).toBe('Test User')
-        expect(details.seat_capacity).toBe(2)
-        expect(details.people_count).toBe(2)
-        expect(details.seats_short).toBe(0)
-        expect(details.spots_left).toBe(0)
-        expect(details.my_request).toBeUndefined()
+
+        expect(detail.roster.length).toBe(1)
+        expect(detail.host.name).toBe('Test User')
+        expect(detail.seat_capacity).toBe(2)
+        expect(detail.people_count).toBe(2)
+        expect(detail.seats_short).toBe(0)
+        expect(detail.spots_left).toBe(0)
+        expect(detail.my_request).toBeUndefined()
     });
     test("shrink surfaces shortage", async ()=> {
         const {ctx: ctxHost} = await asUser(BASE)
-        let res = await createOuting(ctxHost)
-        expect(res.status()).toBe(201)
-
-        const outingData: OutingResponse = (await res.json())['data']
-        res = await updateOuting(ctxHost, outingData.id, {host_seats:0})
+        const outing = await unwrap<OutingResponse>(createOuting(ctxHost), 201)
+        const res = await updateOuting(ctxHost, outing.id, {host_seats:0})
         expect(res.status()).toBe(200)
 
-        res = await getDetail(ctxHost, outingData.id)
-        expect(res.status()).toBe(200)
-        const details: DetailResponse = (await res.json())['data']
+        const detail = await unwrap<DetailResponse>(getDetail(ctxHost, outing.id), 200)
 
-        expect(details.seats_short).toBe(1)
-        expect(details.spots_left).toBe(0)
+        expect(detail.seats_short).toBe(1)
+        expect(detail.spots_left).toBe(0)
     });
     test("empty roster", async () => {
         const {ctx: ctxHost} = await asUser(BASE)
-        let res = await createOuting(ctxHost)
-        expect(res.status()).toBe(201)
-
-        const outingData: OutingResponse = (await res.json())['data']
-
-        res = await getDetail((await request.newContext({baseURL:BASE})), outingData.id)
-        expect(res.status()).toBe(200)
-
-        const detail : DetailResponse = (await res.json())['data']
+        const outing = await unwrap<OutingResponse>(createOuting(ctxHost), 201)
+        const detail = await unwrap<DetailResponse>(getDetail(ctxHost, outing.id), 200)
         expect(detail.roster.length).toBe(0)
         expect(Array.isArray(detail.roster)).toBe(true)
     })

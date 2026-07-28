@@ -1,12 +1,8 @@
 // e2e/fixtures.ts
 import { request, APIRequestContext } from '@playwright/test'
+import {RegisterRequest} from "./types";
 
-export interface RegisterRequest{
-    email: string
-    password: string
-    name: string
-    experience: 'beginner'|'intermediate'|'experienced'
-}
+
 
 
 export async function asUser(

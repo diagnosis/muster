@@ -1,6 +1,7 @@
 // e2e/api.ts
 import { APIRequestContext } from '@playwright/test';
-import {UpdateInput} from "./types";
+import {UpdateInput, UpdateMeInput} from "./types";
+import {RegisterRequest} from "./types";
 
 export const defaultOuting = () => ({
     title: 'Red Mountain',
@@ -43,3 +44,23 @@ export const updateOuting = (ctx: APIRequestContext, outingID: string, data:Upda
 export const cancelOuting = (ctx: APIRequestContext, outingID: string) =>
     ctx.post(`/api/outings/${outingID}/cancel`)
 
+export const getMe = (ctx: APIRequestContext, headers?: Record<string, string>) =>
+    ctx.get('/api/auth/me', {headers})
+export const logout = (ctx:APIRequestContext) =>
+    ctx.post('/api/auth/logout')
+export const login = (ctx:APIRequestContext, input :{email:string, password:string}) =>
+    ctx.post('/api/auth/login', {data: input})
+export const refresh = (ctx:APIRequestContext, headers?: Record<string,string>) =>
+    ctx.post('/api/auth/refresh', {headers})
+export const signup = (ctx:APIRequestContext, input:RegisterRequest)=>
+    ctx.post('/api/auth/signup', {data:input})
+
+
+export const listOutingRequests = (ctx:APIRequestContext, outingID:string) =>
+    ctx.get(`/api/outings/${outingID}/requests`)
+
+export const updateProfile = (ctx: APIRequestContext, data:UpdateMeInput) =>
+    ctx.patch('/api/me/profile', {data})
+
+export const getHiker = (ctx: APIRequestContext, hikerID:string)=>
+    ctx.get(`/api/hikers/${hikerID}`)

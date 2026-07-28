@@ -1,5 +1,20 @@
 //e2e/types.ts
 
+
+export interface ApiEnvelope<T> {
+    data: T
+    correlation_id: string
+    timestamp: string
+}
+export interface ApiErrorBody{
+    error: {
+        status: number
+        message: string
+        correlation_id: string
+        timestamp: string
+    }
+}
+
 export interface OutingResponse {
     id: string
     host_id: string
@@ -56,3 +71,33 @@ export interface UpdateInput {
     notes?: string
 }
 
+export interface RegisterRequest{
+    email: string
+    password: string
+    name: string
+    experience: 'beginner'|'intermediate'|'experienced'
+}
+
+export interface MeResponse{
+    email:string,
+    name:string,
+    experience:string,
+    created_at: string,
+    updated_at: string,
+}
+export interface UpdateMeInput{
+    name?: string,
+    experience?: string
+}
+
+export interface MeRequest{
+    name: string
+    email: string
+    experience: string
+}
+export interface MemberCard{
+    id:string
+    email?:string
+    name:string
+    experience:'beginner'|'intermediate'|'experienced'
+}
