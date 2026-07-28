@@ -1,15 +1,34 @@
-PHONY: lint run migrate-up migrate-down migrate-status migrate-create
+.PHONY: fmt lint build test check run psql migrate-up migrate-down migrate-status migrate-create e2e
 
 -include .env
 export
 
-# linting
+# format all Go code
+fmt:
+	gofmt -w ./cmd ./internal
+
+# vet + lint
 lint:
 	golangci-lint run ./...
+
+# build everything
+build:
+	go build ./...
+
+# run all tests
+test:
+	go test ./...
+
+# the full pre-commit gate
+check: fmt lint build test
 
 # running app
 run:
 	go run cmd/muster/main.go
+
+# open a psql shell against the configured database
+psql:
+	@psql "$(DATABASE_URL)"
 
 # run migrations
 migrate-up:
@@ -23,3 +42,12 @@ migrate-status:
 
 migrate-create:
 	@goose -dir migrations create $(name) sql
+
+e2e:
+	cd e2e && npx playwright test
+
+NEON_PROJECT_ID ?= cold-hall-53463147
+E2E_PARENT ?= main
+
+e2e-branch:  ## fresh 24h-TTL Neon branch + migrations; prints DATABASE_URL
+	sh scripts/e2e-branch.sh

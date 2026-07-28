@@ -184,6 +184,52 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*Hiker, error) {
 	return s.store.GetHikerByID(ctx, id)
 }
 
+// UpdateProfileInput is a partial patch; nil fields are left unchanged.
+// v0 limitation: home_area/bio/gender cannot be cleared to null via
+// this endpoint (null is indistinguishable from omitted) — same
+// limitation as outing PATCH, resolved in v1 if needed.
+type UpdateProfileInput struct {
+	Name       *string     `json:"name"`
+	Experience *Experience `json:"experience"`
+	HomeArea   *string     `json:"home_area"`
+	Bio        *string     `json:"bio"`
+	Gender     *string     `json:"gender"`
+}
+
+// UpdateProfile patches the hiker's profile. Nil fields are left
+// unchanged; optional fields cannot be cleared to null in v0 (null is
+// indistinguishable from omitted — same limitation as outing PATCH).
+func (s *Service) UpdateProfile(ctx context.Context, hikerID uuid.UUID, in UpdateProfileInput) (*Hiker, error) {
+	h, err := s.store.GetHikerByID(ctx, hikerID)
+	if err != nil {
+		return nil, err
+	}
+	if in.Name != nil {
+		h.Name = strings.TrimSpace(*in.Name)
+	}
+	if in.Experience != nil {
+		h.Experience = *in.Experience
+	}
+	if in.HomeArea != nil {
+		h.HomeArea = in.HomeArea
+	}
+	if in.Bio != nil {
+		h.Bio = in.Bio
+	}
+	if in.Gender != nil {
+		h.Gender = in.Gender
+	}
+	v := validator.New()
+	v.Required("name", h.Name)
+	if verr := v.Errors(); verr != nil {
+		return nil, verr
+	}
+	if !h.Experience.Valid() {
+		return nil, apperr.BadRequest("experience is invalid", "invalid experience")
+	}
+	return h, s.store.UpdateHiker(ctx, h)
+}
+
 func (s *Service) mintSession(ctx context.Context, h *Hiker, platform Platform) (*Session, error) {
 	accessToken, err := s.jwt.SignAccess(h.ID.String())
 	if err != nil {

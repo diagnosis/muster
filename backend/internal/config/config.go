@@ -9,9 +9,10 @@ import (
 
 // Config holds all runtime configuration for the muster server.
 type Config struct {
-	App      *AppConfig
-	Database *DatabaseConfig
-	JWT      *JWTConfig
+	App         *AppConfig
+	Database    *DatabaseConfig
+	JWT         *JWTConfig
+	RateLimiter *RateLimiterConfig
 }
 
 // AppConfig holds app configurations. platform, env, port etc.
@@ -41,6 +42,14 @@ type JWTConfig struct {
 	Audience           string
 }
 
+// RateLimiterConfig holds the per-IP request throttle: RPS is the
+// sustained rate, Burst the short-term allowance. Env-overridable for
+// e2e runs; defaults match production shape.
+type RateLimiterConfig struct {
+	RPS   int32
+	Burst int32
+}
+
 // Load reads configuration from the environment, applying defaults for
 // optional values. It returns an error if a required variable is missing
 // or any present value fails to parse.
@@ -55,12 +64,17 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	jwtConfig, err := loadJWTConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	return &Config{App: appConfig, Database: databaseConfig, JWT: jwtConfig}, nil
+	rateLimiterConfig, err := loadRateLimitConfig()
+	if err != nil {
+		return nil, err
+	}
+	return &Config{App: appConfig, Database: databaseConfig, JWT: jwtConfig, RateLimiter: rateLimiterConfig}, nil
 }
 
 func loadAppConfig() (*AppConfig, error) {
@@ -146,6 +160,21 @@ func loadJWTConfig() (*JWTConfig, error) {
 		RefreshTokenExpiry: refreshTokenExpiry,
 		Issuer:             issuer,
 		Audience:           audience,
+	}, nil
+}
+
+func loadRateLimitConfig() (*RateLimiterConfig, error) {
+	rps, err := getEnvInt32("RATE_LIMIT_RPS", 10)
+	if err != nil {
+		return nil, err
+	}
+	burst, err := getEnvInt32("RATE_LIMIT_BURST", 20)
+	if err != nil {
+		return nil, err
+	}
+	return &RateLimiterConfig{
+		RPS:   rps,
+		Burst: burst,
 	}, nil
 }
 
