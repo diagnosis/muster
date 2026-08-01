@@ -1,0 +1,15 @@
+/*src/components/OutingCard.module.css*/
+
+.card {
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 16px;
+}
+.title{
+    margin: 0 0 4px;
+    text-align: center;
+}
+.badges{
+    display:flex;
+    gap: 8px;
+}
