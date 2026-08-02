@@ -43,3 +43,36 @@ export interface Outing{
     updated_at: string
 }
 
+export interface Detail{
+    outing: Outing
+    host: Member
+    roster: Member[]
+    my_request?: JoinRequest
+    seat_capacity: number
+    people_count: number
+    seats_short: number
+    spots_left: number
+}
+
+export type Experience = 'beginner'|'intermediate'|'experienced'
+export interface Member{
+    hiker_id: string
+    name: string
+    experience: Experience
+}
+
+export type RequestStatus = 'requested'|'accepted'|'declined'|'withdrawn'
+export type HikerRole = 'rider'|'driver'
+export interface JoinRequest{
+    id: string
+    outing_id: string
+    hiker_id: string
+    status: RequestStatus
+    role: HikerRole
+    seats_offered: number
+    guests: number
+    note?: string
+    created_at: string
+    updated_at: string
+
+}
