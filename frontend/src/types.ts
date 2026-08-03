@@ -76,3 +76,11 @@ export interface JoinRequest{
     updated_at: string
 
 }
+
+export interface MeResponse{
+    email:string,
+    name:string,
+    experience:string,
+    created_at: string,
+    updated_at: string,
+}
