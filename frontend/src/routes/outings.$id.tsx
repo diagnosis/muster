@@ -1,7 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
+import {createFileRoute, Link} from '@tanstack/react-router'
 import {apiClient} from "../lib/api.ts";
 import type {Detail} from "../types.ts";
 import {useQuery} from "@tanstack/react-query";
+import {useMeQuery} from "../queries.ts";
 
 export const Route = createFileRoute('/outings/$id')({
   component: OutingDetailPage,
@@ -16,6 +17,8 @@ function OutingDetailPage() {
         }
         throw new Error(res.error.message)
     }
+
+    const {data: me} = useMeQuery()
 
     const {data:detail, isPending, error} = useQuery(
         {
@@ -46,7 +49,9 @@ function OutingDetailPage() {
         <div>
             <h1>{detail.outing.title}</h1>
             <p>{detail.outing.destination} · {starts_at_date} · {starts_at_time}</p>
-            <a href="#">Join Button</a>
+            {me
+                ? <button>Request to join</button>
+                : <Link to="/login">Request to join</Link>}
             <p>{detail.people_count} going · {detail.spots_left} of {effectiveCap} spots left</p>
             {isFull && <p>This outing is full.</p>}
             {!isFull && detail.seats_short > 0 && <p>⚠️ {detail.seats_short} more seats needed — join as a driver?</p>}
@@ -60,6 +65,7 @@ function OutingDetailPage() {
                 : detail.roster.map(m => <p key={m.hiker_id}>{m.name} · {m.experience}</p>)}
 
             {detail.outing.notes && <p>{detail.outing.notes}</p>}
+
         </div>
     </>
 }
