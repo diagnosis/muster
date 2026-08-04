@@ -1,6 +1,6 @@
 import {createFileRoute, useNavigate} from '@tanstack/react-router'
 import {useState} from "react";
-import {useMutation, useQueryClient} from "@tanstack/react-query";
+import {useMutation} from "@tanstack/react-query";
 import type {Experience, MeResponse, RegisterRequest} from "../types.ts";
 import {apiClient} from "../lib/api.ts";
 

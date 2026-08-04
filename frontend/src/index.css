@@ -1,5 +1,19 @@
 /*/src/index.css*/
 
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
 ul{
   list-style-type: none;
 }

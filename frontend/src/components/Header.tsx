@@ -3,6 +3,7 @@ import {useMeQuery} from "../queries.ts";
 import {Link, useNavigate} from "@tanstack/react-router";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient} from "../lib/api.ts";
+import styles from  "./Header.module.css"
 
 
 export function Header(){
@@ -22,14 +23,27 @@ export function Header(){
             navigate({to:'/'})
         }
     })
-    if (isPending) return null
-    if (data) return <div><span>{data.name}</span><span><button onClick={ () =>
-       logout.mutate()
-    }>Log out</button></span></div>
+    if (isPending) return (
+        <div className={styles.nav}>
+            <Link className={styles.logo} to="/">Muster</Link>
+        </div>
+    )
     return (
-        <div>
-            <Link to={'/login'}><button>Log in</button></Link>
-            <Link to={'/signup'}><button>Sign up</button></Link>
+        <div className={styles.nav}>
+            <Link className={styles.logo} to={'/'}>Muster</Link>
+            {data ? (
+                <div className={styles.loginSignup}>
+                    <span>{data.name}</span>
+                    <button onClick={ () =>
+                        logout.mutate()
+                    }>Log out</button>
+                </div>
+            ) :
+                (<div className={styles.loginSignup}>
+                <Link to={'/login'}><button>Log in</button></Link>
+                <Link to={'/signup'}><button>Sign up</button></Link>
+            </div>)
+            }
         </div>
     )
 }
