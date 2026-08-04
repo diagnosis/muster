@@ -76,6 +76,12 @@ export interface JoinRequest{
     updated_at: string
 
 }
+export interface JoinRequestInput {
+    role: HikerRole
+    seats_offered: number
+    guests: number
+    note?: string
+}
 
 export interface MeResponse{
     email:string,

@@ -3,6 +3,8 @@ import {apiClient} from "../lib/api.ts";
 import type {Detail} from "../types.ts";
 import {useQuery} from "@tanstack/react-query";
 import {useMeQuery} from "../queries.ts";
+import {useState} from "react";
+import {JoinForm} from "../components/JoinForm.tsx";
 
 export const Route = createFileRoute('/outings/$id')({
   component: OutingDetailPage,
@@ -10,6 +12,7 @@ export const Route = createFileRoute('/outings/$id')({
 
 function OutingDetailPage() {
     const {id} = Route.useParams()
+    const [showForm, setShowForm] = useState(false)
     async function getOutingByID(id:string){
        const res = await apiClient.get<Detail>(`/api/outings/${id}`)
         if (res.ok){
@@ -50,8 +53,11 @@ function OutingDetailPage() {
             <h1>{detail.outing.title}</h1>
             <p>{detail.outing.destination} · {starts_at_date} · {starts_at_time}</p>
             {me
-                ? <button>Request to join</button>
+                ? detail.my_request?.status === 'requested'
+                ? <p>Requested - waiting on host</p>
+                    : <button onClick={()=> setShowForm(true)}>Request to join</button>
                 : <Link to="/login">Request to join</Link>}
+            {showForm && !detail.my_request && <JoinForm outingId={id}/>}
             <p>{detail.people_count} going · {detail.spots_left} of {effectiveCap} spots left</p>
             {isFull && <p>This outing is full.</p>}
             {!isFull && detail.seats_short > 0 && <p>⚠️ {detail.seats_short} more seats needed — join as a driver?</p>}
