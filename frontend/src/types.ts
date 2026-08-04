@@ -85,3 +85,9 @@ export interface MeResponse{
     updated_at: string,
 }
 
+export interface RegisterRequest{
+    email: string
+    password: string
+    name: string
+    experience: Experience
+}
