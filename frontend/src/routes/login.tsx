@@ -3,6 +3,7 @@ import {useState} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient} from "../lib/api.ts";
 import type {MeResponse} from "../types.ts";
+import styles from "./auth.module.css"
 
 export const Route = createFileRoute('/login')({
 
@@ -18,7 +19,7 @@ function LoginPage(){
 
     const login = useMutation({
         mutationFn: async(creds : {email: string, password: string}) => {
-            const res = await apiClient.post<MeResponse>('api/auth/login', creds)
+            const res = await apiClient.post<MeResponse>('/api/auth/login', creds)
             if (res.ok){
                 return res.data
             }
@@ -37,23 +38,28 @@ function LoginPage(){
 
     }
     return <>
-        <form onSubmit={handleSubmit}>
-            <label>Email:
+        <form className={styles.form}
+            onSubmit={handleSubmit}>
+            <h1>Log In</h1>
+            <label className={styles.label}>Email:
                 <input
+                    className={styles.input}
                     type="text"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                 />
             </label>
-            <label>Password:
+            <label className={styles.label}>Password:
                 <input
+                    className={styles.input}
                     type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                 />
             </label>
-            {login.error && <p>{login.error.message}</p>}
-            <button type="submit" disabled={login.isPending}>Log in</button>
+            {login.error && <p className={styles.error}>{login.error.message}</p>}
+            <button className={styles.button}
+                type="submit" disabled={login.isPending}>Log in</button>
         </form>
     </>
 }

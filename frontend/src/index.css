@@ -1,5 +1,8 @@
 /*/src/index.css*/
-
+:root {
+  --color-primary: #0d7377;
+  --color-primary-dark: #0a5d61;
+}
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -21,3 +24,5 @@ a{
   text-decoration:none;
   color:inherit;
 }
+
+
