@@ -147,12 +147,14 @@ func (s *OutingStore) ListUpcoming(ctx context.Context, now time.Time) ([]outing
 }
 
 // ListJoinRequests returns the outing's requests with the given status, oldest first.
-func (s *OutingStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, status outing.RequestStatus) ([]outing.JoinRequest, error) {
+func (s *OutingStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, status outing.RequestStatus) ([]outing.PendingRequest, error) {
 	q := `
-	SELECT id, outing_id, hiker_id, status, role, seats_offered, guests, note, created_at, updated_at	
-		FROM join_requests 
-		WHERE outing_id = $1 AND status = $2
-	ORDER BY created_at
+	SELECT jr.id, jr.outing_id, jr.hiker_id, jr.status, jr.role, jr.seats_offered, jr.guests, jr.note, jr.created_at, jr.updated_at,
+	       h.name, h.experience
+		FROM join_requests jr
+		JOIN hikers h ON h.id = jr.hiker_id
+		WHERE jr.outing_id = $1 AND jr.status = $2
+	ORDER BY jr.created_at
 `
 	rows, err := s.pool.Query(ctx, q, outingID, status)
 	if err != nil {
@@ -160,10 +162,10 @@ func (s *OutingStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, 
 	}
 	defer rows.Close()
 
-	jrs := []outing.JoinRequest{}
+	jrs := []outing.PendingRequest{}
 
 	for rows.Next() {
-		jr, err := scanJoinRequest(rows)
+		jr, err := scanPendingRequest(rows)
 		if err != nil {
 			return nil, apperr.Database("failed to list requests", "scan join requests failed", err)
 		}
@@ -478,6 +480,25 @@ func scanOuting(row pgx.Row) (*outing.Outing, error) {
 		&o.UpdatedAt,
 	)
 	return o, err
+}
+
+func scanPendingRequest(row pgx.Row) (*outing.PendingRequest, error) {
+	r := &outing.PendingRequest{}
+	err := row.Scan(
+		&r.ID,
+		&r.OutingID,
+		&r.HikerID,
+		&r.Status,
+		&r.Role,
+		&r.SeatsOffered,
+		&r.Guests,
+		&r.Note,
+		&r.CreatedAt,
+		&r.UpdatedAt,
+		&r.HikerName,
+		&r.HikerExperience,
+	)
+	return r, err
 }
 
 func scanJoinRequest(row pgx.Row) (*outing.JoinRequest, error) {
