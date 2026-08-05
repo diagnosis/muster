@@ -123,12 +123,16 @@ func (f *fakeStore) ListUpcoming(ctx context.Context, now time.Time) ([]Outing, 
 	return upcoming, nil
 }
 
-func (f *fakeStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, status RequestStatus) ([]JoinRequest, error) {
-	jrs := []JoinRequest{}
+func (f *fakeStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, status RequestStatus) ([]PendingRequest, error) {
+	jrs := []PendingRequest{}
 
 	for _, r := range f.requests {
 		if r.OutingID == outingID && r.Status == status {
-			jrs = append(jrs, *r)
+			jrs = append(jrs, PendingRequest{
+				JoinRequest:     *r,
+				HikerName:       "Fake Hiker",
+				HikerExperience: "beginner",
+			})
 		}
 	}
 	sort.Slice(jrs, func(i, j int) bool {

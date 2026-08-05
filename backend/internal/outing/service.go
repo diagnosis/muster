@@ -24,7 +24,7 @@ type Storage interface {
 	GetJoinRequest(ctx context.Context, id uuid.UUID) (*JoinRequest, error)
 	GetJoinRequestByHiker(ctx context.Context, outingID, hikerID uuid.UUID) (*JoinRequest, error)
 	SetJoinRequestStatus(ctx context.Context, id uuid.UUID, s RequestStatus) error
-	ListJoinRequests(ctx context.Context, outingID uuid.UUID, status RequestStatus) ([]JoinRequest, error)
+	ListJoinRequests(ctx context.Context, outingID uuid.UUID, status RequestStatus) ([]PendingRequest, error)
 	// AcceptIfCapacity flips a request from requested to accepted only if
 	// it fits, atomically: a driver needs cap room (people + 1 + guests
 	// <= max_size); a rider needs cap room AND seat room (people + 1 +
@@ -398,7 +398,7 @@ func (s *Service) ListUpcoming(ctx context.Context) ([]Outing, error) {
 // PendingRequests returns the outing's pending join requests, oldest
 // first — the host's inbox, host-only. No outing-state gate: reads
 // return history regardless of cancelled/past status.
-func (s *Service) PendingRequests(ctx context.Context, hostID, outingID uuid.UUID) ([]JoinRequest, error) {
+func (s *Service) PendingRequests(ctx context.Context, hostID, outingID uuid.UUID) ([]PendingRequest, error) {
 	o, err := s.store.GetOuting(ctx, outingID)
 	if err != nil {
 		return nil, err
