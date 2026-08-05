@@ -3,37 +3,28 @@
 import type {ApiResponse} from '../types'
 
 
-export const apiClient = {
-    get : async <T>(endpoint:string):Promise<ApiResponse<T>> => {
-        const res = await fetch(endpoint)
-        const json = await res.json().catch(()=> null)
-        if (res.ok){
-            return {ok: true, data: json?.data as T}
-        }
-        return {
-            ok: false,
-            httpStatus: res.status,
-            error: json?.error ?? {status:0, message: res.statusText || 'Request failed', timestamp: new Date().toISOString()}
-        }
 
-    },
-    post: async <T>(endpoint:string, body?:unknown): Promise<ApiResponse<T>> => {
-        const res = await fetch(endpoint, {
-            method: "POST",
-            body: JSON.stringify(body),
-            headers:{
-                'Content-type':'application/json',
-            }
-        })
-        const json = await res.json().catch(()=>null)
-        if (res.ok){
-            return {ok: true, data: json?.data as T}
-        }
-        return {
-            ok: false,
-            httpStatus: res.status,
-            error: json?.error ?? {status:0, message: res.statusText || 'Request failed', timestamp: new Date().toISOString()}
-        }
-
+const request = async <T>(endpoint:string, init?: RequestInit): Promise<ApiResponse<T>> =>{
+    const res = await fetch(endpoint, init)
+    const json = await res.json().catch(()=> null)
+    if (res.ok){
+        return {ok: true, data: json?.data as T}
     }
+    return {
+        ok: false,
+        httpStatus: res.status,
+        error: json?.error ?? {status:0, message: res.statusText || 'Request failed', timestamp: new Date().toISOString()}
+    }
+}
+
+
+export const apiClient = {
+    get :  <T>(endpoint:string) =>  request<T>(endpoint),
+    post:  <T>(endpoint:string, body?:unknown) =>
+       request<T>(endpoint, {
+           method:'POST',
+           headers: {'Content-Type': 'application/json'},
+           body: JSON.stringify(body),
+       }),
+    del:  <T>(endpoint:string): Promise<ApiResponse<T>> => request<T>(endpoint, {method:'DELETE'}),
 }

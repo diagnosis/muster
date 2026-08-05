@@ -7,9 +7,10 @@ import {useState} from "react";
 
 interface JoinProps{
     outingId: string
+    onClose: () => void
 }
 
-export function JoinForm({outingId}:JoinProps){
+export function JoinForm({outingId, onClose}:JoinProps){
     const queryClient = useQueryClient()
     const [hikerRole, setHikerRole] = useState<HikerRole|null>(null)
     const [seats, setSeats] = useState(0)
@@ -28,6 +29,7 @@ export function JoinForm({outingId}:JoinProps){
             },
             onSuccess: () => {
                 queryClient.invalidateQueries({queryKey:['outing', outingId]})
+                onClose()
             }
         }
     )
@@ -97,6 +99,10 @@ export function JoinForm({outingId}:JoinProps){
                 type={'submit'}
                 disabled={!hikerRole || joinReqMutation.isPending}
             >Request to join</button>
+            <button
+                type='button'
+                onClick={onClose}
+            >Never mind</button>
         </form>
     )
 

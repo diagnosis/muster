@@ -1,7 +1,7 @@
 // src/queries.ts
 
 
-import type {MeResponse} from "./types.ts";
+import type {Detail, MeResponse} from "./types.ts";
 import {apiClient} from "./lib/api.ts";
 import {useQuery} from "@tanstack/react-query";
 
@@ -27,4 +27,20 @@ export function useMeQuery() {
             staleTime: 5 * 60 * 1000,
         }
     )
+}
+
+
+export const getOutingByID = async (id:string) => {
+    const res = await apiClient.get<Detail>(`/api/outings/${id}`)
+    if (res.ok){
+        return res.data
+    }
+    throw new Error(res.error.message)
+}
+
+export function useOuting(id:string){
+    return useQuery({
+        queryKey:['outing', id],
+        queryFn: () => getOutingByID(id),
+    })
 }
