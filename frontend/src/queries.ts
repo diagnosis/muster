@@ -1,7 +1,7 @@
 // src/queries.ts
 
 
-import type {Detail, MeResponse} from "./types.ts";
+import type {Detail, MeResponse, PendingRequestResponse} from "./types.ts";
 import {apiClient} from "./lib/api.ts";
 import {useQuery} from "@tanstack/react-query";
 
@@ -43,4 +43,20 @@ export function useOuting(id:string){
         queryKey:['outing', id],
         queryFn: () => getOutingByID(id),
     })
+}
+
+export function useOutingJoinRequests(id: string) {
+    return useQuery(
+        {
+            queryKey:['outing-join-requests', id],
+            queryFn: async () => {
+                const res = await apiClient.get<PendingRequestResponse[]>(`/api/outings/${id}/requests`)
+                if(res.ok){
+                    return res.data
+                }
+                throw new Error(res.error.message)
+            }
+
+        }
+    )
 }

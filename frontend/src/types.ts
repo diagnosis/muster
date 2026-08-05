@@ -98,3 +98,8 @@ export interface RegisterRequest{
     name: string
     experience: Experience
 }
+
+export interface PendingRequestResponse extends JoinRequest{
+    hiker_name: string
+    hiker_experience: Experience
+}

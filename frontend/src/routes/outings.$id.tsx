@@ -5,6 +5,7 @@ import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useMeQuery, useOuting} from "../queries.ts";
 import {useState} from "react";
 import {JoinForm} from "../components/JoinForm.tsx";
+import {HostControls} from "../components/HostControls.tsx";
 
 export const Route = createFileRoute('/outings/$id')({
   component: OutingDetailPage,
@@ -37,6 +38,8 @@ function OutingDetailPage() {
     function renderSlot(detail: Detail){
         if (detail.outing.status === 'cancelled') return <p>This outing was canceled</p>
         if (!me) return <Link to="/login">Request to join</Link>
+
+        if (me.id === detail.outing.host_id) return <HostControls outingId={id}/>
 
         const st = detail.my_request?.status
         if (st === 'requested') return <>
