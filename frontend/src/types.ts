@@ -84,6 +84,7 @@ export interface JoinRequestInput {
 }
 
 export interface MeResponse{
+    id:string
     email:string,
     name:string,
     experience:string,
