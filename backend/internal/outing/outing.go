@@ -148,6 +148,13 @@ type JoinRequest struct {
 	UpdatedAt    time.Time     `json:"updated_at"`
 }
 
+// PendingRequest links a hiker and joinrequest to outing.
+type PendingRequest struct {
+	JoinRequest
+	HikerName       string `json:"hiker_name"`
+	HikerExperience string `json:"hiker_experience"`
+}
+
 // Member is a roster read-model: the public slice of a hiker as seen
 // on an outing (join_requests joined with hikers at the query level).
 type Member struct {
