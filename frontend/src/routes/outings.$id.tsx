@@ -39,7 +39,7 @@ function OutingDetailPage() {
         if (detail.outing.status === 'cancelled') return <p>This outing was canceled</p>
         if (!me) return <Link to="/login">Request to join</Link>
 
-        if (me.id === detail.outing.host_id) return <HostControls outingId={id}/>
+        if (me.id === detail.outing.host_id) return <HostControls outingId={id} detail={detail}/>
 
         const st = detail.my_request?.status
         if (st === 'requested') return <>
