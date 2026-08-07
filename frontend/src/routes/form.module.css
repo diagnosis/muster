@@ -14,10 +14,11 @@
     gap: 4px;
 }
 
-.input{
+.input {
     padding: 8px 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-subtle);   /* was #ccc */
     border-radius: 6px;
+    background: var(--surface-raised);
 }
 .button{
     padding:10px;
@@ -35,8 +36,8 @@
     opacity: 0.6;
     cursor:not-allowed;
 }
-.error{
-    color:crimson;
+.error {
+    color: var(--color-danger);   /* was crimson — token not defined yet */
 }
 
 
@@ -49,7 +50,7 @@
     flex: 1;
     text-align: center;
     padding: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-subtle);
     border-radius: 8px;
     cursor: pointer;
 }

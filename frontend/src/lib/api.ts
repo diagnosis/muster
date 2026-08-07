@@ -3,8 +3,37 @@
 import type {ApiResponse} from '../types'
 
 
+let refreshInFlight: Promise<boolean> | null = null
 
-const request = async <T>(endpoint:string, init?: RequestInit): Promise<ApiResponse<T>> =>{
+const refreshSession = () => {
+    if (refreshInFlight) return refreshInFlight
+    refreshInFlight = bareRequest('/api/auth/refresh', {
+        method:'POST',
+    })
+        .then(r => r.ok)
+        .finally(()=>{refreshInFlight = null})
+    return refreshInFlight
+}
+
+const request = async <T>(endpoint:string, init?: RequestInit):Promise<ApiResponse<T>> => {
+    const res = await bareRequest<T>(endpoint, init)
+    if (res.ok){
+        return res
+    }
+    if(res.httpStatus !== 401){
+        return res
+    }
+    const refresh = await refreshSession()
+    if(refresh){
+        return bareRequest<T>(endpoint, init)
+    }
+    return res
+}
+
+
+
+
+const bareRequest = async <T>(endpoint:string, init?: RequestInit): Promise<ApiResponse<T>> =>{
     const res = await fetch(endpoint, init)
     const json = await res.json().catch(()=> null)
     if (res.ok){

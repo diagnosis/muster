@@ -1,7 +1,23 @@
-/*/src/index.css*/
+/* /src/index.css */
+
 :root {
+  /* brand */
   --color-primary: #0d7377;
   --color-primary-dark: #0a5d61;
+
+  /* surfaces */
+  --surface-page: #F7F5EF;
+  --surface-raised: #ffffff;
+
+  /* borders */
+  --border-subtle: #E9E3D8;
+
+  /* text */
+  --color-text: #3B362B;
+  --color-text-muted: #706A5C;
+
+  /* danger */
+  --color-danger: #B3261E;
 }
 
 *, *::before, *::after {
@@ -15,14 +31,15 @@
 body {
   font-family: system-ui, sans-serif;
   line-height: 1.5;
+  background: var(--surface-page);
+  color: var(--color-text);
 }
 
-ul{
+ul {
   list-style-type: none;
 }
-a{
-  text-decoration:none;
-  color:inherit;
+
+a {
+  text-decoration: none;
+  color: inherit;
 }
-
-
