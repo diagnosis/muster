@@ -3,7 +3,8 @@
 
 import type {Detail, MeResponse, MyOutings, PendingRequestResponse} from "./types.ts";
 import {apiClient} from "./lib/api.ts";
-import {useQuery} from "@tanstack/react-query";
+import {type QueryClient, useQuery} from "@tanstack/react-query";
+import {redirect} from "@tanstack/react-router";
 
 
 export const  getMe = async () => {
@@ -79,4 +80,9 @@ export function useMyOutings(){
             }
         }
     )
+}
+
+export async function requireAuth(queryClient: QueryClient){
+    const me = await queryClient.ensureQueryData(meQueryOptions())
+    if (!me) throw redirect({to:'/login'})
 }

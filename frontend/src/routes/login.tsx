@@ -3,7 +3,7 @@ import {useState} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient} from "../lib/api.ts";
 import type {MeResponse} from "../types.ts";
-import styles from "./auth.module.css"
+import styles from "./form.module.css"
 
 export const Route = createFileRoute('/login')({
 

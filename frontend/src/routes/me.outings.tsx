@@ -1,14 +1,11 @@
-import {createFileRoute, Link, redirect} from '@tanstack/react-router'
-import {meQueryOptions, useMyOutings} from "../queries.ts";
+import {createFileRoute, Link} from '@tanstack/react-router'
+import {requireAuth, useMyOutings} from "../queries.ts";
 import {OutingCard} from "../components/OutingCard.tsx";
 
 
 
 export const Route = createFileRoute('/me/outings')({
-    beforeLoad: async ({context}) => {
-       const me = await context.queryClient.ensureQueryData(meQueryOptions())
-        if (!me) throw redirect({to:'/login'})
-    },
+    beforeLoad: async ({context}) => requireAuth(context.queryClient),
   component: MeOutingsPage,
 })
 
