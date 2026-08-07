@@ -87,9 +87,14 @@ export interface MeResponse{
     id:string
     email:string,
     name:string,
-    experience:string,
+    experience:Experience,
     created_at: string,
     updated_at: string,
+}
+
+export interface MeInputRequest{
+    name?:string
+    experience?:Experience
 }
 
 export interface RegisterRequest{

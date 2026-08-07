@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as MeOutingsRouteImport } from './routes/me.outings'
+import { Route as MeProfileRouteImport } from './routes/me.profile'
 import { Route as OutingsIdRouteImport } from './routes/outings.$id'
 import { Route as OutingsNewRouteImport } from './routes/outings.new'
 
@@ -36,6 +37,11 @@ const MeOutingsRoute = MeOutingsRouteImport.update({
   path: '/me/outings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MeProfileRoute = MeProfileRouteImport.update({
+  id: '/me/profile',
+  path: '/me/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OutingsIdRoute = OutingsIdRouteImport.update({
   id: '/outings/$id',
   path: '/outings/$id',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/me/outings': typeof MeOutingsRoute
+  '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
   '/outings/new': typeof OutingsNewRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/me/outings': typeof MeOutingsRoute
+  '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
   '/outings/new': typeof OutingsNewRoute
 }
@@ -69,22 +77,36 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/me/outings': typeof MeOutingsRoute
+  '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
   '/outings/new': typeof OutingsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/login' | '/signup' | '/me/outings' | '/outings/$id' | '/outings/new'
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/me/outings'
+    | '/me/profile'
+    | '/outings/$id'
+    | '/outings/new'
   fileRoutesByTo: FileRoutesByTo
   to:
-    '/' | '/login' | '/signup' | '/me/outings' | '/outings/$id' | '/outings/new'
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/me/outings'
+    | '/me/profile'
+    | '/outings/$id'
+    | '/outings/new'
   id:
     | '__root__'
     | '/'
     | '/login'
     | '/signup'
     | '/me/outings'
+    | '/me/profile'
     | '/outings/$id'
     | '/outings/new'
   fileRoutesById: FileRoutesById
@@ -94,6 +116,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
   MeOutingsRoute: typeof MeOutingsRoute
+  MeProfileRoute: typeof MeProfileRoute
   OutingsIdRoute: typeof OutingsIdRoute
   OutingsNewRoute: typeof OutingsNewRoute
 }
@@ -128,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MeOutingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/me/profile': {
+      id: '/me/profile'
+      path: '/me/profile'
+      fullPath: '/me/profile'
+      preLoaderRoute: typeof MeProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/outings/$id': {
       id: '/outings/$id'
       path: '/outings/$id'
@@ -150,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
   MeOutingsRoute: MeOutingsRoute,
+  MeProfileRoute: MeProfileRoute,
   OutingsIdRoute: OutingsIdRoute,
   OutingsNewRoute: OutingsNewRoute,
 }

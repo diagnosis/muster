@@ -35,7 +35,7 @@ export function Header(){
                 <div className={styles.userOutings}>
                     <Link to="/me/outings">my outings</Link>
                     <div className={styles.loginSignup}>
-                        <span>{data.name}</span>
+                        <Link to={"/me/profile"}>{data.name}</Link>
                         <button onClick={ () =>
                             logout.mutate()
                         }>Log out</button>

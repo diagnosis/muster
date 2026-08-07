@@ -27,4 +27,9 @@ export const apiClient = {
            body: JSON.stringify(body),
        }),
     del:  <T>(endpoint:string): Promise<ApiResponse<T>> => request<T>(endpoint, {method:'DELETE'}),
+    patch: <T>(endpoint:string, body?:unknown) => request<T>(endpoint, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+    })
 }
