@@ -8,6 +8,12 @@
     justify-content: space-between;
 
 }
+.userOutings{
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+    align-items: center;
+}
 .loginSignup{
     display: flex;
     flex-direction: row;

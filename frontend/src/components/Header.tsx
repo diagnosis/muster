@@ -32,12 +32,16 @@ export function Header(){
         <div className={styles.nav}>
             <Link className={styles.logo} to={'/'}>Muster</Link>
             {data ? (
-                <div className={styles.loginSignup}>
-                    <span>{data.name}</span>
-                    <button onClick={ () =>
-                        logout.mutate()
-                    }>Log out</button>
+                <div className={styles.userOutings}>
+                    <Link to="/me/outings">my outings</Link>
+                    <div className={styles.loginSignup}>
+                        <span>{data.name}</span>
+                        <button onClick={ () =>
+                            logout.mutate()
+                        }>Log out</button>
+                    </div>
                 </div>
+
             ) :
                 (<div className={styles.loginSignup}>
                 <Link to={'/login'}><button>Log in</button></Link>

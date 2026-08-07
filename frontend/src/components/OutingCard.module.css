@@ -13,3 +13,4 @@
     display:flex;
     gap: 8px;
 }
+.cancelled { color: crimson; font-size: 0.85rem; }

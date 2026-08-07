@@ -103,3 +103,8 @@ export interface PendingRequestResponse extends JoinRequest{
     hiker_name: string
     hiker_experience: Experience
 }
+
+export interface MyOutings{
+    hosting: Outing[]
+    joined: Outing[]
+}

@@ -1,7 +1,7 @@
 // src/queries.ts
 
 
-import type {Detail, MeResponse, PendingRequestResponse} from "./types.ts";
+import type {Detail, MeResponse, MyOutings, PendingRequestResponse} from "./types.ts";
 import {apiClient} from "./lib/api.ts";
 import {useQuery} from "@tanstack/react-query";
 
@@ -19,13 +19,15 @@ export const  getMe = async () => {
     }
 }
 
+export const meQueryOptions = () =>({
+    queryKey: ['me'],
+    queryFn: getMe,
+    staleTime: 5 * 60 * 1000,
+})
+
 export function useMeQuery() {
     return useQuery(
-        {
-            queryKey: ['me'],
-            queryFn: getMe,
-            staleTime: 5 * 60 * 1000,
-        }
+        meQueryOptions()
     )
 }
 
@@ -57,6 +59,24 @@ export function useOutingJoinRequests(id: string) {
                 throw new Error(res.error.message)
             }
 
+        }
+    )
+}
+
+
+// my outings
+
+export function useMyOutings(){
+    return useQuery(
+        {
+            queryKey:['my-outings'],
+            queryFn: async () => {
+                const res = await apiClient.get<MyOutings>(`/api/me/outings`)
+                if (res.ok){
+                    return res.data
+                }
+                throw new Error(res.error.message)
+            }
         }
     )
 }
