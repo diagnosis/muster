@@ -1,3 +1,5 @@
+
+// src/routes/signup.tsx
 import {createFileRoute, useNavigate} from '@tanstack/react-router'
 import {useState} from "react";
 import {useMutation} from "@tanstack/react-query";
@@ -45,7 +47,6 @@ function SignupPage() {
             <label className={styles.label}>
                 Name:
                 <input
-                    className={styles.input}
                     type="text"
                     value={name}
                     onChange={e => setName(e.target.value)}
@@ -54,7 +55,6 @@ function SignupPage() {
             <label className={styles.label}>
                 Email:
                 <input
-                    className={styles.input}
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
@@ -63,7 +63,6 @@ function SignupPage() {
             <label className={styles.label}>
                 Password:
                 <input
-                    className={styles.input}
                     type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
@@ -99,7 +98,7 @@ function SignupPage() {
                 </label>
             </div>
             {signup.error && <p className={styles.error}>{signup.error.message}</p>}
-            <button className={styles.button} type="submit" disabled={signup.isPending}>Sign up</button>
+            <button className="btn-primary" type="submit" disabled={signup.isPending || name==="" || password.length <=3 || email===""}>Sign up</button>
         </form>
     </>
 }

@@ -30,6 +30,7 @@ export function Header(){
     )
     return (
         <div className={styles.nav}>
+            <div className={styles.inner}>
             <Link className={styles.logo} to={'/'}>Muster</Link>
             {data ? (
                 <div className={styles.userOutings}>
@@ -48,6 +49,7 @@ export function Header(){
                 <Link to={'/signup'}><button>Sign up</button></Link>
             </div>)
             }
+            </div>
         </div>
     )
 }

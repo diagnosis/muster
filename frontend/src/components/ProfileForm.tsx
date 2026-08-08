@@ -31,7 +31,6 @@ export function ProfileForm({me}: ProfileFormProps){
 
     function handleProfileUpdate(e:React.SubmitEvent){
         e.preventDefault()
-        // if (!window.confirm("Update your profile?")) return
         meMutation.mutate({ name: hikerName, experience: hikerExperience })
     }
     const isDirty =
@@ -42,30 +41,22 @@ export function ProfileForm({me}: ProfileFormProps){
         !hikerExperience ||
         !isDirty ||
         meMutation.isPending
-    return <div className='profileCard'>
+    return <div>
         <form className={styles.form} onSubmit={handleProfileUpdate}>
-            <label className={styles.label}>
-                Id:
-                <p className={styles.input}>
-                    {me.id}
-                </p>
-            </label>
-            <label className={styles.label}>
-                Email:
-                <p className={styles.input}>
-                    {me.email}
-                </p>
-            </label>
+            <div className={styles.readOnlyRow}>
+                <span className={styles.readOnlyLabel}>Email:</span>
+                <span>{me.email}</span>
+            </div>
             <label className={styles.label}>
                 Name:
                 <input
-                    className={styles.input}
                     type="text"
                     value={hikerName}
                     onChange={e=>setHikerName(e.target.value)}
                 />
             </label>
-            <div className={styles.radioRow}>
+            <label className={styles.label}>Experience:
+              <div className={styles.radioRow}>
                 <label className={`${styles.radioButton} ${hikerExperience==='beginner'? styles.radioButtonChecked:""}`}>
                     <input
                         name="experience"
@@ -96,9 +87,9 @@ export function ProfileForm({me}: ProfileFormProps){
                     />
                     Experienced
                 </label>
-            </div>
-
-            <button type={"submit"} className={styles.button} disabled={isDisabled}>Submit Changes</button>
+                </div>
+            </label>
+            <button type={"submit"} className="btn-primary" disabled={isDisabled}>Submit Changes</button>
             {meMutation.error&&<p className={styles.error}>{meMutation.error.message}</p>}
         </form>
     </div>

@@ -58,7 +58,6 @@ function CreateOutingPage() {
             <h1>Create Outing</h1>
               <label className={styles.label}>Title
                   <input
-                      className={styles.input}
                       type="text"
                       value={title}
                       onChange={e => setTitle(e.target.value)}
@@ -66,7 +65,6 @@ function CreateOutingPage() {
               </label>
               <label className={styles.label}>Destination
                   <input
-                      className={styles.input}
                       type="text"
                       value={destination}
                       onChange={e => setDestination(e.target.value)}
@@ -74,7 +72,6 @@ function CreateOutingPage() {
               </label>
               <label className={styles.label}>Meet Label
                   <input
-                      className={styles.input}
                       type="text"
                       value={meet_label}
                       onChange={e => setMeet_label(e.target.value)}
@@ -82,7 +79,6 @@ function CreateOutingPage() {
               </label>
               <label className={styles.label}>Starts At
                   <input
-                      className={styles.input}
                       type="datetime-local"
                       value={startsAt}
                       onChange={e => setStartsAt(e.target.value)}
@@ -90,7 +86,6 @@ function CreateOutingPage() {
               </label>
               <label className={styles.label}>Max Size
                   <input
-                      className={styles.input}
                       type="number"
                       min={2}
                       value={max_size}
@@ -99,7 +94,6 @@ function CreateOutingPage() {
               </label>
               <label className={styles.label}>Host Seats
                   <input
-                      className={styles.input}
                       type="number"
                       min={0}
                       value={host_seats}
@@ -108,7 +102,6 @@ function CreateOutingPage() {
               </label>
               <label className={styles.label}>Cost per Seat
                     <input
-                        className={styles.input}
                         type="number"
                         min={0}
                         value={costDollar}
@@ -185,7 +178,7 @@ function CreateOutingPage() {
                     onChange={e => setNotes(e.target.value)}
                 ></textarea>
               </label>
-            <button className={styles.button} type={"submit"} disabled={!title || !destination || !startsAt || !difficulty || !pace || createMutation.isPending}>Create Outing</button>
+            <button className="btn-primary" type={"submit"} disabled={!title || !destination || !startsAt || !difficulty || !pace || createMutation.isPending}>Create Outing</button>
               {createMutation.error&&<p className={styles.error}>{createMutation.error.message}</p>}
           </form>
       </div>

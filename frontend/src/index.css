@@ -1,5 +1,5 @@
 /* /src/index.css */
-
+@import "./styles/base.css";
 :root {
   /* brand */
   --color-primary: #0d7377;

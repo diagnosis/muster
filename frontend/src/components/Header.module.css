@@ -1,11 +1,16 @@
 /*/src/components/Header.module.css*/
 
 .nav{
-    padding: var(--space-3) var(--space-4);
+    padding-block: var(--space-4);
     border-bottom: 1px solid var(--border-subtle);
-    align-items: center;
+}
+.inner{
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    max-width: var(--width-shell);
+    margin-inline: auto;
+    padding-inline: var(--space-4) ;
 }
 .userOutings{
     display: flex;

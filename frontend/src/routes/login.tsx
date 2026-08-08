@@ -1,3 +1,5 @@
+// src/routes/login.tsx
+
 import {createFileRoute, useNavigate} from '@tanstack/react-router'
 import {useState} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
@@ -43,7 +45,6 @@ function LoginPage(){
             <h1>Log In</h1>
             <label className={styles.label}>Email:
                 <input
-                    className={styles.input}
                     type="text"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
@@ -51,14 +52,13 @@ function LoginPage(){
             </label>
             <label className={styles.label}>Password:
                 <input
-                    className={styles.input}
                     type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                 />
             </label>
             {login.error && <p className={styles.error}>{login.error.message}</p>}
-            <button className={styles.button}
+            <button className="btn-primary"
                 type="submit" disabled={login.isPending}>Log in</button>
         </form>
     </>

@@ -1,0 +1,42 @@
+
+/*/src/styles/base.css*/
+/*scope will be button, input, textarea, select*/
+
+button{
+    padding: var(--space-3) var(--space-4);
+    border: solid 1px var(--border-subtle);
+    border-radius: 8px;
+    background: transparent;
+    font:inherit;
+    cursor: pointer;
+}
+button:hover{
+    background: var(--surface-raised);
+}
+button:disabled{
+    cursor: not-allowed;
+    opacity: .5;
+}
+.btn-primary{
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-on-primary);
+}
+.btn-primary:hover{
+    background: var(--color-primary-dark);
+}
+
+input:not([type="radio"]):not([type="checkbox"]),
+textarea, select {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    background: var(--surface-raised);
+    font: inherit;
+}
+textarea{
+    resize: vertical;
+    min-height: 5rem;
+}
+
+

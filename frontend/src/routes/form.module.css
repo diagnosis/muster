@@ -1,8 +1,8 @@
 /* /src/routes/form.module.css */
 
 .form{
-    max-width: 360px;
-    margin: var(--space-8) auto;
+    max-width: 28rem;
+
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
@@ -14,28 +14,7 @@
     gap: var(--space-1);
 }
 
-.input {
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border-subtle);
-    border-radius: 6px;
-    background: var(--surface-raised);
-}
-.button{
-    padding: var(--space-3);
-    border: none;
-    border-radius: 8px;
-    background: var(--color-primary);
-    color: var(--color-on-primary);
-    font-weight: 600;
-    cursor:pointer;
-}
-.button:hover{
-    background: var(--color-primary-dark);
-}
-.button:disabled{
-    opacity: 0.6;
-    cursor:not-allowed;
-}
+
 .error {
     color: var(--color-danger);
 }
@@ -77,3 +56,12 @@
 }
 
 .form h1 { text-align: center; margin-bottom: var(--space-1); }
+
+.readOnlyRow{
+    display: flex;
+    flex-direction: column;
+    gap:var(--space-1);
+}
+.readOnlyLabel{
+    color:var(--color-text-muted);
+}

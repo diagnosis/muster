@@ -1,3 +1,5 @@
+
+// src/components/JoinForm.tsx
 import type {HikerRole, JoinRequest, JoinRequestInput} from "../types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient} from "../lib/api.ts";
@@ -67,7 +69,6 @@ export function JoinForm({outingId, onClose}:JoinProps){
             <label className={styles.label}>
                 Seats Offered:
                 <input
-                    className={styles.input}
                     type="number"
                     min={0}
                     value={seats}
@@ -78,7 +79,6 @@ export function JoinForm({outingId, onClose}:JoinProps){
             <label className={styles.label}>
                 Guests:
                 <input
-                    className={styles.input}
                     type="number"
                     min={0}
                     max={3}
@@ -95,7 +95,7 @@ export function JoinForm({outingId, onClose}:JoinProps){
             </label>
             {joinReqMutation.error && <p className={styles.error}>{joinReqMutation.error.message}</p>}
             <button
-                className={styles.button}
+               className={"btn-primary"}
                 type={'submit'}
                 disabled={!hikerRole || joinReqMutation.isPending}
             >Request to join</button>
