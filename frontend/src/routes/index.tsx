@@ -4,6 +4,7 @@ import {apiClient} from "../lib/api.ts";
 import type {Outing} from "../types.ts";
 import {useQuery} from "@tanstack/react-query";
 import {OutingCard} from "../components/OutingCard.tsx";
+import styles from "./index.module.css"
 
 export const Route = createFileRoute('/')({
   component: OutingsPage,
@@ -34,10 +35,11 @@ function OutingsPage() {
         </div>
     }
     return <>
-        <div className='wrapper'>
-            <h2>Outings</h2>
+        <h2 className={styles.heading}>Outings</h2>
+        <div className={styles.list}>
+
             {outings.map(outing=>
-                <Link to={"/outings/$id"} params={{id: outing.id}} key={outing.id}><OutingCard outing={outing}/></Link>
+                <Link className={styles.cardLink} to={"/outings/$id"} params={{id: outing.id}} key={outing.id}><OutingCard outing={outing}/></Link>
 
             )}
         </div>

@@ -1,0 +1,16 @@
+
+/*src/routes/index.module.css*/
+
+
+.list{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.heading{
+    margin-bottom: var(--space-4);
+}
+.cardLink{
+    display: block;
+}

@@ -23,9 +23,14 @@ export function OutingCard({outing}: OutingCardProps){
     return <div className={styles.card}>
             <h2 className={styles.title}>{outing.title}</h2>
             {outing.status==="cancelled" && <span className={styles.cancelled}>cancelled</span>}
-            <p>{outing.destination}</p>
-            <p>{starts_at_date} - {starts_at_time}</p>
-            <p className={styles.badges}><span>{outing.difficulty}</span><span>{outing.pace}</span>{outing.cost_per_seat_cents > 0 && <span>{seat_cost}</span>}</p>
+            <p className={styles.metaLine}>{outing.destination}</p>
+            <p className={styles.metaLine}>{outing.meet_label}</p>
+            <p className={styles.metaLine}>{starts_at_date} - {starts_at_time}</p>
+            <div className={styles.badges}>
+                <span className={styles.badge}>{outing.difficulty}</span>
+                <span className={styles.badge}>{outing.pace}</span>
+                {outing.cost_per_seat_cents > 0 && <span className={styles.cost}>{seat_cost}</span>}
+            </div>
     </div>
 
 }

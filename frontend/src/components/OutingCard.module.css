@@ -1,17 +1,38 @@
 /*src/components/OutingCard.module.css*/
 
 .card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
     padding: var(--space-4);
     background: var(--surface-raised);
+    transition: border-color 140ms ease, transform 140ms ease;
 }
-.title{
-    margin: 0 0 var(--space-1);
-    text-align: center;
+.card:hover{
+    border-color: var(--color-text-muted);
+    transform: translateY(-1px);
+}
+
+.metaLine{
+    color: var(--color-text-muted);
+}
+
+.badge{
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
 }
 .badges{
-    display:flex;
+    display: flex;
     gap: var(--space-2);
+    align-items: center;
+}
+.cost{
+    font-weight: bold;
 }
 .cancelled { color: var(--color-danger); font-size: 0.85rem; }
+
