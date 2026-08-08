@@ -4,6 +4,7 @@
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
     padding: 16px;
+    background: var(--surface-raised);
 }
 .title{
     margin: 0 0 4px;
@@ -13,4 +14,4 @@
     display:flex;
     gap: 8px;
 }
-.cancelled { color: crimson; font-size: 0.85rem; }
+.cancelled { color: var(--color-danger); font-size: 0.85rem; }

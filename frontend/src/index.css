@@ -18,6 +18,8 @@
 
   /* danger */
   --color-danger: #B3261E;
+
+  --color-on-primary: #FFFFFF;
 }
 
 *, *::before, *::after {
@@ -42,4 +44,9 @@ ul {
 a {
   text-decoration: none;
   color: inherit;
+}
+
+:focus-visible{
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
