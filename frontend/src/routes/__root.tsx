@@ -3,6 +3,7 @@
 import {Outlet, createRootRouteWithContext} from '@tanstack/react-router'
 import type {QueryClient} from "@tanstack/react-query";
 import {Header} from "../components/Header.tsx";
+import styles from "./Layout.module.css"
 
 export const Route =
     createRootRouteWithContext<{queryClient:QueryClient}>()({
@@ -12,7 +13,9 @@ export const Route =
 function RouteComponent(){
     return <>
         <Header/>
-        <Outlet/>
+        <div className={styles.shell}>
+            <Outlet/>
+        </div>
     </>
 }
 

@@ -3,15 +3,15 @@
 .card {
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
-    padding: 16px;
+    padding: var(--space-4);
     background: var(--surface-raised);
 }
 .title{
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     text-align: center;
 }
 .badges{
     display:flex;
-    gap: 8px;
+    gap: var(--space-2);
 }
 .cancelled { color: var(--color-danger); font-size: 0.85rem; }

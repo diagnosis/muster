@@ -4,7 +4,6 @@ import {apiClient} from "../lib/api.ts";
 import type {Outing} from "../types.ts";
 import {useQuery} from "@tanstack/react-query";
 import {OutingCard} from "../components/OutingCard.tsx";
-import '../index.css'
 
 export const Route = createFileRoute('/')({
   component: OutingsPage,

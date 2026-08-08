@@ -1,7 +1,7 @@
 /*/src/components/Header.module.css*/
 
 .nav{
-    padding: 12px 16px;
+    padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--border-subtle);
     align-items: center;
     display: flex;
@@ -10,19 +10,17 @@
 .userOutings{
     display: flex;
     flex-direction: row;
-    gap: 5px;
+    gap: var(--space-2);
     align-items: center;
 }
 .loginSignup{
     display: flex;
     flex-direction: row;
-    gap:5px;
+    gap: var(--space-2);
     align-items: center;
 }
 
 .logo{
     font-weight: bold;
     font-size:1.25rem;
-    text-decoration: none;
-    color:inherit;
 }

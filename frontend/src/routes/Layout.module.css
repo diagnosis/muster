@@ -1,0 +1,10 @@
+
+/*src/routes/Layout.module.css*/
+
+.shell{
+    padding-inline: var(--space-4);
+    padding-block: var(--space-6);
+    max-width: var(--width-shell);
+    margin-inline: auto;
+
+}
