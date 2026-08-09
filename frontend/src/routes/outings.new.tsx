@@ -4,6 +4,7 @@ import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
 import type {CreateOutingInput, Difficulty, Outing, Pace} from "../types.ts";
 import styles from "./form.module.css"
+import layout from "./outings.new.module.css"
 import {apiClient} from "../lib/api.ts";
 
 export const Route = createFileRoute('/outings/new')({
@@ -54,8 +55,12 @@ function CreateOutingPage() {
 
   return (
       <div>
-          <form className={styles.form} onSubmit={handleSubmit}>
+          <form className={`${styles.form} ${layout.createForm}`} onSubmit={handleSubmit}>
             <h1>Create Outing</h1>
+            <div className={layout.groups}>
+              <div className={layout.group}>
+                <div className={layout.groupLabel}>Where &amp; when</div>
+                <div className={layout.fields}>
               <label className={styles.label}>Title
                   <input
                       type="text"
@@ -84,6 +89,12 @@ function CreateOutingPage() {
                       onChange={e => setStartsAt(e.target.value)}
                   />
               </label>
+                </div>
+              </div>
+
+              <div className={layout.group}>
+                <div className={layout.groupLabel}>Seats &amp; cost</div>
+                <div className={layout.fields}>
               <label className={styles.label}>Max Size
                   <input
                       type="number"
@@ -108,6 +119,12 @@ function CreateOutingPage() {
                         onChange={e => setCostDollar(Number(e.target.value))}
                     />
               </label>
+                </div>
+              </div>
+
+              <div className={layout.group}>
+                <div className={layout.groupLabel}>What it's like</div>
+                <div className={layout.fields}>
               <label className={styles.label}>Difficulty
                   <div className={styles.radioRow}>
                       <label className={`${styles.radioButton} ${difficulty === 'easy'? styles.radioButtonChecked:""}`}>
@@ -178,7 +195,10 @@ function CreateOutingPage() {
                     onChange={e => setNotes(e.target.value)}
                 ></textarea>
               </label>
-            <button className="btn-primary" type={"submit"} disabled={!title || !destination || !startsAt || !difficulty || !pace || createMutation.isPending}>Create Outing</button>
+                </div>
+              </div>
+            </div>
+            <button className={`btn-primary ${layout.submit}`} type={"submit"} disabled={!title || !destination || !startsAt || !difficulty || !pace || createMutation.isPending}>Create Outing</button>
               {createMutation.error&&<p className={styles.error}>{createMutation.error.message}</p>}
           </form>
       </div>
