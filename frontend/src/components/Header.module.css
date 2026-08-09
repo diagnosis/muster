@@ -54,6 +54,12 @@
     margin-top: var(--space-3);
     width: 100%;
 }
+.hamburgerBtn{
+    padding: 0;
+    margin:0;
+    font-size: 2rem;
+    background: none;
+}
 
 /* ---- 640px and up ---- */
 

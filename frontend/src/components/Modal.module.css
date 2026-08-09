@@ -5,6 +5,9 @@
 }
 
 .panel{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
     background: var(--surface-raised); border-radius: var(--radius-card);
     padding: var(--space-4); max-width: var(--width-modal); width: 90%;
 }

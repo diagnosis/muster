@@ -1,10 +1,12 @@
 
+//src/components/HostControls.tsx
 import {apiClient} from "../lib/api.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import type {Detail, JoinRequest, Outing, PendingRequestResponse} from "../types.ts";
 import {useOutingJoinRequests} from "../queries.ts";
 import {useState} from "react";
 import {Modal} from "./Modal.tsx";
+import styles from "./HostControls.module.css"
 
 interface HostControlsProps{
     outingId: string
@@ -67,44 +69,51 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
     }
     const requestLen = requests?.length
 
-    return <>
-        {requestsError&&<p>{requestsError.message}</p>}
-        {requestsPending&&<p>requests loading...</p>}
+    return <div className={styles.host}>
+            {requestsError&&<p>{requestsError.message}</p>}
+            {requestsPending&&<p>requests loading...</p>}
         <h3>Requests ({requestLen ?? 0})</h3>
         {requests?.map(r => (
-            <p
+            <button
+                className={styles.requestRow}
                 onClick={()=>setSelectedRequest(r)}
                 key={r.id}>
-                {r.hiker_name} · {r.role}
-                {r.guests > 0 && ` · +${r.guests} guest`}
-                {r.note && ` — "${r.note}"`}
-            </p>
+                {r.hiker_name} requests as {r.role}
+                {r.guests > 0 && ` and brings ${r.guests} guest${r.guests>1?'s':''}`}
+            </button>
         ))}
         {selectedRequest&&(
-            <Modal onClose={()=> setSelectedRequest(null)}>
-                <button onClick={()=> setSelectedRequest(null)}>close</button>
-                <h3>{selectedRequest.hiker_name} {"·"} {selectedRequest.hiker_experience}</h3>
-                <p>{selectedRequest.role}
-                    {selectedRequest.seats_offered>0 &&` · offering ${selectedRequest.seats_offered}`}
-                    {selectedRequest.guests > 0 && ` · +${selectedRequest.guests} guest`}
-                    {selectedRequest.note && <p>{selectedRequest.note}</p>}
-                    <p>Accepting adds {1+ selectedRequest.guests} - {detail.spots_left} spots left</p>
-                    {1+selectedRequest.guests > detail.spots_left && (
-                        <p>⚠️Doesn't fit right now - more seats or spots needed</p>
-                    )}
-                    <button onClick={ () => acceptMutation.mutate(selectedRequest.id)}>Accept</button>
-                    <p>{acceptMutation.error&&acceptMutation.error.message}</p>
-                    <button onClick={ () => declineMutation.mutate(selectedRequest.id)}>Decline</button>
-                    <p>{declineMutation.error&&declineMutation.error.message}</p>
-
+            <Modal onClose={() => setSelectedRequest(null)}>
+                <div className={styles.modalHeader}>
+                    <h3>{selectedRequest.hiker_name} · {selectedRequest.hiker_experience}</h3>
+                    <button className={styles.closeBtn} onClick={() => setSelectedRequest(null)}>✕</button>
+                </div>
+                <p>
+                    {selectedRequest.role}
+                    {selectedRequest.seats_offered > 0 && ` · offering ${selectedRequest.seats_offered}`}
+                    {selectedRequest.guests > 0 && `  +${selectedRequest.guests} guest`}
                 </p>
+
+                {selectedRequest.note && <p>{selectedRequest.note}</p>}
+
+                <p>Accepting adds {1 + selectedRequest.guests} — {detail.spots_left} spots left</p>
+
+                {1 + selectedRequest.guests > detail.spots_left && (
+                    <p>⚠️ Doesn't fit right now — more seats or spots needed</p>
+                )}
+
+                <div className={styles.actions}>
+                    <button className="btn-primary" onClick={() => acceptMutation.mutate(selectedRequest.id)}>Accept</button>
+                    <button className={styles.declineBtn} onClick={() => declineMutation.mutate(selectedRequest.id)}>Decline</button>
+                </div>
+                {acceptMutation.error && <p className={styles.error}>{acceptMutation.error.message}</p>}
+                {declineMutation.error && <p className={styles.error}>{declineMutation.error.message}</p>}
             </Modal>
         )}
 
-        <h2>Declined Request </h2>
-        <button onClick={handleCancel}>Cancel Outing</button>
+        <button className={styles.cancelBtn} onClick={handleCancel}>Cancel Outing</button>
+        </div>
 
-    </>
 
 
 }

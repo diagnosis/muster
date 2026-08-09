@@ -37,7 +37,7 @@ export function Header(){
         <div className={styles.nav}>
             <div className={styles.inner}>
             <Link className={styles.logo} to={'/'}>Muster</Link>
-                <button className={styles.toggle} aria-expanded={open} onClick={()=> setOpen(o => !o)}>Toggle</button>
+                <button className={`${styles.toggle} ${styles.hamburgerBtn}`} aria-expanded={open} onClick={()=> setOpen(o => !o)}>=</button>
             <div className={`${styles.panel} ${open ? styles.panelOpen : ""}`}>
                 {data ? (
                         <div className={styles.userOutings}>

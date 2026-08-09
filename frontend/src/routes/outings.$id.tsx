@@ -37,7 +37,7 @@ function OutingDetailPage() {
     }
 
     function renderSlot(detail: Detail){
-        if (detail.outing.status === 'cancelled') return <p>This outing was canceled</p>
+        if (detail.outing.status === 'cancelled') return <p>This outing was cancelled</p>
         if (!me) return <Link to="/login">Request to join</Link>
 
         if (me.id === detail.outing.host_id) return <HostControls outingId={id} detail={detail}/>
@@ -79,26 +79,39 @@ function OutingDetailPage() {
 
     const effectiveCap = Math.min(detail.seat_capacity, detail.outing.max_size)
     const isFull = detail.people_count >= detail.outing.max_size
-
+    const seat_cost = `$${(detail.outing.cost_per_seat_cents / 100).toFixed(2)}/seat `
 
     return <>
-        <div>
-            <h1 className={styles.heading}>{detail.outing.title}</h1>
-            <p>{detail.outing.destination} · {starts_at_date} · {starts_at_time}</p>
-            {renderSlot(detail)}
-            <p>{detail.people_count} going · {detail.spots_left} of {effectiveCap} spots left</p>
-            {isFull && <p>This outing is full.</p>}
-            {!isFull && detail.seats_short > 0 && <p>⚠️ {detail.seats_short} more seats needed — join as a driver?</p>}
-            {!isFull && detail.seats_short === 0 && detail.spots_left === 0 && <p>No seats left — a driver could open more spots. 🚗</p>}
-            <h3 className={styles.subheading}>Host</h3>
-            <p>{detail.host.name} · {detail.host.experience}</p>
+        <div className={styles.container}>
+            <section className={styles.section}>
+                <h1 className={styles.heading}>{detail.outing.title}</h1>
+                <p>{detail.outing.destination} · {detail.outing.meet_label} · {starts_at_date} · {starts_at_time}  {detail.outing.cost_per_seat_cents>0&&seat_cost}</p>
+            </section>
 
-            <h3 className={styles.subheading}>Who's going ({detail.roster.length})</h3>
-            {detail.roster.length === 0
-                ? <p>No members yet — be the first.</p>
-                : detail.roster.map(m => <p key={m.hiker_id}>{m.name} · {m.experience}</p>)}
+            <section className={styles.section}>
+                {renderSlot(detail)}
+            </section>
+            <section className={styles.section}>
+                <p>{detail.people_count} going · {detail.spots_left} of {effectiveCap} spots left</p>
+                {isFull && <p>This outing is full.</p>}
+                {!isFull && detail.seats_short > 0 && <p>⚠️ {detail.seats_short} more seats needed — join as a driver?</p>}
+                {!isFull && detail.seats_short === 0 && detail.spots_left === 0 && <p>No seats left — a driver could open more spots. 🚗</p>}
+            </section>
 
-            {detail.outing.notes && <p>{detail.outing.notes}</p>}
+            <section className={styles.section}>
+                <h3 className={styles.subheading}>Host</h3>
+                <p>{detail.host.name} · {detail.host.experience}</p>
+            </section>
+
+
+            <section className={styles.section}>
+                <h3 className={styles.subheading}>Who's going ({detail.roster.length})</h3>
+                {detail.roster.length === 0
+                    ? <p>No members yet — be the first.</p>
+                    : detail.roster.map(m => <p key={m.hiker_id}>{m.name} · {m.experience}</p>)}
+
+                {detail.outing.notes && <p>{detail.outing.notes}</p>}
+            </section>
 
         </div>
     </>
