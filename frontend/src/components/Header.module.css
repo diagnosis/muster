@@ -3,6 +3,7 @@
 .nav{
     padding-block: var(--space-4);
     border-bottom: 1px solid var(--border-subtle);
+    position: relative;
 }
 .inner{
     display: flex;
@@ -10,22 +11,79 @@
     align-items: center;
     max-width: var(--width-shell);
     margin-inline: auto;
-    padding-inline: var(--space-4) ;
+    padding-inline: var(--space-4);
 }
-.userOutings{
-    display: flex;
-    flex-direction: row;
-    gap: var(--space-2);
-    align-items: center;
-}
-.loginSignup{
-    display: flex;
-    flex-direction: row;
-    gap: var(--space-2);
-    align-items: center;
-}
-
 .logo{
     font-weight: bold;
-    font-size:1.25rem;
+    font-size: 1.25rem;
+}
+
+/* ---- mobile ---- */
+
+.panel{
+    display: none;
+}
+.panelOpen{
+    display: flex;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: 0 var(--space-4) var(--space-4);
+    background: var(--surface-raised);
+    border-bottom: 1px solid var(--border-subtle);
+    box-shadow: 0 8px 16px -12px rgb(59 54 43 / 0.4);
+    z-index: 20;
+}
+.userOutings,
+.loginSignup{
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+}
+.panelOpen .userOutings > a,
+.panelOpen .loginSignup > a{
+    padding-block: var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+}
+.panelOpen button{
+    margin-top: var(--space-3);
+    width: 100%;
+}
+
+/* ---- 640px and up ---- */
+
+@media (min-width: 40em){
+    .toggle{
+        display: none;
+    }
+    .panel,
+    .panelOpen{
+        display: flex;
+        position: static;
+        padding: 0;
+        background: none;
+        border: 0;
+        box-shadow: none;
+    }
+    .userOutings,
+    .loginSignup{
+        flex-direction: row;
+        align-items: center;
+        gap: var(--space-2);
+        width: auto;
+    }
+    .userOutings{
+        gap: var(--space-6);
+    }
+    .panelOpen .userOutings > a,
+    .panelOpen .loginSignup > a{
+        padding-block: 0;
+        border-bottom: 0;
+    }
+    .panelOpen button{
+        margin-top: 0;
+        width: auto;
+    }
 }
