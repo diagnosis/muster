@@ -5,6 +5,6 @@
 }
 
 .panel{
-    background: var(--surface-raised); border-radius: 12px;
+    background: var(--surface-raised); border-radius: var(--radius-card);
     padding: var(--space-4); max-width: var(--width-modal); width: 90%;
 }

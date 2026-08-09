@@ -6,6 +6,7 @@ import {useMeQuery, useOuting} from "../queries.ts";
 import {useState} from "react";
 import {JoinForm} from "../components/JoinForm.tsx";
 import {HostControls} from "../components/HostControls.tsx";
+import styles from "./outings.$id.module.css"
 
 export const Route = createFileRoute('/outings/$id')({
   component: OutingDetailPage,
@@ -82,17 +83,17 @@ function OutingDetailPage() {
 
     return <>
         <div>
-            <h1>{detail.outing.title}</h1>
+            <h1 className={styles.heading}>{detail.outing.title}</h1>
             <p>{detail.outing.destination} · {starts_at_date} · {starts_at_time}</p>
             {renderSlot(detail)}
             <p>{detail.people_count} going · {detail.spots_left} of {effectiveCap} spots left</p>
             {isFull && <p>This outing is full.</p>}
             {!isFull && detail.seats_short > 0 && <p>⚠️ {detail.seats_short} more seats needed — join as a driver?</p>}
             {!isFull && detail.seats_short === 0 && detail.spots_left === 0 && <p>No seats left — a driver could open more spots. 🚗</p>}
-            <h3>Host</h3>
+            <h3 className={styles.subheading}>Host</h3>
             <p>{detail.host.name} · {detail.host.experience}</p>
 
-            <h3>Who's going ({detail.roster.length})</h3>
+            <h3 className={styles.subheading}>Who's going ({detail.roster.length})</h3>
             {detail.roster.length === 0
                 ? <p>No members yet — be the first.</p>
                 : detail.roster.map(m => <p key={m.hiker_id}>{m.name} · {m.experience}</p>)}

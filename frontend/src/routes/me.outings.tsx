@@ -1,6 +1,7 @@
 import {createFileRoute, Link} from '@tanstack/react-router'
 import {requireAuth, useMyOutings} from "../queries.ts";
 import {OutingCard} from "../components/OutingCard.tsx";
+import styles from "./me.outings.module.css"
 
 
 
@@ -17,7 +18,7 @@ function MeOutingsPage() {
     const joinedOutings = data.joined
     return (
         <div>
-            <h2>Hosting</h2>
+            <h2 className={styles.heading}>Hosting</h2>
     {hostingOutings.length === 0
     ? <p>Not hosting anything yet.</p>
     : hostingOutings.map(o=> (
@@ -26,7 +27,7 @@ function MeOutingsPage() {
         </Link>
         ))}
 
-           <h2>Joined</h2>
+           <h2 className={styles.heading}>Joined</h2>
             {joinedOutings.length === 0
             ? <p>Not joined anything yet.</p>
                 : joinedOutings.map(o => (
