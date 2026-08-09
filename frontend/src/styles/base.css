@@ -15,10 +15,6 @@ button{
 button:hover{
     background: var(--surface-raised);
 }
-button:disabled{
-    cursor: not-allowed;
-    opacity: .5;
-}
 .btn-primary{
     background: var(--color-primary);
     border-color: var(--color-primary);
@@ -27,6 +23,18 @@ button:disabled{
 }
 .btn-primary:hover{
     background: var(--color-primary-dark);
+}
+
+/* Disabled sits on the page surface behind a dashed edge, so it reads as
+   "waiting on you" rather than as a faded-out colour. Must stay below the
+   :hover rules — button:disabled and button:hover have equal specificity,
+   so source order is what keeps hover from repainting a disabled button. */
+button:disabled,
+.btn-primary:disabled{
+    background: var(--surface-page);
+    border: 1px dashed var(--border-subtle);
+    color: var(--color-text-muted);
+    cursor: not-allowed;
 }
 
 input:not([type="radio"]):not([type="checkbox"]),

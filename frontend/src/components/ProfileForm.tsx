@@ -90,6 +90,7 @@ export function ProfileForm({me}: ProfileFormProps){
                 </div>
             </label>
             <button type={"submit"} className="btn-primary" disabled={isDisabled}>Submit Changes</button>
+            {!isDirty && <p className={styles.hint}>Nothing to save yet.</p>}
             {meMutation.error&&<p className={styles.error}>{meMutation.error.message}</p>}
         </form>
     </div>
