@@ -68,6 +68,8 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
         cancelMutation.mutate()
     }
     const requestLen = requests?.length
+    const spotsUnderMax = detail.outing.max_size - detail.people_count
+    const seatBound = detail.spots_left < spotsUnderMax
 
     return <div className={styles.host}>
             {requestsError&&<p>{requestsError.message}</p>}
@@ -96,14 +98,18 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
 
                 {selectedRequest.note && <p>{selectedRequest.note}</p>}
 
-                <p>Accepting adds {1 + selectedRequest.guests} — {detail.spots_left} spots left</p>
+                <p>Accepting adds {1 + selectedRequest.guests} {selectedRequest.guests>0?"people":"person"}
+                    {` · `}
+                    {`${detail.spots_left===0?"no spot left":detail.spots_left>1?detail.spots_left+"spots left":"only one spot left"}`}</p>
 
                 {1 + selectedRequest.guests > detail.spots_left && (
-                    <p>⚠️ Doesn't fit right now — more seats or spots needed</p>
+                    <p>⚠️ {seatBound
+                        ? "Not enough seats — someone needs to drive"
+                        : "Not enough spots — the outing is at its size limit"}</p>
                 )}
 
                 <div className={styles.actions}>
-                    <button className="btn-primary" onClick={() => acceptMutation.mutate(selectedRequest.id)}>Accept</button>
+                    <button disabled={1 + selectedRequest.guests > detail.spots_left} className="btn-primary" onClick={() => acceptMutation.mutate(selectedRequest.id)}>Accept</button>
                     <button className={styles.declineBtn} onClick={() => declineMutation.mutate(selectedRequest.id)}>Decline</button>
                 </div>
                 {acceptMutation.error && <p className={styles.error}>{acceptMutation.error.message}</p>}

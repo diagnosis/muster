@@ -85,7 +85,9 @@ function OutingDetailPage() {
         <div className={styles.container}>
             <section className={styles.section}>
                 <h1 className={styles.heading}>{detail.outing.title}</h1>
-                <p>{detail.outing.destination} · {detail.outing.meet_label} · {starts_at_date} · {starts_at_time}  {detail.outing.cost_per_seat_cents>0&&seat_cost}</p>
+                <p>{detail.outing.destination} · {detail.outing.meet_label} · {starts_at_date} · {starts_at_time}
+                    {detail.outing.cost_per_seat_cents > 0 && ` · ${seat_cost}`}
+                    </p>
             </section>
 
             <section className={styles.section}>
