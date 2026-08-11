@@ -48,6 +48,33 @@ func (s *OutingStore) CreateOuting(ctx context.Context, o *outing.Outing) error 
 	return nil
 }
 
+// UpdateJoinRequest persists the full request row — role, seats,
+// guests, note, and status. The store writes what it's given; deciding
+// which transitions are legal is the service's job.
+func (s *OutingStore) UpdateJoinRequest(ctx context.Context, jr *outing.JoinRequest) error {
+	q := ` 
+	UPDATE join_requests
+	SET role=$1,
+	    seats_offered=$2, 
+	    guests=$3,
+	    note=$4,
+	    status=$5,
+	    updated_at=NOW()
+	    WHERE
+		id = $6
+`
+	cmTag, err := s.pool.Exec(ctx, q, jr.Role, jr.SeatsOffered, jr.Guests, jr.Note, jr.Status, jr.ID)
+	if err != nil {
+		return apperr.Database("could not update join request", "update_joinRequest: failed to execute statement", err)
+	}
+	if cmTag.RowsAffected() == 0 {
+		return apperr.NotFound("joinRequest not found", "update_JoinRequest: no row matches id")
+	}
+
+	return nil
+
+}
+
 // GetOuting returns the outing with given id
 func (s *OutingStore) GetOuting(ctx context.Context, id uuid.UUID) (*outing.Outing, error) {
 	q := `

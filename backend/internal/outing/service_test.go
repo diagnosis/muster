@@ -190,7 +190,7 @@ func TestRequestJoin_DuplicateActive(t *testing.T) {
 	wantStatus(t, err, apperr.CodeConflict)
 }
 
-func TestRequestJoin_WithdrawnMayRequest(t *testing.T) {
+func TestRequestJoin_WithdrawnMyRequest(t *testing.T) {
 	f := newFakeStore()
 	svc := NewService(f)
 
@@ -206,7 +206,14 @@ func TestRequestJoin_WithdrawnMayRequest(t *testing.T) {
 	f.requests[r.ID] = r
 	f.requests[r.ID].Status = RequestStatusWithdrawn
 
-	r2, err := svc.RequestJoin(context.Background(), hikerID, o.ID, JoinInput{Role: RoleRider})
+	newNote := "new note"
+
+	r2, err := svc.RequestJoin(context.Background(), hikerID, o.ID, JoinInput{
+		Role:         RoleDriver,
+		SeatsOffered: 2,
+		Guests:       1,
+		Note:         &newNote,
+	})
 	if err != nil {
 		t.Fatalf("re-request after withdraw: %v", err)
 	}
@@ -215,6 +222,15 @@ func TestRequestJoin_WithdrawnMayRequest(t *testing.T) {
 	}
 	if f.requests[r.ID].Status != RequestStatusRequested {
 		t.Errorf("stored status = %q, want %q", f.requests[r.ID].Status, RequestStatusRequested)
+	}
+	if r2.Role != RoleDriver {
+		t.Errorf("role = %q, want driver", r2.Role)
+	}
+	if r2.SeatsOffered != 2 {
+		t.Errorf("seats = %d, want 2", r2.SeatsOffered)
+	}
+	if r2.Guests != 1 {
+		t.Errorf("guests = %d, want 1", r2.Guests)
 	}
 }
 

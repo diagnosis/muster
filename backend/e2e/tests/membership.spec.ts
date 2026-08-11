@@ -38,7 +38,7 @@ test.describe("membership", ()=> {
       expect(inbox[2].hiker_id).toBe(hiker3Id);
   });
 
-  test('withdrawn re-request keeps ORIGINAL role/seats (v0 spec — scheduled to change, see parking lot: v1-early)', async ()=> {
+  test('withdrawn re-request applies the NEW payload', async ()=> {
       const {ctx: ctxHost} = await  asUser(BASE)
 
       const outing = await unwrap<OutingResponse>(createOuting(ctxHost), 201)
@@ -50,10 +50,13 @@ test.describe("membership", ()=> {
       res = await withdraw(ctxHiker, outing.id)
       expect(res.status()).toBe(200)
 
-      const joinRequest =  await unwrap<JoinRequestResponse>(requestJoin(ctxHiker, outing.id),201)
+
+      const joinRequest =
+          await unwrap<JoinRequestResponse>(requestJoin(ctxHiker, outing.id, {role:'rider', 'seats_offered':0, guests:2}),201)
       expect(joinRequest.status).toBe('requested')
-      expect(joinRequest.role).toBe('driver')
-      expect(joinRequest.seats_offered).toBe(3)
+      expect(joinRequest.role).toBe('rider')
+      expect(joinRequest.seats_offered).toBe(0)
+      expect(joinRequest.guests).toBe(2)
 
   });
 

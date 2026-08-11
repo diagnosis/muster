@@ -200,3 +200,12 @@ func (f *fakeStore) UpdateOuting(ctx context.Context, o *Outing) error {
 	f.outings[o.ID] = o
 	return nil
 }
+
+func (f *fakeStore) UpdateJoinRequest(ctx context.Context, jr *JoinRequest) error {
+	if _, ok := f.requests[jr.ID]; !ok {
+		return apperr.NotFound("join request not found", "fake: no join request to update")
+	}
+
+	f.requests[jr.ID] = jr
+	return nil
+}
