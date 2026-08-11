@@ -29,7 +29,8 @@ function OutingDetailPage() {
             throw new Error(res.error.message)
         },
         onSuccess : () => {
-            qc.invalidateQueries({queryKey:['outing', id]})
+            qc.invalidateQueries({queryKey: ['outing', id]})
+            qc.invalidateQueries({queryKey: ['my-outings']})
         }
     })
     function handleOnClose(){

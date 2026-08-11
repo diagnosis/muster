@@ -4,7 +4,7 @@ import {Link, useNavigate} from "@tanstack/react-router";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient} from "../lib/api.ts";
 import styles from  "./Header.module.css"
-import {useState} from "react";
+import {useEffect, useRef, useState} from "react";
 
 
 export function Header(){
@@ -12,6 +12,7 @@ export function Header(){
     const {data, isPending} = useMeQuery()
     const queryClient = useQueryClient()
     const navigate = useNavigate()
+    const headerRef = useRef<HTMLDivElement>(null)
     const logout = useMutation({
         mutationFn: async () => {
             const res = await apiClient.post("/api/auth/logout")
@@ -23,8 +24,24 @@ export function Header(){
         onSettled : () => {
             queryClient.invalidateQueries({queryKey:['me']})
             navigate({to:'/'})
+            setOpen(false)
         }
     })
+    useEffect(()=>{
+        const handleOutsideClick = (event: MouseEvent) =>{
+            if (headerRef.current && event.target instanceof Node && !headerRef.current.contains(event.target)){
+                setOpen(false)
+            }
+        };
+        if(open){
+            document.addEventListener("mousedown", handleOutsideClick)
+        }
+
+        //clean up
+        return () => {
+            document.removeEventListener("mousedown", handleOutsideClick)
+        }
+    },[open])
 
     if (isPending) return (
         <div className={styles.nav}>
@@ -34,16 +51,17 @@ export function Header(){
         </div>
     )
     return (
-        <div className={styles.nav}>
+        <div className={styles.nav} ref={headerRef}>
             <div className={styles.inner}>
-            <Link className={styles.logo} to={'/'}>Muster</Link>
-                <button className={`${styles.toggle} ${styles.hamburgerBtn}`} aria-expanded={open} onClick={()=> setOpen(o => !o)}>=</button>
+            <Link className={styles.logo} to={'/'} onClick={()=>setOpen(false)}>Muster</Link>
+                <button className={`${styles.toggle} ${styles.hamburgerBtn}`} aria-expanded={open} onClick={()=> setOpen(o => !o)}>☰</button>
             <div className={`${styles.panel} ${open ? styles.panelOpen : ""}`}>
                 {data ? (
                         <div className={styles.userOutings}>
-                            <Link to="/me/outings">my outings</Link>
+                            <Link to="/me/outings" onClick={()=> setOpen(false)}>my outings</Link>
+                            <Link to="/outings/new" onClick={() => setOpen(false)}>Create new</Link>
                             <div className={styles.loginSignup}>
-                                <Link to={"/me/profile"}>{data.name}</Link>
+                                <Link onClick={()=>setOpen(false)} to={"/me/profile"}>{data.name}</Link>
                                 <button onClick={ () =>
                                     logout.mutate()
                                 }>Log out</button>
@@ -52,8 +70,8 @@ export function Header(){
 
                     ) :
                     (<div className={styles.loginSignup}>
-                        <Link to={'/login'}><button>Log in</button></Link>
-                        <Link to={'/signup'}><button>Sign up</button></Link>
+                        <Link to={'/login'} onClick={()=>setOpen(false)}><button>Log in</button></Link>
+                        <Link to={'/signup'} onClick={() => setOpen(false)}><button>Sign up</button></Link>
                     </div>)
                 }
             </div>

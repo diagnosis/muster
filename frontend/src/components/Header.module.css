@@ -55,11 +55,23 @@
     width: 100%;
 }
 .hamburgerBtn{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
     padding: 0;
-    margin:0;
-    font-size: 2rem;
+    font-size: 1.5rem;
+    line-height: 1;
     background: none;
+    border: 0;
+    border-radius: var(--radius-control);
 }
+    .hamburgerBtn:hover{
+        background: var(--surface-raised);
+    }
+
+
 
 /* ---- 640px and up ---- */
 

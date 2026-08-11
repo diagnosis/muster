@@ -29,6 +29,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
         onSuccess: () => {
             qc.invalidateQueries({queryKey: ['outing', outingId]})
             qc.invalidateQueries({queryKey:['outings']})
+            qc.invalidateQueries({queryKey: ['my-outings']})
         },
     })
 
@@ -42,6 +43,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
         },
         onSuccess: () => {
             qc.invalidateQueries({queryKey:['outing', outingId]})
+            qc.invalidateQueries({queryKey: ['my-outings']})
             qc.invalidateQueries({queryKey:['outing-join-requests', outingId]})
             setSelectedRequest(null)
         }
@@ -56,6 +58,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
             throw new Error(res.error.message)
         }, onSuccess:() => {
             qc.invalidateQueries({queryKey:['outing', outingId]})
+            qc.invalidateQueries({queryKey: ['my-outings']})
             qc.invalidateQueries({queryKey:['outing-join-requests', outingId]})
             setSelectedRequest(null)
         }
@@ -104,7 +107,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
                 {wontFit && <p>⚠️ Not enough seats — someone needs to drive</p>}
 
                 <div className={styles.actions}>
-                    <button disabled={wontFit} className="btn-primary" onClick={() => acceptMutation.mutate(selectedRequest.id)}>Accept</button>
+                    <button className="btn-primary" onClick={() => acceptMutation.mutate(selectedRequest.id)}>Accept</button>
                     <button className={styles.declineBtn} onClick={() => declineMutation.mutate(selectedRequest.id)}>Decline</button>
                 </div>
                 {acceptMutation.error && <p className={styles.error}>{acceptMutation.error.message}</p>}
