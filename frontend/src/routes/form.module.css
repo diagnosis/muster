@@ -110,3 +110,15 @@
     color:var(--color-text-muted);
     font-weight: 600;
 }
+.quietBtn{
+    border:0;
+    color: var(--color-text-muted);
+    align-self: flex-start;
+    padding-inline: 0;
+    text-decoration: underline;
+
+}
+.quietBtn:hover{
+    background: transparent;
+    color: var(--color-text);
+}

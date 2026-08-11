@@ -2,7 +2,8 @@
 /*/src/styles/base.css*/
 /*scope will be button, input, textarea, select*/
 
-button{
+button,
+.btn{
     padding: var(--space-3) var(--space-4);
     border: solid 1px var(--border-subtle);
     border-radius: var(--radius-control);
@@ -12,7 +13,8 @@ button{
     line-height: var(--leading-body);
     cursor: pointer;
 }
-button:hover{
+button:hover,
+.btn:hover{
     background: var(--surface-raised);
 }
 .btn-primary{

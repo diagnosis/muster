@@ -41,3 +41,6 @@
 .slotActive{
     border-color: var(--color-primary)
 }
+.hostRow{
+    font-weight: 600;
+}

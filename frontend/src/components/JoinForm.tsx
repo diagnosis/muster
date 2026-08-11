@@ -44,27 +44,28 @@ export function JoinForm({outingId, onClose}:JoinProps){
 
     return(
         <form className={styles.form} onSubmit={handleSubmit}>
-            <label>Hiker Role:</label>
-            <div className={styles.radioRow}>
-                <label className={`${styles.radioButton} ${hikerRole==='rider' ? styles.radioButtonChecked: ''}`}>
-                    <input
-                        type="radio"
-                        value='rider'
-                        checked={hikerRole==='rider'}
-                        onChange={e => {setHikerRole(e.target.value as HikerRole); setSeats(0)}}
-                    />
-                    Rider
-                </label>
-                <label className={`${styles.radioButton} ${hikerRole==='driver' ? styles.radioButtonChecked: ''}`}>
-                    <input
-                        type="radio"
-                        value='driver'
-                        checked={hikerRole==='driver'}
-                        onChange={e => {setHikerRole(e.target.value as HikerRole); setSeats(0)}}
-                    />
-                    Driver
-                </label>
-            </div>
+            <label>Hiker Role:
+                <div className={styles.radioRow}>
+                    <label className={`${styles.radioButton} ${hikerRole==='rider' ? styles.radioButtonChecked: ''}`}>
+                        <input
+                            type="radio"
+                            value='rider'
+                            checked={hikerRole==='rider'}
+                            onChange={e => {setHikerRole(e.target.value as HikerRole); setSeats(0)}}
+                        />
+                        Rider
+                    </label>
+                    <label className={`${styles.radioButton} ${hikerRole==='driver' ? styles.radioButtonChecked: ''}`}>
+                        <input
+                            type="radio"
+                            value='driver'
+                            checked={hikerRole==='driver'}
+                            onChange={e => {setHikerRole(e.target.value as HikerRole); setSeats(0)}}
+                        />
+                        Driver
+                    </label>
+                </div>
+            </label>
             {hikerRole == 'driver' &&
             <label className={styles.label}>
                 Seats Offered:
@@ -87,19 +88,23 @@ export function JoinForm({outingId, onClose}:JoinProps){
                 />
             </label>
             <label className={styles.label}>
+                Note to the host (optional):
                 <textarea
                     aria-label={'Anything the host should know about?'}
-                    value={note?note:""}
+                    value={note}
                     onChange={e => setNote(e.target.value)}
                 ></textarea>
             </label>
             {joinReqMutation.error && <p className={styles.error}>{joinReqMutation.error.message}</p>}
+
             <button
                className={"btn-primary"}
                 type={'submit'}
                 disabled={!hikerRole || joinReqMutation.isPending}
             >Request to join</button>
+            {!hikerRole && <p className={styles.hint}>Pick a role first.</p>}
             <button
+                className={styles.quietBtn}
                 type='button'
                 onClick={onClose}
             >Never mind</button>

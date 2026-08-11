@@ -117,20 +117,17 @@ function OutingDetailPage() {
                 {!isFull && detail.seats_short === 0 && detail.spots_left === 0 && <p>No seats left — a driver could open more spots. 🚗</p>}
             </section>
 
+
+
             <section className={styles.section}>
-                <h3 className={styles.subheading}>Host</h3>
-                <p>{detail.host.name} · {detail.host.experience}</p>
+                <h3 className={styles.subheading}>Who's going ({detail.roster.length + 1})</h3>
+                <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience} · host</p>
+                {detail.roster.map(m => <p key={m.hiker_id}>{m.name} · {m.experience}</p>)}
             </section>
-
-
-            <section className={styles.section}>
-                <h3 className={styles.subheading}>Who's going ({detail.roster.length})</h3>
-                {detail.roster.length === 0
-                    ? <p>No members yet — be the first.</p>
-                    : detail.roster.map(m => <p key={m.hiker_id}>{m.name} · {m.experience}</p>)}
-
+            {detail.outing.notes&&<section className={styles.section}>
+                <h3 className={styles.subheading}>Notes</h3>
                 {detail.outing.notes && <p>{detail.outing.notes}</p>}
-            </section>
+            </section>}
 
         </div>
     </>
