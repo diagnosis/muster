@@ -25,6 +25,7 @@ type Storage interface {
 	GetJoinRequestByHiker(ctx context.Context, outingID, hikerID uuid.UUID) (*JoinRequest, error)
 	SetJoinRequestStatus(ctx context.Context, id uuid.UUID, s RequestStatus) error
 	ListJoinRequests(ctx context.Context, outingID uuid.UUID, status RequestStatus) ([]PendingRequest, error)
+	UpdateJoinRequest(ctx context.Context, r *JoinRequest) error
 	// AcceptIfCapacity flips a request from requested to accepted only if
 	// it fits, atomically: a driver needs cap room (people + 1 + guests
 	// <= max_size); a rider needs cap room AND seat room (people + 1 +
@@ -301,11 +302,15 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 
 	switch joinRequest.Status {
 	case RequestStatusWithdrawn:
-		// Re-requesting is legal. v0 keeps the original role/seats/guests.
-		if err = s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusRequested); err != nil {
+		// Re-requesting is legal and applies the NEW payload.
+		joinRequest.Role = in.Role
+		joinRequest.SeatsOffered = in.SeatsOffered
+		joinRequest.Guests = in.Guests
+		joinRequest.Note = in.Note
+		joinRequest.Status = RequestStatusRequested
+		if err = s.store.UpdateJoinRequest(ctx, joinRequest); err != nil {
 			return nil, err
 		}
-		joinRequest.Status = RequestStatusRequested
 		return joinRequest, nil
 	case RequestStatusDeclined:
 		return nil, apperr.Conflict("your request to this outing was declined", "declined is terminal")
