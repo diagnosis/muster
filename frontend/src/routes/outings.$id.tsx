@@ -37,21 +37,36 @@ function OutingDetailPage() {
     }
 
     function renderSlot(detail: Detail){
-        if (detail.outing.status === 'cancelled') return <p>This outing was cancelled</p>
-        if (!me) return <Link to="/login">Request to join</Link>
+        if (detail.outing.status === 'cancelled')
+            return <div className={styles.slot}>
+                <p>This outing was cancelled</p>
+            </div>
+        if (!me)
+        return <div className={`${styles.slot} ${styles.slotActive}`}>
+            <Link to="/login"><button className={'btn-primary'}>Request To join</button></Link>
+        </div>
 
-        if (me.id === detail.outing.host_id) return <HostControls outingId={id} detail={detail}/>
+        if (me.id === detail.outing.host_id) return <div className={styles.slot}>
+            <HostControls outingId={id} detail={detail}/>
+        </div>
 
         const st = detail.my_request?.status
-        if (st === 'requested') return <>
-            <p>Requested - waiting on host</p>
-            <button onClick={()=>withdrawMutation.mutate()}>Withdraw</button>
-        </>
-        if (st === 'accepted') return <>
-            <p>You're going! 🎉</p>
-            <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>
-        </>
-        if (st === 'declined')return <p>The host declined this request.</p>
+        if (st === 'requested')
+            return <div className={styles.slot}>
+                <p>Requested — waiting on host</p>
+                <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>
+            </div>
+
+        if (st === 'accepted')
+            return <div className={`${styles.slot} ${styles.slotActive}`}>
+                <p>You're going! 🎉</p>
+                <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>
+            </div>
+
+        if (st === 'declined')
+            return <div className={styles.slot}>
+                <p>The host declined this request.</p>
+            </div>
 
         return <>
             {showForm
@@ -80,6 +95,7 @@ function OutingDetailPage() {
     const effectiveCap = Math.min(detail.seat_capacity, detail.outing.max_size)
     const isFull = detail.people_count >= detail.outing.max_size
     const seat_cost = `$${(detail.outing.cost_per_seat_cents / 100).toFixed(2)}/seat `
+
 
     return <>
         <div className={styles.container}>
