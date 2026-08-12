@@ -118,11 +118,11 @@ export interface CreateOutingInput {
     title: string
     destination: string
     meet_label: string
-    starts_at: string          // ISO — from datetime-local via toISOString()
+    starts_at: string
     max_size: number
     host_seats: number
     cost_per_seat_cents: number
     difficulty: Difficulty
     pace: Pace
-    notes?: string             // optional — include the textarea, send-if-nonempty (the note||undefined move)
+    notes?: string
 }
