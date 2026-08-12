@@ -1,7 +1,7 @@
 // src/queries.ts
 
 
-import type {Detail, MeResponse, MyOutings, PendingRequestResponse} from "./types.ts";
+import type {Detail, MeResponse, MyOutings, Outing, PendingRequestResponse} from "./types.ts";
 import {apiClient} from "./lib/api.ts";
 import {type QueryClient, useQuery} from "@tanstack/react-query";
 import {redirect} from "@tanstack/react-router";
@@ -40,13 +40,29 @@ export const getOutingByID = async (id:string) => {
     }
     throw new Error(res.error.message)
 }
-
 export function useOuting(id:string){
     return useQuery({
         queryKey:['outing', id],
         queryFn: () => getOutingByID(id),
     })
 }
+
+export const getOutings=async ()=>{
+    const res = await apiClient.get<Outing[]>('/api/outings')
+    if (res.ok){
+        return res.data
+    }
+    throw new Error(res.error.message)
+}
+
+export function useOutings(){
+    return useQuery({
+        queryKey:['outings'],
+        queryFn:getOutings,
+    })
+}
+
+
 
 export function useOutingJoinRequests(id: string) {
     return useQuery(

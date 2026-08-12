@@ -104,7 +104,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
                 <p>Accepting adds {1 + selectedRequest.guests} {selectedRequest.guests>0?"people":"person"}
                     </p>
 
-                {wontFit && <p>⚠️ Not enough seats — someone needs to drive</p>}
+                {wontFit && <p>⚠️ Looks like there isn't room for {1 + selectedRequest.guests} right now.</p>}
 
                 <div className={styles.actions}>
                     <button className="btn-primary" onClick={() => acceptMutation.mutate(selectedRequest.id)}>Accept</button>

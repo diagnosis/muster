@@ -25,7 +25,7 @@ function CreateOutingPage() {
     const [costDollar, setCostDollar] = useState(0)
     const [difficulty, setDifficulty] = useState<Difficulty|null>(null)
     const [pace, setPace] = useState<Pace|null>(null)
-    const [notes, setNotes] = useState<string|null>(null)
+    const [notes, setNotes] = useState<string>("")
 
     const createMutation = useMutation({
         mutationFn: async (body:CreateOutingInput) => {
@@ -125,73 +125,82 @@ function CreateOutingPage() {
               <div className={layout.group}>
                 <div className={layout.groupLabel}>What it's like</div>
                 <div className={layout.fields}>
-              <label className={styles.label}>Difficulty
-                  <div className={styles.radioRow}>
-                      <label className={`${styles.radioButton} ${difficulty === 'easy'? styles.radioButtonChecked:""}`}>
-                          <input
-                              type="radio"
-                              value="easy"
-                              checked={difficulty==="easy"}
-                              onChange={e=> setDifficulty(e.target.value as Difficulty)}
-                          />
-                          Easy
-                      </label>
-                      <label className={`${styles.radioButton} ${difficulty === 'moderate'? styles.radioButtonChecked:""}`}>
-                          <input
-                              type="radio"
-                              value="moderate"
-                              checked={difficulty==="moderate"}
-                              onChange={e=> setDifficulty(e.target.value as Difficulty)}
-                          />
-                          Moderate
-                      </label>
-                      <label className={`${styles.radioButton} ${difficulty === 'hard'? styles.radioButtonChecked:""}`}>
-                          <input
-                              type="radio"
-                              value="hard"
-                              checked={difficulty==="hard"}
-                              onChange={e=> setDifficulty(e.target.value as Difficulty)}
-                          />
-                          Hard
-                      </label>
-                  </div>
-              </label>
-              <label className={styles.label}>Pace
-                  <div className={styles.radioRow}>
-                      <label className={`${styles.radioButton} ${pace === "relaxed"? styles.radioButtonChecked:""}`}>
-                          <input
-                              type="radio"
-                              value="relaxed"
-                              checked={pace==="relaxed"}
-                              onChange={e => setPace(e.target.value as Pace)}
-                          />
-                          Relaxed
-                      </label>
-                      <label className={`${styles.radioButton} ${pace==="moderate" ? styles.radioButtonChecked:''}`}>
-                          <input
-                              type="radio"
-                              value="moderate"
-                              checked={pace==="moderate"}
-                              onChange={e => setPace(e.target.value as Pace)}
-                          />
-                          Moderate
-                      </label>
-                      <label className={`${styles.radioButton} ${pace==="fast" ? styles.radioButtonChecked:''}`}>
-                          <input
-                              type="radio"
-                              value="fast"
-                              checked={pace==="fast"}
-                              onChange={e => setPace(e.target.value as Pace)}
-                          />
-                          Fast
-                      </label>
-                  </div>
-              </label>
+
+                    <fieldset className={styles.fieldset}>
+                        <legend className={styles.legend}>Difficulty</legend>
+                        <div className={styles.radioRow}>
+                            <label className={`${styles.radioButton} ${difficulty === 'easy'? styles.radioButtonChecked:""}`}>
+                                <input
+                                    name={"difficulty"}
+                                    type="radio"
+                                    value="easy"
+                                    checked={difficulty==="easy"}
+                                    onChange={e=> setDifficulty(e.target.value as Difficulty)}
+                                />
+                                Easy
+                            </label>
+                            <label className={`${styles.radioButton} ${difficulty === 'moderate'? styles.radioButtonChecked:""}`}>
+                                <input
+                                    name={"difficulty"}
+                                    type="radio"
+                                    value="moderate"
+                                    checked={difficulty==="moderate"}
+                                    onChange={e=> setDifficulty(e.target.value as Difficulty)}
+                                />
+                                Moderate
+                            </label>
+                            <label className={`${styles.radioButton} ${difficulty === 'hard'? styles.radioButtonChecked:""}`}>
+                                <input
+                                    name={"difficulty"}
+                                    type="radio"
+                                    value="hard"
+                                    checked={difficulty==="hard"}
+                                    onChange={e=> setDifficulty(e.target.value as Difficulty)}
+                                />
+                                Hard
+                            </label>
+                        </div>
+                    </fieldset>
+             <fieldset className={styles.fieldset}>
+                 <legend className={styles.legend}>Pace</legend>
+                 <div className={styles.radioRow}>
+                     <label className={`${styles.radioButton} ${pace === "relaxed"? styles.radioButtonChecked:""}`}>
+                         <input
+                             name={"pace"}
+                             type="radio"
+                             value="relaxed"
+                             checked={pace==="relaxed"}
+                             onChange={e => setPace(e.target.value as Pace)}
+                         />
+                         Relaxed
+                     </label>
+                     <label className={`${styles.radioButton} ${pace==="moderate" ? styles.radioButtonChecked:''}`}>
+                         <input
+                             name={"pace"}
+                             type="radio"
+                             value="moderate"
+                             checked={pace==="moderate"}
+                             onChange={e => setPace(e.target.value as Pace)}
+                         />
+                         Moderate
+                     </label>
+                     <label className={`${styles.radioButton} ${pace==="fast" ? styles.radioButtonChecked:''}`}>
+                         <input
+                             name={"pace"}
+                             type="radio"
+                             value="fast"
+                             checked={pace==="fast"}
+                             onChange={e => setPace(e.target.value as Pace)}
+                         />
+                         Fast
+                     </label>
+                 </div>
+             </fieldset>
               <label className={styles.label}>
-                  Notes:
+                  Notes
                 <textarea
-                    aria-label={'Anything the host should know about?'}
-                    value={notes?notes:""}
+                    placeholder={'Anything the members should know about?'}
+                    value={notes}
                     onChange={e => setNotes(e.target.value)}
                 ></textarea>
               </label>

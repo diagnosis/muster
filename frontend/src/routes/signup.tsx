@@ -45,7 +45,7 @@ function SignupPage() {
         <form className={styles.form} onSubmit={handleSubmit}>
             <h1>Sign Up</h1>
             <label className={styles.label}>
-                Name:
+                Name
                 <input
                     type="text"
                     value={name}
@@ -53,7 +53,7 @@ function SignupPage() {
                 />
             </label>
             <label className={styles.label}>
-                Email:
+                Email
                 <input
                     type="email"
                     value={email}
@@ -61,42 +61,47 @@ function SignupPage() {
                 />
             </label>
             <label className={styles.label}>
-                Password:
+                Password
                 <input
                     type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                 />
             </label>
-            <label className={styles.label}>
-                Experience:
-            </label>
-            <div className={styles.radioRow}>
-                <label className={`${styles.radioButton} ${experience === 'beginner' ? styles.radioButtonChecked: ''}`}>
-                    <input
-                        type="radio"
-                        value='beginner'
-                        checked={experience === 'beginner'}
-                        onChange={e=> setExperience(e.target.value as Experience)}/>
-                    Beginner
-                </label>
-                <label className={`${styles.radioButton} ${experience === 'intermediate'? styles.radioButtonChecked:''}`}>
-                    <input
-                        type="radio"
-                        value='intermediate'
-                        checked={experience === 'intermediate'}
-                        onChange={e=> setExperience(e.target.value as Experience)}/>
-                    Intermediate
-                </label>
-                <label className={`${styles.radioButton} ${experience === 'experienced' ? styles.radioButtonChecked: ''} `}>
-                    <input
-                        type="radio"
-                        value='experienced'
-                        checked={experience === 'experienced'}
-                        onChange={e=> setExperience(e.target.value as Experience)}/>
-                    Experienced
-                </label>
-            </div>
+            <fieldset className={styles.fieldset}>
+                <legend className={styles.legend}>Experience</legend>
+                    <div className={styles.radioRow}>
+                        <label className={`${styles.radioButton} ${experience === 'beginner' ? styles.radioButtonChecked: ''}`}>
+                            <input
+                                name={"experience"}
+                                type="radio"
+                                value='beginner'
+                                checked={experience === 'beginner'}
+                                onChange={e=> setExperience(e.target.value as Experience)}/>
+                            Beginner
+                        </label>
+                        <label className={`${styles.radioButton} ${experience === 'intermediate'? styles.radioButtonChecked:''}`}>
+                            <input
+                                name={"experience"}
+                                type="radio"
+                                value='intermediate'
+                                checked={experience === 'intermediate'}
+                                onChange={e=> setExperience(e.target.value as Experience)}/>
+                            Intermediate
+                        </label>
+                        <label className={`${styles.radioButton} ${experience === 'experienced' ? styles.radioButtonChecked: ''} `}>
+                            <input
+                                name={"experience"}
+                                type="radio"
+                                value='experienced'
+                                checked={experience === 'experienced'}
+                                onChange={e=> setExperience(e.target.value as Experience)}/>
+                            Experienced
+                        </label>
+                    </div>
+
+            </fieldset>
+
             {signup.error && <p className={styles.error}>{signup.error.message}</p>}
             <button className="btn-primary" type="submit" disabled={signup.isPending || name==="" || password.length <=3 || email===""}>Sign up</button>
         </form>

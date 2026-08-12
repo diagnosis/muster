@@ -44,10 +44,12 @@ export function JoinForm({outingId, onClose}:JoinProps){
 
     return(
         <form className={styles.form} onSubmit={handleSubmit}>
-            <label>Hiker Role:
+            <fieldset className={styles.fieldset}>
+                <legend className={styles.legend}>Hiker Role</legend>
                 <div className={styles.radioRow}>
                     <label className={`${styles.radioButton} ${hikerRole==='rider' ? styles.radioButtonChecked: ''}`}>
                         <input
+                            name={"role"}
                             type="radio"
                             value='rider'
                             checked={hikerRole==='rider'}
@@ -57,6 +59,7 @@ export function JoinForm({outingId, onClose}:JoinProps){
                     </label>
                     <label className={`${styles.radioButton} ${hikerRole==='driver' ? styles.radioButtonChecked: ''}`}>
                         <input
+                            name={"role"}
                             type="radio"
                             value='driver'
                             checked={hikerRole==='driver'}
@@ -65,10 +68,11 @@ export function JoinForm({outingId, onClose}:JoinProps){
                         Driver
                     </label>
                 </div>
-            </label>
+            </fieldset>
+
             {hikerRole == 'driver' &&
             <label className={styles.label}>
-                Seats Offered:
+                Seats Offered
                 <input
                     type="number"
                     min={0}
@@ -78,7 +82,7 @@ export function JoinForm({outingId, onClose}:JoinProps){
             </label>
             }
             <label className={styles.label}>
-                Guests:
+                Guests
                 <input
                     type="number"
                     min={0}
@@ -90,7 +94,7 @@ export function JoinForm({outingId, onClose}:JoinProps){
             <label className={styles.label}>
                 Note to the host (optional):
                 <textarea
-                    aria-label={'Anything the host should know about?'}
+                    placeholder={'Anything the host should know about?'}
                     value={note}
                     onChange={e => setNote(e.target.value)}
                 ></textarea>
