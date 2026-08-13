@@ -6,9 +6,11 @@ import {useMutation} from "@tanstack/react-query";
 import type {Experience, MeResponse, RegisterRequest} from "@/types.ts";
 import {apiClient} from "@/lib/api.ts";
 import styles from "@/routes/form.module.css"
+import {requireGuest} from "@/queries.ts";
 
 export const Route = createFileRoute('/signup')({
-  component: SignupPage,
+    beforeLoad: async ({context}) => requireGuest(context.queryClient),
+    component: SignupPage,
 })
 
 export function SignupPage() {

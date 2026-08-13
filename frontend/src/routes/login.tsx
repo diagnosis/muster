@@ -6,10 +6,11 @@ import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient} from "@/lib/api";
 import type {MeResponse} from "@/types";
 import styles from "@/routes/form.module.css"
+import {requireGuest} from "@/queries.ts";
 
 export const Route = createFileRoute('/login')({
-
-  component: LoginPage
+    beforeLoad: async ({context}) => requireGuest(context.queryClient),
+    component: LoginPage
 })
 
 

@@ -102,3 +102,8 @@ export async function requireAuth(queryClient: QueryClient){
     const me = await queryClient.ensureQueryData(meQueryOptions())
     if (!me) throw redirect({to:'/login'})
 }
+
+export async function requireGuest(queryClient: QueryClient){
+    const me = await queryClient.ensureQueryData(meQueryOptions())
+    if (me) throw redirect({to:'/'})
+}
