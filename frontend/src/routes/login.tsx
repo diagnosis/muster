@@ -3,9 +3,9 @@
 import {createFileRoute, useNavigate} from '@tanstack/react-router'
 import {useState} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
-import {apiClient} from "../lib/api.ts";
-import type {MeResponse} from "../types.ts";
-import styles from "./form.module.css"
+import {apiClient} from "@/lib/api";
+import type {MeResponse} from "@/types";
+import styles from "@/routes/form.module.css"
 
 export const Route = createFileRoute('/login')({
 
@@ -13,7 +13,7 @@ export const Route = createFileRoute('/login')({
 })
 
 
-function LoginPage(){
+export function LoginPage(){
     const queryClient = useQueryClient()
     const navigate = useNavigate()
     const [email, setEmail] = useState("")

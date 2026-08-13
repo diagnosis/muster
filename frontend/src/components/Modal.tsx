@@ -1,4 +1,4 @@
-import styles from './Modal.module.css'
+import styles from '@/components/Modal.module.css'
 
 interface ModalProps{
     onClose: () => void

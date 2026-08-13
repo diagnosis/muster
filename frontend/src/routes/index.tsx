@@ -1,14 +1,15 @@
 // src/routes/index.tsx
 import {createFileRoute, Link} from '@tanstack/react-router'
-import {OutingCard} from "../components/OutingCard.tsx";
-import styles from "./index.module.css"
-import {useOutings} from "../queries.ts";
+import {OutingCard} from "@/components/OutingCard.tsx";
+import styles from "@/routes/index.module.css"
+import {useOutings} from "@/queries.ts";
+
 
 export const Route = createFileRoute('/')({
   component: OutingsPage,
 })
 
-function OutingsPage() {
+export function OutingsPage() {
 
     //using tanstack query
     const {data: outings, isPending, error} = useOutings()

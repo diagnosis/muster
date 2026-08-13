@@ -1,18 +1,18 @@
 import {createFileRoute, Link} from '@tanstack/react-router'
-import {apiClient} from "../lib/api.ts";
-import type {Detail} from "../types.ts";
+import {apiClient} from "@/lib/api.ts";
+import type {Detail} from "@/types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
-import {useMeQuery, useOuting} from "../queries.ts";
+import {useMeQuery, useOuting} from "@/queries.ts";
 import {useState} from "react";
-import {JoinForm} from "../components/JoinForm.tsx";
-import {HostControls} from "../components/HostControls.tsx";
-import styles from "./outings.$id.module.css"
+import {JoinForm} from "@/components/JoinForm.tsx";
+import {HostControls} from "@/components/HostControls.tsx";
+import styles from "@/routes/outings.$id.module.css"
 
 export const Route = createFileRoute('/outings/$id')({
   component: OutingDetailPage,
 })
 
-function OutingDetailPage() {
+export function OutingDetailPage() {
     const {id} = Route.useParams()
     const qc = useQueryClient()
     const [showForm, setShowForm] = useState(false)

@@ -3,15 +3,15 @@
 import {createFileRoute, useNavigate} from '@tanstack/react-router'
 import {useState} from "react";
 import {useMutation} from "@tanstack/react-query";
-import type {Experience, MeResponse, RegisterRequest} from "../types.ts";
-import {apiClient} from "../lib/api.ts";
-import styles from "./form.module.css"
+import type {Experience, MeResponse, RegisterRequest} from "@/types.ts";
+import {apiClient} from "@/lib/api.ts";
+import styles from "@/routes/form.module.css"
 
 export const Route = createFileRoute('/signup')({
   component: SignupPage,
 })
 
-function SignupPage() {
+export function SignupPage() {
     const navigate = useNavigate()
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")

@@ -1,10 +1,10 @@
 // src/components/ProfileForm.tsx
 
-import type {Experience, MeInputRequest, MeResponse} from "../types.ts";
+import type {Experience, MeInputRequest, MeResponse} from "@/types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
-import styles from "../routes/form.module.css";
-import {apiClient} from "../lib/api.ts";
+import styles from "@/routes/form.module.css";
+import {apiClient} from "@/lib/api.ts";
 
 interface ProfileFormProps{
     me: MeResponse

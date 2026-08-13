@@ -1,9 +1,9 @@
 
 // src/components/JoinForm.tsx
-import type {HikerRole, JoinRequest, JoinRequestInput} from "../types.ts";
+import type {HikerRole, JoinRequest, JoinRequestInput} from "@/types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
-import {apiClient} from "../lib/api.ts";
-import styles from '../routes/form.module.css'
+import {apiClient} from "@/lib/api.ts";
+import styles from '@/routes/form.module.css'
 import {useState} from "react";
 
 

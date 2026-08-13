@@ -1,18 +1,18 @@
 import {createFileRoute, useNavigate} from '@tanstack/react-router'
-import {requireAuth} from "../queries.ts";
+import {requireAuth} from "@/queries.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
-import type {CreateOutingInput, Difficulty, Outing, Pace} from "../types.ts";
-import styles from "./form.module.css"
-import layout from "./outings.new.module.css"
-import {apiClient} from "../lib/api.ts";
+import type {CreateOutingInput, Difficulty, Outing, Pace} from "@/types.ts";
+import styles from "@/routes/form.module.css"
+import layout from "@/routes/outings.new.module.css"
+import {apiClient} from "@/lib/api.ts";
 
 export const Route = createFileRoute('/outings/new')({
     beforeLoad : async ({context}) => requireAuth(context.queryClient),
   component: CreateOutingPage,
 })
 
-function CreateOutingPage() {
+export function CreateOutingPage() {
 
     const qc = useQueryClient()
     const navigate = useNavigate()

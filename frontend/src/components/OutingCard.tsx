@@ -1,6 +1,6 @@
 //src/components/OutingCard.tsx
-import type {Outing} from "../types.ts";
-import styles from './OutingCard.module.css'
+import type {Outing} from "@/types.ts";
+import styles from '@/components/OutingCard.module.css'
 interface OutingCardProps {
    outing: Outing
 }

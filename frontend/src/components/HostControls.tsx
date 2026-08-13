@@ -1,12 +1,12 @@
 
 //src/components/HostControls.tsx
-import {apiClient} from "../lib/api.ts";
+import {apiClient} from "@/lib/api.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
-import type {Detail, JoinRequest, Outing, PendingRequestResponse} from "../types.ts";
-import {useOutingJoinRequests} from "../queries.ts";
+import type {Detail, JoinRequest, Outing, PendingRequestResponse} from "@/types.ts";
+import {useOutingJoinRequests} from "@/queries.ts";
 import {useState} from "react";
-import {Modal} from "./Modal.tsx";
-import styles from "./HostControls.module.css"
+import {Modal} from "@/components/Modal.tsx";
+import styles from "@/components/HostControls.module.css"
 
 interface HostControlsProps{
     outingId: string

@@ -1,8 +1,8 @@
 // src/queries.ts
 
 
-import type {Detail, MeResponse, MyOutings, Outing, PendingRequestResponse} from "./types.ts";
-import {apiClient} from "./lib/api.ts";
+import type {Detail, MeResponse, MyOutings, Outing, PendingRequestResponse} from "@/types.ts";
+import {apiClient} from "@/lib/api.ts";
 import {type QueryClient, useQuery} from "@tanstack/react-query";
 import {redirect} from "@tanstack/react-router";
 

@@ -1,7 +1,7 @@
 import {createFileRoute, Link} from '@tanstack/react-router'
-import {requireAuth, useMyOutings} from "../queries.ts";
-import {OutingCard} from "../components/OutingCard.tsx";
-import styles from "./me.outings.module.css"
+import {requireAuth, useMyOutings} from "@/queries.ts";
+import {OutingCard} from "@/components/OutingCard.tsx";
+import styles from "@/routes/me.outings.module.css"
 
 
 
@@ -10,7 +10,7 @@ export const Route = createFileRoute('/me/outings')({
   component: MeOutingsPage,
 })
 
-function MeOutingsPage() {
+export function MeOutingsPage() {
     const {data, isPending, error} = useMyOutings()
     if (isPending) return <div>Outings loading...</div>
     if (error) return <div>{error.message}</div>

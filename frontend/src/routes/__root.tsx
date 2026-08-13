@@ -2,15 +2,15 @@
 
 import {Outlet, createRootRouteWithContext} from '@tanstack/react-router'
 import type {QueryClient} from "@tanstack/react-query";
-import {Header} from "../components/Header.tsx";
-import styles from "./Layout.module.css"
+import {Header} from "@/components/Header.tsx";
+import styles from "@/routes/Layout.module.css"
 
 export const Route =
     createRootRouteWithContext<{queryClient:QueryClient}>()({
         component: RouteComponent,
     })
 
-function RouteComponent(){
+export function RouteComponent(){
     return <>
         <Header/>
         <div className={styles.shell}>
