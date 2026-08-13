@@ -44,7 +44,7 @@ export function OutingDetailPage() {
             </div>
         if (!me)
         return <div className={`${styles.slot} ${styles.slotActive}`}>
-            <Link to="/login"><button className={'btn-primary'}>Request To join</button></Link>
+            <Link className={'btn-primary btn'} to="/login">Request To join</Link>
         </div>
 
         if (me.id === detail.outing.host_id) return <div className={styles.slot}>

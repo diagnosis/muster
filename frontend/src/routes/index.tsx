@@ -22,14 +22,24 @@ export function OutingsPage() {
             error loading outings: {error.message}
         </div>
     }
+
+
     return <>
         <h2 className={styles.heading}>Outings</h2>
-        <div className={styles.list}>
 
-            {outings.map(outing=>
-                <Link className={styles.cardLink} to={"/outings/$id"} params={{id: outing.id}} key={outing.id}><OutingCard outing={outing}/></Link>
 
-            )}
-        </div>
+            {outings.length === 0
+                ? <div className={styles.empty}>
+                    <p className={styles.emptyText}>No outing yet</p>
+                    <Link className={'btn-primary btn'} to={'/outings/new'}>Create new outing</Link>
+                </div>
+               : <div className={styles.list}>
+                    {outings.map(outing=>
+                    <Link className={styles.cardLink} to={"/outings/$id"} params={{id: outing.id}} key={outing.id}><OutingCard outing={outing}/></Link>)}
+                </div>
+
+            }
+
+
     </>
 }

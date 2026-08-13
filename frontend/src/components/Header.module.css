@@ -21,6 +21,13 @@
     letter-spacing: -0.01em;
 }
 
+.navLink:hover{
+    text-decoration: underline;
+}
+.navLink[data-status="active"]{
+    color: var(--color-primary);
+}
+
 /* ---- mobile ---- */
 
 .panel{
@@ -45,15 +52,19 @@
     align-items: stretch;
     width: 100%;
 }
-.panelOpen .userOutings > a,
-.panelOpen .loginSignup > a{
+
+/* nav links get row treatment; buttons don't */
+.panelOpen .navLink{
     padding-block: var(--space-3);
     border-bottom: 1px solid var(--border-subtle);
 }
-.panelOpen button{
-    margin-top: var(--space-3);
+.panelOpen button,
+.panelOpen .btn{
+    justify-content: center;
     width: 100%;
+    margin-top: var(--space-3);
 }
+
 .hamburgerBtn{
     display: flex;
     align-items: center;
@@ -67,11 +78,12 @@
     border: 0;
     border-radius: var(--radius-control);
 }
-    .hamburgerBtn:hover{
-        background: var(--surface-raised);
-    }
-
-
+.hamburgerBtn:hover{
+    background: var(--surface-raised);
+}
+.logoutBtn:hover{
+    background: var(--surface-sunken);
+}
 
 /* ---- 640px and up ---- */
 
@@ -98,13 +110,13 @@
     .userOutings{
         gap: var(--space-6);
     }
-    .panelOpen .userOutings > a,
-    .panelOpen .loginSignup > a{
+    .panelOpen .navLink{
         padding-block: 0;
         border-bottom: 0;
     }
-    .panelOpen button{
-        margin-top: 0;
+    .panelOpen button,
+    .panelOpen .btn{
         width: auto;
+        margin-top: 0;
     }
 }

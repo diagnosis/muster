@@ -58,11 +58,11 @@ export function Header(){
             <div className={`${styles.panel} ${open ? styles.panelOpen : ""}`}>
                 {data ? (
                         <div className={styles.userOutings}>
-                            <Link to="/me/outings" onClick={()=> setOpen(false)}>my outings</Link>
-                            <Link to="/outings/new" onClick={() => setOpen(false)}>Create new</Link>
+                            <Link className={styles.navLink} to="/me/outings" onClick={()=> setOpen(false)}>My outings</Link>
+                            <Link className={styles.navLink} to="/outings/new" onClick={() => setOpen(false)}>Create outing</Link>
                             <div className={styles.loginSignup}>
-                                <Link onClick={()=>setOpen(false)} to={"/me/profile"}>{data.name}</Link>
-                                <button onClick={ () =>
+                                <Link className={styles.navLink} onClick={()=>setOpen(false)} to={"/me/profile"}>{data.name}</Link>
+                                <button className={styles.logoutBtn} onClick={ () =>
                                     logout.mutate()
                                 }>Log out</button>
                             </div>
@@ -70,8 +70,8 @@ export function Header(){
 
                     ) :
                     (<div className={styles.loginSignup}>
-                        <Link to={'/login'} onClick={()=>setOpen(false)}><button>Log in</button></Link>
-                        <Link to={'/signup'} onClick={() => setOpen(false)}><button>Sign up</button></Link>
+                        <Link className={'btn'} to={'/login'} onClick={()=>setOpen(false)}>Log in</Link>
+                        <Link className={'btn-primary btn'} to={'/signup'} onClick={() => setOpen(false)}>Sign up</Link>
                     </div>)
                 }
             </div>
