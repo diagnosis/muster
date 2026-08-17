@@ -2,7 +2,7 @@
 // src/components/JoinForm.tsx
 import type {HikerRole, JoinRequest, JoinRequestInput} from "@/types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
-import {apiClient} from "@/lib/api.ts";
+import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import styles from '@/routes/form.module.css'
 import {useState} from "react";
 
@@ -27,7 +27,7 @@ export function JoinForm({outingId, onClose}:JoinProps){
                 if (res.ok){
                     return res.data
                 }
-                throw new Error(res.error.message)
+                throw new ApiRequestError(res.error, res.httpStatus)
             },
             onSuccess: () => {
                 queryClient.invalidateQueries({queryKey:['outing', outingId]})
@@ -79,6 +79,7 @@ export function JoinForm({outingId, onClose}:JoinProps){
                     value={seats}
                     onChange={e => setSeats(Number(e.target.value))}
                 />
+                <p className={styles.hint}>Includes your seat. 4 means you + 3 riders</p>
             </label>
             }
             <label className={styles.label}>

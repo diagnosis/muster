@@ -138,3 +138,10 @@
     line-height: var(--leading-label);
     font-weight: 600;
 }
+
+.fieldError{
+    color: var(--color-danger);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+    font-weight: 400;
+}

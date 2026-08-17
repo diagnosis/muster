@@ -1,6 +1,7 @@
 import { request, type APIRequestContext, type BrowserContext} from '@playwright/test'
 import type {RegisterRequest} from "./types.ts";
 import {BASE_URL} from "./config.ts";
+import {tag} from "./mint.ts";
 
 
 export interface Actor{
@@ -43,17 +44,15 @@ export async function actorInBrowser(actor: Actor, context: BrowserContext){
 
 const ADJ = ['brisk', 'sunny', 'quiet', 'amber', 'swift', 'rustic', 'clever', 'stormy']
 const NOUN = ['otter', 'falcon', 'cedar', 'harbor', 'lark', 'meadow', 'pebble', 'summit']
-const W = Number(process.env.TEST_WORKER_INDEX ?? 0).toString(36)
 
-let seq = 0
+
+
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
 const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)]
 
 const HOST = 'test.dev'
 
-function tag(): string {
-    return W + (seq++ % 1296).toString(36).padStart(2, '0') + Math.random().toString(36).slice(2, 5)
-}
+
 
 export function uniqueIdentity(): { name: string; email: string } {
     const adj = pick(ADJ)

@@ -4,7 +4,7 @@ import {createFileRoute, useNavigate} from '@tanstack/react-router'
 import {useState} from "react";
 import {useMutation} from "@tanstack/react-query";
 import type {Experience, MeResponse, RegisterRequest} from "@/types.ts";
-import {apiClient} from "@/lib/api.ts";
+import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import styles from "@/routes/form.module.css"
 import {requireGuest} from "@/queries.ts";
 
@@ -29,7 +29,7 @@ export function SignupPage() {
                 if (res.ok){
                     return res.data
                 }
-                throw new Error(res.error.message)
+                throw new ApiRequestError(res.error, res.httpStatus)
             },
             onSuccess: () => {
                 navigate({to: "/login"})
@@ -41,7 +41,7 @@ export function SignupPage() {
         e.preventDefault()
         signup.mutate({email, password, name, experience})
     }
-
+    const details =signup.error instanceof ApiRequestError ? signup.error.apiError.details : undefined
     return <>
 
         <form className={styles.form} onSubmit={handleSubmit}>
@@ -62,6 +62,7 @@ export function SignupPage() {
                     onChange={e => setEmail(e.target.value)}
                 />
             </label>
+            {details?.email && <p className={styles.fieldError}>{details.email}</p>}
             <label className={styles.label}>
                 Password
                 <input
@@ -70,6 +71,7 @@ export function SignupPage() {
                     onChange={e => setPassword(e.target.value)}
                 />
             </label>
+            {details?.password && <p className={styles.fieldError}>{details.password}</p>}
             <fieldset className={styles.fieldset}>
                 <legend className={styles.legend}>Experience</legend>
                     <div className={styles.radioRow}>

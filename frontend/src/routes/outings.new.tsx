@@ -5,7 +5,7 @@ import {useState} from "react";
 import type {CreateOutingInput, Difficulty, Outing, Pace} from "@/types.ts";
 import styles from "@/routes/form.module.css"
 import layout from "@/routes/outings.new.module.css"
-import {apiClient} from "@/lib/api.ts";
+import {apiClient, ApiRequestError} from "@/lib/api.ts";
 
 export const Route = createFileRoute('/outings/new')({
     beforeLoad : async ({context}) => requireAuth(context.queryClient),
@@ -33,7 +33,7 @@ export function CreateOutingPage() {
             if (res.ok){
                 return res.data
             }
-            throw new Error(res.error.message)
+            throw new ApiRequestError(res.error, res.httpStatus)
         },
         onSuccess:(data)=>{
             qc.invalidateQueries({queryKey:['outings']})
@@ -110,6 +110,7 @@ export function CreateOutingPage() {
                       value={host_seats}
                       onChange={e => setHost_seats(Number(e.target.value))}
                   />
+                  <span className={styles.hint}>Includes your seat — 4 means you + 3 riders</span>
               </label>
               <label className={styles.label}>Cost per Seat
                     <input
@@ -207,7 +208,7 @@ export function CreateOutingPage() {
                 </div>
               </div>
             </div>
-            <button className={`btn-primary ${layout.submit}`} type={"submit"} disabled={!title || !destination || !startsAt || !difficulty || !pace || createMutation.isPending}>Create Outing</button>
+            <button className={`btn-primary ${layout.submit}`} type={"submit"} disabled={!title || !destination ||!meet_label|| !startsAt || !difficulty || !pace || createMutation.isPending}>Create Outing</button>
               {createMutation.error&&<p className={styles.error}>{createMutation.error.message}</p>}
           </form>
       </div>

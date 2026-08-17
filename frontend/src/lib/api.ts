@@ -1,6 +1,6 @@
 // frontend/lib.api.ts
 
-import type {ApiResponse} from '../types'
+import type {ApiError, ApiResponse} from '../types'
 
 
 let refreshInFlight: Promise<boolean> | null = null
@@ -61,4 +61,15 @@ export const apiClient = {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(body),
     })
+}
+
+
+export class ApiRequestError extends Error {
+    readonly apiError: ApiError
+    readonly httpStatus: number
+    constructor(apiError: ApiError, httpStatus: number) {
+        super(apiError.message)
+        this.apiError = apiError
+        this.httpStatus = httpStatus
+    }
 }
