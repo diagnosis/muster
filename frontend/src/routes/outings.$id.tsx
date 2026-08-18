@@ -71,8 +71,14 @@ export function OutingDetailPage() {
 
         return <>
             {showForm
-                ? <JoinForm outingId={id} onClose={handleOnClose}/>
-                : <button className={'btn btn-primary'} onClick={() => setShowForm(true)}>Request to join</button>}
+                ? <>
+                    {isFull && <p className={styles.warning}>⚠️This outing is full — you can still request in case a spot opens.</p>}
+                    <JoinForm outingId={id} onClose={handleOnClose}/>
+                </>
+                : <>
+                    {isFull && <p className={styles.warning}>⚠️This outing is full — you can still request in case a spot opens.</p>}
+                    <button className={'btn btn-primary'} onClick={() => setShowForm(true)}>Request to join</button>
+                </>}
         </>
     }
 
@@ -113,7 +119,7 @@ export function OutingDetailPage() {
             </section>
             <section className={styles.section}>
                 <p>{detail.people_count} going · {detail.spots_left} of {effectiveCap} spots left</p>
-                {isFull && <p>This outing is full.</p>}
+                {isFull && <p className={styles.warning}>This outing is full.</p>}
                 {!isFull && detail.seats_short > 0 && <p>⚠️ {detail.seats_short} more seats needed — join as a driver?</p>}
                 {!isFull && detail.seats_short === 0 && detail.spots_left === 0 && <p>No seats left — a driver could open more spots. 🚗</p>}
             </section>

@@ -35,12 +35,12 @@ test.describe('join form', ()=>{
 
 
 
-async function openJoinForm(page: Page, context: BrowserContext){
+export async function openJoinForm(page: Page, context: BrowserContext){
     const actorHost = await createActor()
     const outing = await createOuting(actorHost)
     const actorHiker = await createActor()
     await actorInBrowser(actorHiker, context)
     await page.goto(`/outings/${outing.id}`)
     await page.getByRole('button', {name:'Request to join'}).click()
-    return{outing, actorHiker}
+    return{outing, actorHiker, actorHost}
 }

@@ -43,7 +43,7 @@ export function JoinForm({outingId, onClose}:JoinProps){
     }
 
     return(
-        <form className={styles.form} onSubmit={handleSubmit}>
+        <form aria-label={'Join outing'} className={styles.form} onSubmit={handleSubmit}>
             <fieldset className={styles.fieldset}>
                 <legend className={styles.legend}>Hiker Role</legend>
                 <div className={styles.radioRow}>

@@ -9,7 +9,7 @@ interface ModalProps{
 export function Modal({onClose, children}: ModalProps){
     return (
         <div className={styles.backdrop} onClick={onClose}>
-            <div className={styles.panel} onClick={e => e.stopPropagation()}>
+            <div className={styles.panel} role="dialog" aria-modal={true} onClick={e => e.stopPropagation()}>
                 {children}
             </div>
         </div>
