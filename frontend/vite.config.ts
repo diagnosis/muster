@@ -16,5 +16,6 @@ export default defineConfig({
           '@': resolve(__dirname, './src')
       }
     },
-  server: {proxy: {'/api':'http://localhost:8088'}}
+    server: {proxy: {'/api':'http://localhost:8088'}},
+    preview: { proxy: { '/api': 'http://localhost:8088' } },
 })

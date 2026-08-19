@@ -1,7 +1,7 @@
 import {expect, test} from '@playwright/test'
 import {actorInBrowser, createActor} from "../fixtures/actor.ts";
 import {acceptRequest, createOuting, joinRequest} from "../fixtures/outingApiHelper.ts";
-import {FULL_WARNING, OUTING_FULL, SEAT_SHORTAGE} from "../fixtures/copy.ts";
+import {FULL_WARNING, OUTING_FULL, SEAT_SHORT, NO_SEAT_LEFT} from "../fixtures/copy.ts";
 
 
 test.describe('outing capacity', ()=>{
@@ -29,9 +29,19 @@ test.describe('outing capacity', ()=>{
         await acceptRequest(actorHost, jr.id)
         await actorInBrowser(actorDriver, context)
         await page.goto(`/outings/${outing.id}`)
-        await expect(page.getByText(SEAT_SHORTAGE)).toBeVisible()
+        await expect(page.getByText(NO_SEAT_LEFT)).toBeVisible()
         await expect(page.getByText(OUTING_FULL)).not.toBeVisible()
         await expect(page.getByText(FULL_WARNING)).not.toBeVisible()
+     });
+    test('host_seats:0', async ({page, context})=>{
+        const actorHost = await createActor()
+        const outing = await createOuting(actorHost, {host_seats:0, max_size:4})
+        const actorHiker = await createActor()
+        await actorInBrowser(actorHiker, context)
+        await page.goto(`/outings/${outing.id}`)
+        await expect(page.getByText(SEAT_SHORT)).toBeVisible()
+        await expect(page.getByText(NO_SEAT_LEFT)).not.toBeVisible()
+        await expect(page.getByText(OUTING_FULL)).not.toBeVisible()
 
-     })
+    })
 })
