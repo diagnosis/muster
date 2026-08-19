@@ -2,7 +2,7 @@
 
 
 import type {Detail, MeResponse, MyOutings, Outing, PendingRequestResponse} from "@/types.ts";
-import {apiClient} from "@/lib/api.ts";
+import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import {type QueryClient, useQuery} from "@tanstack/react-query";
 import {redirect} from "@tanstack/react-router";
 
@@ -15,7 +15,7 @@ export const  getMe = async () => {
         if (res.httpStatus === 401){
             return null
         }else{
-            throw new Error(res.error.message)
+            throw new ApiRequestError(res.error, res.httpStatus)
         }
     }
 }
@@ -38,7 +38,7 @@ export const getOutingByID = async (id:string) => {
     if (res.ok){
         return res.data
     }
-    throw new Error(res.error.message)
+    throw new ApiRequestError(res.error, res.httpStatus)
 }
 export function useOuting(id:string){
     return useQuery({
@@ -52,7 +52,7 @@ export const getOutings=async ()=>{
     if (res.ok){
         return res.data
     }
-    throw new Error(res.error.message)
+    throw new ApiRequestError(res.error, res.httpStatus)
 }
 
 export function useOutings(){
@@ -73,7 +73,7 @@ export function useOutingJoinRequests(id: string) {
                 if(res.ok){
                     return res.data
                 }
-                throw new Error(res.error.message)
+                throw new ApiRequestError(res.error, res.httpStatus)
             }
 
         }
@@ -92,7 +92,7 @@ export function useMyOutings(){
                 if (res.ok){
                     return res.data
                 }
-                throw new Error(res.error.message)
+                throw new ApiRequestError(res.error, res.httpStatus)
             }
         }
     )

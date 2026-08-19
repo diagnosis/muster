@@ -3,7 +3,7 @@
 import {createFileRoute, useNavigate} from '@tanstack/react-router'
 import {useState} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
-import {apiClient} from "@/lib/api";
+import {apiClient, ApiRequestError} from "@/lib/api";
 import type {MeResponse} from "@/types";
 import styles from "@/routes/form.module.css"
 import {requireGuest} from "@/queries.ts";
@@ -26,7 +26,7 @@ export function LoginPage(){
             if (res.ok){
                 return res.data
             }
-            throw new Error(res.error.message)
+            throw new ApiRequestError(res.error, res.httpStatus)
         },
         onSuccess: () =>{
             queryClient.invalidateQueries({queryKey:['me']})
