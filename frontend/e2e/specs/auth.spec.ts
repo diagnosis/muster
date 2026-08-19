@@ -1,7 +1,7 @@
 import {test, expect} from '@playwright/test'
 import {WEB_URL} from "../fixtures/config.ts";
 import {actorInBrowser, createActor, uniqueIdentity} from "../fixtures/actor.ts";
-import {expectLoggedIn, expectLoggedOut} from "../fixtures/assertions.ts";
+import {expectLoggedIn, expectLoggedOut, expectNavClosed, openNav} from "../fixtures/assertions.ts";
 import {EMAIL_EXISTS, INVALID_LOGIN, INVALID_PASSWORD, SHORT_PASSWORD, VALIDATION_FAILED} from "../fixtures/copy.ts";
 
 
@@ -9,6 +9,7 @@ import {EMAIL_EXISTS, INVALID_LOGIN, INVALID_PASSWORD, SHORT_PASSWORD, VALIDATIO
 test.describe("auth flow", ()=> {
     test('successful register', async ({page})=>{
         await page.goto("/")
+        await openNav(page)
         await page.getByRole('link', { name: 'Sign up' }).click()
 
         await expect(page).toHaveURL(`${WEB_URL}/signup`)
@@ -29,6 +30,7 @@ test.describe("auth flow", ()=> {
         const {email} = actor.user
 
         await page.goto("/")
+        await openNav(page)
         await page.getByRole('link', { name: 'Sign up' }).click()
 
         await expect(page).toHaveURL(`${WEB_URL}/signup`)
@@ -45,6 +47,7 @@ test.describe("auth flow", ()=> {
     });
     test('invalid password for registration field', async ({page})=>{
         await page.goto('/')
+        await openNav(page)
         await page.getByRole("link", {name: 'Sign up'}).click()
         await expect(page).toHaveURL(`${WEB_URL}/signup`)
         await expect(page.getByRole('heading', { name: 'Sign Up' })).toBeVisible()
@@ -68,6 +71,7 @@ test.describe("auth flow", ()=> {
     test('successful login', async ({page})=>{
         const actor = await createActor()
         await page.goto("/")
+        await openNav(page)
         await page.getByRole('link', {name: 'Log in'}).click()
         await expect(page).toHaveURL(`${WEB_URL}/login`)
 
@@ -81,6 +85,7 @@ test.describe("auth flow", ()=> {
     });
     test('failed login', async ({page})=>{
         await page.goto('/')
+        await openNav(page)
         await page.getByRole('link', {name: 'Log in'}).click()
         await expect(page).toHaveURL(`${WEB_URL}/login`)
 
@@ -99,8 +104,10 @@ test.describe("auth flow", ()=> {
         const {name} = actor.user
         await actorInBrowser(actor, context)
         await page.goto('/')
+        await openNav(page)
         await expectLoggedIn(page, name)
         await page.getByRole('button', { name: 'Log out' }).click()
+        await expectNavClosed(page)
         await expectLoggedOut(page)
     });
     test('successful refresh', async ({page, context})=>{

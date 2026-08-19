@@ -3,12 +3,14 @@
 import {expect, test} from "@playwright/test";
 import {actorInBrowser, createActor} from "../fixtures/actor.ts";
 import {createOuting} from "../fixtures/outingApiHelper.ts";
+import {openNav} from "../fixtures/assertions.ts";
 
 test.describe('create outing', ()=>{
     test('disabled-until-valid', async({page, context})=>{
         const actor = await createActor()
         await actorInBrowser(actor, context)
         await page.goto('/')
+        await openNav(page)
         await page.getByRole('link', {name:'Create outing'}).click()
         await expect(page.getByRole('heading', { name: 'Create Outing' })).toBeVisible()
 
