@@ -1,5 +1,5 @@
 import {createFileRoute, Link} from '@tanstack/react-router'
-import {apiClient} from "@/lib/api.ts";
+import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import type {Detail} from "@/types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useMeQuery, useOuting} from "@/queries.ts";
@@ -26,7 +26,7 @@ export function OutingDetailPage() {
             if (res.ok){
                 return res.data
             }
-            throw new Error(res.error.message)
+            throw new ApiRequestError(res.error, res.httpStatus)
         },
         onSuccess : () => {
             qc.invalidateQueries({queryKey: ['outing', id]})

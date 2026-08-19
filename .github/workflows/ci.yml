@@ -75,9 +75,22 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      - name: Install Playwright browsers
+      - name: Cache Playwright browsers
         if: inputs.suite != 'backend'
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        if: inputs.suite != 'backend' && steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium webkit
+        working-directory: frontend
+
+      - name: Install Playwright OS deps
+        if: inputs.suite != 'backend' && steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium webkit
         working-directory: frontend
 
       - name: Run UI suite

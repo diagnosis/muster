@@ -1,6 +1,6 @@
 
 //src/components/HostControls.tsx
-import {apiClient} from "@/lib/api.ts";
+import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import type {Detail, JoinRequest, Outing, PendingRequestResponse} from "@/types.ts";
 import {useOutingJoinRequests} from "@/queries.ts";
@@ -24,7 +24,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
             if(res.ok){
                 return res.data
             }
-            throw new Error(res.error.message)
+            throw new ApiRequestError(res.error, res.httpStatus)
         },
         onSuccess: () => {
             qc.invalidateQueries({queryKey: ['outing', outingId]})
@@ -39,7 +39,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
             if (res.ok){
                 return res.data
             }
-            throw new Error(res.error.message)
+            throw new ApiRequestError(res.error, res.httpStatus)
         },
         onSuccess: () => {
             qc.invalidateQueries({queryKey:['outing', outingId]})
@@ -55,7 +55,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
             if (res.ok){
                 return res.data
             }
-            throw new Error(res.error.message)
+            throw new ApiRequestError(res.error, res.httpStatus)
         }, onSuccess:() => {
             qc.invalidateQueries({queryKey:['outing', outingId]})
             qc.invalidateQueries({queryKey: ['my-outings']})

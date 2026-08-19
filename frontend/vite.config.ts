@@ -13,7 +13,7 @@ export default defineConfig({
       react()],
     resolve:{
       alias:{
-          '@': resolve(__dirname, './src')
+          '@': resolve(import.meta.dirname, './src')
       }
     },
     server: {proxy: {'/api':'http://localhost:8088'}},

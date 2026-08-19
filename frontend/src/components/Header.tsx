@@ -2,7 +2,7 @@
 import {useMeQuery} from "@/queries.ts";
 import {Link, useNavigate} from "@tanstack/react-router";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
-import {apiClient} from "@/lib/api.ts";
+import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import styles from  "@/components/Header.module.css"
 import {useEffect, useRef, useState} from "react";
 
@@ -19,7 +19,7 @@ export function Header(){
             if (res.ok){
                 return res.data
             }
-            throw new Error(res.error.message)
+            throw new ApiRequestError(res.error, res.httpStatus)
         },
         onSettled : () => {
             queryClient.invalidateQueries({queryKey:['me']})

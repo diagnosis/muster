@@ -4,7 +4,7 @@ import type {Experience, MeInputRequest, MeResponse} from "@/types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
 import styles from "@/routes/form.module.css";
-import {apiClient} from "@/lib/api.ts";
+import {apiClient, ApiRequestError} from "@/lib/api.ts";
 
 interface ProfileFormProps{
     me: MeResponse
@@ -21,7 +21,7 @@ export function ProfileForm({me}: ProfileFormProps){
                 if (res.ok){
                     return res.data
                 }
-                throw new Error(res.error.message)
+                throw new ApiRequestError(res.error, res.httpStatus)
             },
             onSuccess: ()=>{
                 qc.invalidateQueries({queryKey: ["me"]})
