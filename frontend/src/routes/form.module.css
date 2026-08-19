@@ -1,0 +1,147 @@
+/* /src/routes/form.module.css */
+
+.form{
+    max-width: 28rem;
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.label{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
+    font-weight: 600;
+}
+
+
+.error {
+    color: var(--color-danger);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+}
+
+/* the "why" line under a disabled submit */
+.hint{
+    color: var(--color-text-muted);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+}
+
+
+.radioRow {
+    display: flex;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+    background: var(--surface-raised);
+}
+
+.radioButton{
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    /* tight inline padding: three segments of "Experienced"/"Intermediate"
+       have to clear 375px without wrapping */
+    padding: var(--space-2) var(--space-1);
+    text-align: center;
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
+    font-weight: 400;
+    cursor: pointer;
+}
+
+/* hairline divider between segments — every one but the first */
+.radioButton + .radioButton{
+    border-left: 1px solid var(--border-subtle);
+}
+
+.radioButton:not(.radioButtonChecked):hover{
+    background: var(--surface-page);
+}
+
+.radioButton input{
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* inset ring: the container clips overflow, so an outward offset would
+   be cut off on the two end segments */
+.radioButton:has(input:focus-visible){
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
+.radioButtonChecked{
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-weight: 600;
+}
+
+.form h1 {
+    text-align: center;
+    margin-bottom: var(--space-1);
+    font-family: var(--font-display);
+    font-size: var(--text-display);
+    line-height: var(--leading-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+.readOnlyRow{
+    display: flex;
+    flex-direction: column;
+    gap:var(--space-1);
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
+}
+.readOnlyLabel{
+    color:var(--color-text-muted);
+    font-weight: 600;
+}
+.quietBtn{
+    border:0;
+    color: var(--color-text-muted);
+    align-self: flex-start;
+    padding-inline: 0;
+    text-decoration: underline;
+
+}
+.quietBtn:hover{
+    background: transparent;
+    color: var(--color-text);
+}
+
+.fieldset {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+.legend {
+    padding: 0;
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
+    font-weight: 600;
+}
+
+.fieldError{
+    color: var(--color-danger);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+    font-weight: 400;
+}

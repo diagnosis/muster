@@ -1,0 +1,56 @@
+
+/*/src/styles/base.css*/
+/*scope will be button, input, textarea, select*/
+
+button,
+.btn{
+    padding: var(--space-3) var(--space-4);
+    border: solid 1px var(--border-subtle);
+    border-radius: var(--radius-control);
+    background: transparent;
+    font-family: inherit;
+    font-size: var(--text-body);
+    line-height: var(--leading-body);
+    cursor: pointer;
+}
+button:hover,
+.btn:hover{
+    background: var(--surface-raised);
+}
+.btn-primary{
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-on-primary);
+    font-weight: 600;
+}
+.btn-primary:hover{
+    background: var(--color-primary-dark);
+}
+
+/* Disabled sits on the page surface behind a dashed edge, so it reads as
+   "waiting on you" rather than as a faded-out colour. Must stay below the
+   :hover rules — button:disabled and button:hover have equal specificity,
+   so source order is what keeps hover from repainting a disabled button. */
+button:disabled,
+.btn-primary:disabled{
+    background: var(--surface-page);
+    border: 1px dashed var(--border-subtle);
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+}
+
+input:not([type="radio"]):not([type="checkbox"]),
+textarea, select {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-control);
+    background: var(--surface-raised);
+    font-family: inherit;
+    font-size: var(--text-body);
+    font-weight: 400;
+    line-height: var(--leading-body);
+}
+textarea{
+    resize: vertical;
+    min-height: 5rem;
+}

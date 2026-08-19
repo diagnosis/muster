@@ -1,0 +1,86 @@
+/*src/routes/outings.new.module.css*/
+
+/* width of the desktop margin column, shared by the group labels and by the
+   submit offset so the two cannot drift apart */
+.createForm{
+    --label-col: 11rem;
+}
+
+.groups{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+
+.group{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.groupLabel{
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+}
+
+/* the hairline runs from the end of the label to the edge of the column */
+.groupLabel::after{
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-subtle);
+}
+
+.fields{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+@media (min-width: 40em){
+    /* .form caps at 28rem for the other four forms; this one needs the
+       margin column beside it. Doubled class so the override wins on
+       specificity rather than on stylesheet order, which is decided by
+       the bundler. */
+    .createForm.createForm{
+        max-width: 41rem;
+    }
+
+    .group{
+        flex-direction: row;
+        align-items: flex-start;
+        gap: var(--space-8);
+    }
+    /* the rule between groups replaces the inline one, as in the design */
+    .group + .group{
+        border-top: 1px solid var(--border-subtle);
+        padding-top: var(--space-6);
+    }
+
+    .groupLabel{
+        flex: none;
+        width: var(--label-col);
+        padding-top: var(--space-1);
+    }
+    .groupLabel::after{
+        display: none;
+    }
+
+    .fields{
+        width: 28rem;
+    }
+
+    /* the form is 41rem here, so the submit would otherwise stretch across
+       both columns; line it up under the fields instead */
+    .submit{
+        width: 28rem;
+        margin-left: calc(var(--label-col) + var(--space-8));
+    }
+}

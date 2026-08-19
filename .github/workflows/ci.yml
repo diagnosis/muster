@@ -4,6 +4,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      suite:
+        type: choice
+        options: [both, backend, frontend]
+        default: both
 
 jobs:
   check:
@@ -56,12 +61,39 @@ jobs:
           curl --retry 15 --retry-delay 2 --retry-connrefused --retry-all-errors -sS http://localhost:8088/api/health
 
       - name: Install e2e deps
+        if: inputs.suite != 'frontend'
         run: npm ci
         working-directory: backend/e2e
 
       - name: Run suite
+        if: inputs.suite != 'frontend'
         env: { BASE_URL: "http://localhost:8088" }
         run: make e2e
+
+      - name: Install e2e frontend deps
+        if: inputs.suite != 'backend'
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install Playwright browsers
+        if: inputs.suite != 'backend'
+        run: npx playwright install --with-deps chromium webkit
+        working-directory: frontend
+
+      - name: Run UI suite
+        if: inputs.suite != 'backend'
+        run: npm run e2e
+        working-directory: frontend
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 'playwright-report'
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
 
       - name: Delete Neon branch
         if: always()

@@ -1,0 +1,49 @@
+
+/*src/components/HostControls.module.css*/
+.requestRow{
+    width: 100%;
+    text-align: left;
+    background: var(--surface-raised);
+}
+.requestRow:hover{
+    border-color: var(--color-text-muted);
+}
+.cancelBtn{
+    margin-top:var(--space-4);
+    border-color: var(--color-danger);
+    color:var(--color-danger);
+}
+
+.host{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    align-items: flex-start;
+}
+.modalHeader{
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3)
+}
+.closeBtn{
+    border:0;
+    padding: var(--space-1) var(--space-2);
+    font-size: 1.25rem;
+    line-height: 1;
+    color: var(--color-text-muted);
+}
+.closeBtn:hover{
+    color: var(--color-text);
+    background: var(--surface-page);
+}
+
+.actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+.declineBtn {
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+}

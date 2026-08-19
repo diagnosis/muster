@@ -1,0 +1,122 @@
+/*/src/components/Header.module.css*/
+
+.nav{
+    padding-block: var(--space-4);
+    border-bottom: 1px solid var(--border-subtle);
+    position: relative;
+}
+.inner{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: var(--width-shell);
+    margin-inline: auto;
+    padding-inline: var(--space-4);
+}
+.logo{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: var(--text-title);
+    line-height: var(--leading-title);
+    letter-spacing: -0.01em;
+}
+
+.navLink:hover{
+    text-decoration: underline;
+}
+.navLink[data-status="active"]{
+    color: var(--color-primary);
+}
+
+/* ---- mobile ---- */
+
+.panel{
+    display: none;
+}
+.panelOpen{
+    display: flex;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: 0 var(--space-4) var(--space-4);
+    background: var(--surface-raised);
+    border-bottom: 1px solid var(--border-subtle);
+    box-shadow: 0 8px 16px -12px rgb(59 54 43 / 0.4);
+    z-index: 20;
+}
+.userOutings,
+.loginSignup{
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+}
+
+/* nav links get row treatment; buttons don't */
+.panelOpen .navLink{
+    padding-block: var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+}
+.panelOpen button,
+.panelOpen .btn{
+    justify-content: center;
+    width: 100%;
+    margin-top: var(--space-3);
+}
+
+.hamburgerBtn{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 1.5rem;
+    line-height: 1;
+    background: none;
+    border: 0;
+    border-radius: var(--radius-control);
+}
+.hamburgerBtn:hover{
+    background: var(--surface-raised);
+}
+.logoutBtn:hover{
+    background: var(--surface-sunken);
+}
+
+/* ---- 640px and up ---- */
+
+@media (min-width: 40em){
+    .toggle{
+        display: none;
+    }
+    .panel,
+    .panelOpen{
+        display: flex;
+        position: static;
+        padding: 0;
+        background: none;
+        border: 0;
+        box-shadow: none;
+    }
+    .userOutings,
+    .loginSignup{
+        flex-direction: row;
+        align-items: center;
+        gap: var(--space-2);
+        width: auto;
+    }
+    .userOutings{
+        gap: var(--space-6);
+    }
+    .panelOpen .navLink{
+        padding-block: 0;
+        border-bottom: 0;
+    }
+    .panelOpen button,
+    .panelOpen .btn{
+        width: auto;
+        margin-top: 0;
+    }
+}

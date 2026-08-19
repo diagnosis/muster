@@ -1,0 +1,10 @@
+/*/src/App.css*/
+
+.wrapper{
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap:12px;
+}

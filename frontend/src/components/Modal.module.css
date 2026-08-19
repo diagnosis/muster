@@ -1,0 +1,13 @@
+.backdrop{
+    position: fixed; inset: 0;z-index: 10;
+    background: rgb(0 0 0 / 0.5);
+    display: flex; align-items: center; justify-content: center;
+}
+
+.panel{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    background: var(--surface-raised); border-radius: var(--radius-card);
+    padding: var(--space-4); max-width: var(--width-modal); width: 90%;
+}
