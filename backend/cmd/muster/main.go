@@ -66,9 +66,9 @@ func run() error {
 	outings := outing.NewService(outingsStore)
 	srv := api.NewServer(cfg, hikers, signer, outings)
 
-	logger.Info(ctx, "muster listening", "port", cfg.App.Port)
+	logger.Info(ctx, "muster listening", "addr", cfg.App.Host+":"+cfg.App.Port)
 	return (&http.Server{
-		Addr:              ":" + cfg.App.Port,
+		Addr:              cfg.App.Host + ":" + cfg.App.Port,
 		Handler:           srv.Routes(),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      0,
