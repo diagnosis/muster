@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,8 +19,11 @@ type Config struct {
 
 // AppConfig holds app configurations. platform, env, port etc.
 type AppConfig struct {
-	Env  string
-	Port string
+	Env            string
+	Port           string
+	Host           string
+	CORSOrigins    []string
+	CookieSameSite http.SameSite
 }
 
 // DatabaseConfig holds connection settings and pool tuning for Postgres.
@@ -80,9 +85,30 @@ func Load() (*Config, error) {
 func loadAppConfig() (*AppConfig, error) {
 	env := getEnv("APP_ENV", "dev")
 	port := getEnv("APP_PORT", "8088")
+	host := getEnv("APP_HOST", "")
+
+	corsOrigins := []string{}
+	corsRaw := getEnv("CORS_ORIGINS", "")
+	if corsRaw != "" {
+		for origin := range strings.SplitSeq(corsRaw, ",") {
+			corsOrigins = append(corsOrigins, strings.TrimSpace(origin))
+		}
+	}
+
+	cookieSameSite, err := parseSameSite("COOKIE_SAMESITE", "lax")
+	if err != nil {
+		return nil, err
+	}
+	if cookieSameSite == http.SameSiteNoneMode && env == "dev" {
+		return nil, fmt.Errorf("COOKIE_SAMESITE=none requires non-dev APP_ENV (Secure cookies)")
+	}
+
 	return &AppConfig{
-		Env:  env,
-		Port: port,
+		Env:            env,
+		Port:           port,
+		Host:           host,
+		CORSOrigins:    corsOrigins,
+		CookieSameSite: cookieSameSite,
 	}, nil
 }
 
@@ -207,4 +233,17 @@ func getEnvDuration(key string, def time.Duration) (time.Duration, error) {
 		return 0, fmt.Errorf("%s: invalid value %q: %w", key, val, err)
 	}
 	return d, nil
+}
+func parseSameSite(key, def string) (http.SameSite, error) {
+	val := strings.ToLower(strings.TrimSpace(getEnv(key, def)))
+	switch val {
+	case "lax":
+		return http.SameSiteLaxMode, nil
+	case "none":
+		return http.SameSiteNoneMode, nil
+	case "strict":
+		return http.SameSiteStrictMode, nil
+	default:
+		return 0, fmt.Errorf("%s: invalid value %q (want lax, none, or strict)", key, val)
+	}
 }

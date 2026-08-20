@@ -72,6 +72,7 @@ func (s *Server) Routes() http.Handler {
 	var h http.Handler = mux
 	h = middleware.RateLimit(rate.Limit(s.cfg.RateLimiter.RPS), int(s.cfg.RateLimiter.Burst), 5*time.Minute)(h)
 	h = middleware.CorrelationID()(h)
+	h = middleware.CORS(s.cfg.App.CORSOrigins)(h)
 	return h
 }
 

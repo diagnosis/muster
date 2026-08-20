@@ -180,22 +180,22 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setSessionCookies(w http.ResponseWriter, sess *hiker.Session) {
-	secure := s.cfg.App.Env != "dev" // hardcoded true would eat cookies on localhost http
+	secure, sameSite := s.cookieFlags()
 	http.SetCookie(w, &http.Cookie{
 		Name: "access_token", Value: sess.AccessToken, Path: "/",
-		HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: secure, SameSite: sameSite,
 		MaxAge: int(s.cfg.JWT.AccessTokenExpiry.Seconds()),
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name: "refresh_token", Value: sess.RefreshToken, Path: "/",
-		HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: secure, SameSite: sameSite,
 		MaxAge: int(s.cfg.JWT.RefreshTokenExpiry.Seconds()),
 	})
 
 }
 
 func (s *Server) clearSessionCookies(w http.ResponseWriter) {
-	secure := s.cfg.App.Env != "dev" // hardcoded true would eat cookies on localhost http
+	secure, sameSite := s.cookieFlags()
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
 		Value:    "",
@@ -203,7 +203,7 @@ func (s *Server) clearSessionCookies(w http.ResponseWriter) {
 		MaxAge:   int(-1),
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
@@ -212,6 +212,11 @@ func (s *Server) clearSessionCookies(w http.ResponseWriter) {
 		MaxAge:   int(-1),
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 	})
+}
+
+// exact flag needs to be dev
+func (s *Server) cookieFlags() (bool, http.SameSite) {
+	return s.cfg.App.Env != "dev", s.cfg.App.CookieSameSite
 }
