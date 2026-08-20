@@ -1,5 +1,5 @@
 // frontend/lib.api.ts
-
+const API_BASE = import.meta.env.VITE_API_URL ?? ''
 import type {ApiError, ApiResponse} from '../types'
 
 
@@ -34,7 +34,7 @@ const request = async <T>(endpoint:string, init?: RequestInit):Promise<ApiRespon
 
 
 const bareRequest = async <T>(endpoint:string, init?: RequestInit): Promise<ApiResponse<T>> =>{
-    const res = await fetch(endpoint, init)
+    const res = await fetch(API_BASE+endpoint, {...init, credentials: 'include'})
     const json = await res.json().catch(()=> null)
     if (res.ok){
         return {ok: true, data: json?.data as T}
