@@ -1,0 +1,36 @@
+name: deploy.yml
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: backend/go.mod }
+
+      - name: Build
+        run: GOOS=linux GOARCH=amd64 go build -o muster ./cmd/muster
+
+      - name: Write deploy key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Ship binary
+        run: scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new muster ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/muster/backend/muster.new
+
+      - name: Swap and restart
+        run: ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} 'mv /var/www/muster/backend/muster.new /var/www/muster/backend/muster && sudo systemctl restart muster'
+
+      - name: Verify
+        run: curl --retry 5 --retry-delay 2 --retry-connrefused -sSf https://muster-api.safadev.app/health
