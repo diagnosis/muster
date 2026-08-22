@@ -30,7 +30,8 @@ func (f *fakeStore) GetOuting(ctx context.Context, id uuid.UUID) (*Outing, error
 	if !ok {
 		return nil, apperr.NotFound("outing not found", "fake: no outing")
 	}
-	return o, nil
+	cp := *o
+	return &cp, nil
 }
 func (f *fakeStore) CreateOuting(ctx context.Context, o *Outing) error {
 	f.outings[o.ID] = o
@@ -46,13 +47,15 @@ func (f *fakeStore) GetJoinRequest(ctx context.Context, id uuid.UUID) (*JoinRequ
 	if !ok {
 		return nil, apperr.NotFound("request not found", "fake: no request")
 	}
-	return r, nil
+	cp := *r
+	return &cp, nil
 }
 
 func (f *fakeStore) GetJoinRequestByHiker(ctx context.Context, outingID, hikerID uuid.UUID) (*JoinRequest, error) {
 	for _, r := range f.requests {
 		if r.OutingID == outingID && r.HikerID == hikerID {
-			return r, nil
+			cp := *r
+			return &cp, nil
 		}
 	}
 	return nil, apperr.NotFound("request not found", "fake: no request for hiker")

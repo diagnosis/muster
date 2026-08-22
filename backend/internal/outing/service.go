@@ -158,9 +158,10 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 
 // Update patches the host's open, future outing. Nil fields are left
 // unchanged; a "notes": null cannot clear notes in v0 (indistinguishable
-// from omission). Capacity is NOT re-checked against the roster:
-// shrinking limits below commitments is allowed — the shortage surfaces
-// in Detail and the host resolves it.
+// from omission). MaxSize is re-checked post-apply against committed
+// people (host + accepted + guests): shrinking below that count is
+// rejected with Conflict. Seat capacity may shrink freely — shortage
+// surfaces as the seats-short state and the host resolves it.
 func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in UpdateInput) (*Outing, error) {
 	o, err := s.store.GetOuting(ctx, outingID)
 	if err != nil {
@@ -211,6 +212,22 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 	}
 	if in.Notes != nil {
 		o.Notes = in.Notes
+	}
+
+	acceptedRequests, err := s.store.ListJoinRequests(ctx, outingID, RequestStatusAccepted)
+	if err != nil {
+		return nil, err
+	}
+	peopleCount := 1
+
+	for _, r := range acceptedRequests {
+		peopleCount += 1 + r.Guests
+	}
+	if o.MaxSize < peopleCount {
+		return nil, apperr.Conflict(
+			"cannot reduce group size below current committed members",
+			"update: max_size below people count",
+		)
 	}
 
 	if verr := validateOuting(o); verr != nil {
