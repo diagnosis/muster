@@ -7,6 +7,7 @@ import {useOutingJoinRequests} from "@/queries.ts";
 import {useState} from "react";
 import {Modal} from "@/components/Modal.tsx";
 import styles from "@/components/HostControls.module.css"
+import {Link} from "@tanstack/react-router";
 
 interface HostControlsProps{
     outingId: string
@@ -115,7 +116,10 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
             </Modal>
         )}
 
-        <button className={styles.cancelBtn} onClick={handleCancel}>Cancel Outing</button>
+        <div className={styles.actions}>
+            <button className={styles.cancelBtn} onClick={handleCancel}>Cancel Outing</button>
+            <Link className={'btn'} to="/outings/$id/edit" params={{id: outingId}}>Edit Outing</Link>
+        </div>
         </div>
 
 
