@@ -1,0 +1,202 @@
+// src/components/OutingFrom.tsx
+
+import type {CreateOutingInput, Difficulty, Outing, Pace} from "@/types.ts";
+import styles from "@/routes/form.module.css"
+import {type ApiRequestError} from "@/lib/api.ts";
+import {useState} from "react";
+import layout from "@/routes/outings.new.module.css"
+import {isoToLocalInput} from "@/utils/date.ts";
+
+interface OutingFormProps {
+    heading: string
+    initial? : Outing
+    onSubmit: (values: CreateOutingInput) => void
+    submitLabel: string,
+    pending?: boolean,
+    error?: ApiRequestError
+}
+
+
+
+export function OutingForm(props: OutingFormProps){
+    const [title, setTitle] = useState(props.initial?.title ?? "")
+    const [destination, setDestination] = useState(props.initial?.destination ?? "")
+    const [meet_label, setMeet_label] = useState(props.initial?.meet_label ?? "")
+    const [startsAt, setStartsAt] = useState(props.initial ? isoToLocalInput(props.initial.starts_at) : "")
+    const [max_size, setMax_size] = useState(props.initial?.max_size ?? 2)
+    const [host_seats, setHost_seats] = useState(props.initial?.host_seats ?? 0)
+    const [costDollar, setCostDollar] = useState(props.initial ? props.initial.cost_per_seat_cents / 100 : 0)
+    const [difficulty, setDifficulty] = useState<Difficulty|null>(props.initial?.difficulty ?? null)
+    const [pace, setPace] = useState<Pace|null>(props.initial?.pace ?? null)
+    const [notes, setNotes] = useState<string>(props.initial?.notes ?? "")
+
+    function handleSubmit(e: React.SubmitEvent){
+        e.preventDefault()
+        if (!difficulty || !pace) return
+        props.onSubmit({
+            title, destination, meet_label,
+            starts_at: new Date(startsAt).toISOString(),
+            max_size, host_seats, cost_per_seat_cents: Math.round(costDollar*100),
+            difficulty, pace,
+            notes: notes || undefined,
+        })
+    }
+
+    return <>
+        <form className={`${styles.form} ${layout.createForm}`} onSubmit={handleSubmit}>
+            <h1>{props.heading}</h1>
+            <div className={layout.groups}>
+                <div className={layout.group}>
+                    <div className={layout.groupLabel}>Where &amp; when</div>
+                    <div className={layout.fields}>
+                        <label className={styles.label}>Title
+                            <input
+                                type="text"
+                                value={title}
+                                onChange={e => setTitle(e.target.value)}
+                            />
+                        </label>
+                        <label className={styles.label}>Destination
+                            <input
+                                type="text"
+                                value={destination}
+                                onChange={e => setDestination(e.target.value)}
+                            />
+                        </label>
+                        <label className={styles.label}>Meet Label
+                            <input
+                                type="text"
+                                value={meet_label}
+                                onChange={e => setMeet_label(e.target.value)}
+                            />
+                        </label>
+                        <label className={styles.label}>Starts At
+                            <input
+                                type="datetime-local"
+                                value={startsAt}
+                                onChange={e => setStartsAt(e.target.value)}
+                            />
+                        </label>
+                    </div>
+                </div>
+
+                <div className={layout.group}>
+                    <div className={layout.groupLabel}>Seats &amp; cost</div>
+                    <div className={layout.fields}>
+                        <label className={styles.label}>Max Size
+                            <input
+                                type="number"
+                                min={2}
+                                value={max_size}
+                                onChange={e => setMax_size(Number(e.target.value))}
+                            />
+                        </label>
+                        <label className={styles.label}>Host Seats
+                            <input
+                                type="number"
+                                min={0}
+                                value={host_seats}
+                                onChange={e => setHost_seats(Number(e.target.value))}
+                            />
+                            <span className={styles.hint}>Includes your seat — 4 means you + 3 riders</span>
+                        </label>
+                        <label className={styles.label}>Cost per Seat
+                            <input
+                                type="number"
+                                min={0}
+                                value={costDollar}
+                                onChange={e => setCostDollar(Number(e.target.value))}
+                            />
+                        </label>
+                    </div>
+                </div>
+
+                <div className={layout.group}>
+                    <div className={layout.groupLabel}>What it's like</div>
+                    <div className={layout.fields}>
+
+                        <fieldset className={styles.fieldset}>
+                            <legend className={styles.legend}>Difficulty</legend>
+                            <div className={styles.radioRow}>
+                                <label className={`${styles.radioButton} ${difficulty === 'easy'? styles.radioButtonChecked:""}`}>
+                                    <input
+                                        name={"difficulty"}
+                                        type="radio"
+                                        value="easy"
+                                        checked={difficulty==="easy"}
+                                        onChange={e=> setDifficulty(e.target.value as Difficulty)}
+                                    />
+                                    Easy
+                                </label>
+                                <label className={`${styles.radioButton} ${difficulty === 'moderate'? styles.radioButtonChecked:""}`}>
+                                    <input
+                                        name={"difficulty"}
+                                        type="radio"
+                                        value="moderate"
+                                        checked={difficulty==="moderate"}
+                                        onChange={e=> setDifficulty(e.target.value as Difficulty)}
+                                    />
+                                    Moderate
+                                </label>
+                                <label className={`${styles.radioButton} ${difficulty === 'hard'? styles.radioButtonChecked:""}`}>
+                                    <input
+                                        name={"difficulty"}
+                                        type="radio"
+                                        value="hard"
+                                        checked={difficulty==="hard"}
+                                        onChange={e=> setDifficulty(e.target.value as Difficulty)}
+                                    />
+                                    Hard
+                                </label>
+                            </div>
+                        </fieldset>
+                        <fieldset className={styles.fieldset}>
+                            <legend className={styles.legend}>Pace</legend>
+                            <div className={styles.radioRow}>
+                                <label className={`${styles.radioButton} ${pace === "relaxed"? styles.radioButtonChecked:""}`}>
+                                    <input
+                                        name={"pace"}
+                                        type="radio"
+                                        value="relaxed"
+                                        checked={pace==="relaxed"}
+                                        onChange={e => setPace(e.target.value as Pace)}
+                                    />
+                                    Relaxed
+                                </label>
+                                <label className={`${styles.radioButton} ${pace==="moderate" ? styles.radioButtonChecked:''}`}>
+                                    <input
+                                        name={"pace"}
+                                        type="radio"
+                                        value="moderate"
+                                        checked={pace==="moderate"}
+                                        onChange={e => setPace(e.target.value as Pace)}
+                                    />
+                                    Moderate
+                                </label>
+                                <label className={`${styles.radioButton} ${pace==="fast" ? styles.radioButtonChecked:''}`}>
+                                    <input
+                                        name={"pace"}
+                                        type="radio"
+                                        value="fast"
+                                        checked={pace==="fast"}
+                                        onChange={e => setPace(e.target.value as Pace)}
+                                    />
+                                    Fast
+                                </label>
+                            </div>
+                        </fieldset>
+                        <label className={styles.label}>
+                            Notes
+                            <textarea
+                                placeholder={'Anything the members should know about?'}
+                                value={notes}
+                                onChange={e => setNotes(e.target.value)}
+                            ></textarea>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <button className={`btn-primary ${layout.submit}`} type={"submit"} disabled={!title || !destination ||!meet_label|| !startsAt || !difficulty || !pace || props.pending}>{props.submitLabel}</button>
+            {props.error&&<p className={styles.error}>{props.error.message}</p>}
+        </form></>
+}

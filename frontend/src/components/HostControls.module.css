@@ -9,7 +9,6 @@
     border-color: var(--color-text-muted);
 }
 .cancelBtn{
-    margin-top:var(--space-4);
     border-color: var(--color-danger);
     color:var(--color-danger);
 }

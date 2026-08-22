@@ -40,11 +40,14 @@ export const getOutingByID = async (id:string) => {
     }
     throw new ApiRequestError(res.error, res.httpStatus)
 }
-export function useOuting(id:string){
-    return useQuery({
-        queryKey:['outing', id],
-        queryFn: () => getOutingByID(id),
-    })
+
+export const outingQueryOptions = (id: string) => ({
+    queryKey: ['outing', id],
+    queryFn: () => getOutingByID(id),
+})
+
+export function useOuting(id: string) {
+    return useQuery(outingQueryOptions(id))
 }
 
 export const getOutings=async ()=>{

@@ -16,3 +16,4 @@ export const FULL_WARNING = '⚠️This outing is full — you can still request
 export const OUTING_FULL = 'This outing is full.'
 export const NO_SEAT_LEFT = 'No seats left — a driver could open more spots.'
 export const SEAT_SHORT = '1 more seats needed — join as a driver?'
+export const MAX_SIZE_SHRINK_CONFLICT = 'cannot reduce group size below current committed members'

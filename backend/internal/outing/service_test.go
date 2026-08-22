@@ -958,3 +958,22 @@ func Test_Update_InvalidPatchRejected(t *testing.T) {
 	_, err := svc.Update(context.Background(), host, o.ID, UpdateInput{StartsAt: &updateStart})
 	wantStatus(t, err, apperr.CodeBadRequest)
 }
+
+func Test_Update_SizeShrinkNotAllowedLessThenPeopleCount(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	host := uuid.New()
+	o := seedOuting(8, 4, StatusOpen, host, f)
+	_ = seedJoinRequest(o.ID, uuid.New(), RequestStatusAccepted, RoleRider, f, 1)
+	_ = seedJoinRequest(o.ID, uuid.New(), RequestStatusAccepted, RoleRider, f, 0)
+
+	maxSize := 3
+	_, err := svc.Update(context.Background(), host, o.ID, UpdateInput{MaxSize: &maxSize})
+	wantStatus(t, err, apperr.CodeConflict)
+
+	okSize := 4
+	_, err = svc.Update(context.Background(), host, o.ID, UpdateInput{MaxSize: &okSize})
+	if err != nil {
+		t.Errorf("exact-fit capacity should be allowed, got %v", err)
+	}
+}
