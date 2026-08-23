@@ -42,14 +42,14 @@ test.describe('slot testing', ()=> {
         const host = await createActor()
         const outing = await createOuting(host)
         await page.goto(`/outings/${outing.id}`)          // no handoff — anonymous
-        await expect(page.getByRole('link', { name: 'Request To join' })).toBeVisible()
+        await expect(page.getByRole('link', { name: 'Request to join' })).toBeVisible()
     });
     test('host sees host controls', async ({ page, context }) => {
         const host = await createActor()
         const outing = await createOuting(host)
         await actorInBrowser(host, context)
         await page.goto(`/outings/${outing.id}`)
-        await expect(page.getByRole('button', { name: 'Cancel Outing' })).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Cancel outing' })).toBeVisible()
     });
     test('Round-trip', async ({page, context})=>{
         const actorHost = await createActor()
@@ -63,7 +63,7 @@ test.describe('slot testing', ()=> {
         await expect(joinForm).toBeVisible()
         const roles = page.getByRole('group', { name: 'Hiker Role' })
         await roles.getByText('Driver').click()
-        await joinForm.getByRole('spinbutton', { name: 'Seats Offered' }).fill('3')
+        await joinForm.getByRole('spinbutton', { name: 'Seats offered' }).fill('3')
         await joinForm.getByRole('spinbutton', { name: 'Guests' }).fill('1')
         await joinForm.getByRole('textbox', { name: 'Note to the host' }).fill('Halay Guzeldir.')
         await joinForm.getByRole('button', {name:'Request to join'}).click()

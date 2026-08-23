@@ -43,15 +43,15 @@ export function LoginPage(){
     return <>
         <form className={styles.form}
             onSubmit={handleSubmit}>
-            <h1>Log In</h1>
-            <label className={styles.label}>Email:
+            <h1>Log in</h1>
+            <label className={styles.label}>Email
                 <input
                     type="text"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                 />
             </label>
-            <label className={styles.label}>Password:
+            <label className={styles.label}>Password
                 <input
                     type="password"
                     value={password}

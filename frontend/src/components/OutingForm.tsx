@@ -63,14 +63,14 @@ export function OutingForm(props: OutingFormProps){
                                 onChange={e => setDestination(e.target.value)}
                             />
                         </label>
-                        <label className={styles.label}>Meet Label
+                        <label className={styles.label}>Meet label
                             <input
                                 type="text"
                                 value={meet_label}
                                 onChange={e => setMeet_label(e.target.value)}
                             />
                         </label>
-                        <label className={styles.label}>Starts At
+                        <label className={styles.label}>Starts at
                             <input
                                 type="datetime-local"
                                 value={startsAt}
@@ -83,7 +83,7 @@ export function OutingForm(props: OutingFormProps){
                 <div className={layout.group}>
                     <div className={layout.groupLabel}>Seats &amp; cost</div>
                     <div className={layout.fields}>
-                        <label className={styles.label}>Max Size
+                        <label className={styles.label}>Max size
                             <input
                                 type="number"
                                 min={2}
@@ -91,7 +91,7 @@ export function OutingForm(props: OutingFormProps){
                                 onChange={e => setMax_size(Number(e.target.value))}
                             />
                         </label>
-                        <label className={styles.label}>Host Seats
+                        <label className={styles.label}>Host seats
                             <input
                                 type="number"
                                 min={0}
@@ -100,7 +100,7 @@ export function OutingForm(props: OutingFormProps){
                             />
                             <span className={styles.hint}>Includes your seat — 4 means you + 3 riders</span>
                         </label>
-                        <label className={styles.label}>Cost per Seat
+                        <label className={styles.label}>Cost per seat
                             <input
                                 type="number"
                                 min={0}

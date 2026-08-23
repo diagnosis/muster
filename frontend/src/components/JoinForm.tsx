@@ -45,7 +45,7 @@ export function JoinForm({outingId, onClose}:JoinProps){
     return(
         <form aria-label={'Join outing'} className={styles.form} onSubmit={handleSubmit}>
             <fieldset className={styles.fieldset}>
-                <legend className={styles.legend}>Hiker Role</legend>
+                <legend className={styles.legend}>Hiker role</legend>
                 <div className={styles.radioRow}>
                     <label className={`${styles.radioButton} ${hikerRole==='rider' ? styles.radioButtonChecked: ''}`}>
                         <input
@@ -72,14 +72,14 @@ export function JoinForm({outingId, onClose}:JoinProps){
 
             {hikerRole == 'driver' &&
             <label className={styles.label}>
-                Seats Offered
+                Seats offered
                 <input
                     type="number"
                     min={0}
                     value={seats}
                     onChange={e => setSeats(Number(e.target.value))}
                 />
-                <p className={styles.hint}>Includes your seat. 4 means you + 3 riders</p>
+                <p className={styles.hint}>Includes your seat. 4 means you + 3 riders or you + 2 riders + 1 guest</p>
             </label>
             }
             <label className={styles.label}>
@@ -93,7 +93,7 @@ export function JoinForm({outingId, onClose}:JoinProps){
                 />
             </label>
             <label className={styles.label}>
-                Note to the host (optional):
+                Note to the host (optional)
                 <textarea
                     placeholder={'Anything the host should know about?'}
                     value={note}

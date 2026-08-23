@@ -89,7 +89,7 @@ export function ProfileForm({me}: ProfileFormProps){
                     </label>
                 </div>
             </fieldset>
-            <button type={"submit"} className="btn-primary" disabled={isDisabled}>Save Changes</button>
+            <button type={"submit"} className="btn-primary" disabled={isDisabled}>Save changes</button>
             {!isDirty && <p className={styles.hint}>Nothing to save yet.</p>}
             {meMutation.error&&<p className={styles.error}>{meMutation.error.message}</p>}
         </form>

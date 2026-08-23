@@ -12,7 +12,7 @@ test.describe('profile', ()=>{
         await expect(page.getByText(actor.user.email)).toBeVisible()
         const newName = uniqueName()
         await page.getByRole('textbox', { name: 'Name' }).fill(newName)
-        await page.getByRole('button', { name: 'Save Changes' }).click()
+        await page.getByRole('button', { name: 'Save changes' }).click()
         await openNav(page)
         await expect(page.getByRole('link', {name:newName})).toBeVisible()
 

@@ -45,7 +45,7 @@ export function SignupPage() {
     return <>
 
         <form className={styles.form} onSubmit={handleSubmit}>
-            <h1>Sign Up</h1>
+            <h1>Sign up</h1>
             <label className={styles.label}>
                 Name
                 <input
