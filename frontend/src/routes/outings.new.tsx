@@ -36,9 +36,9 @@ export function CreateOutingPage() {
   return (
       <div>
         <OutingForm
-            heading={"Create Outing"}
+            heading={"Create outing"}
             onSubmit={values => createMutation.mutate(values)}
-            submitLabel={"Create Outing"}
+            submitLabel={"Create outing"}
             error={createMutation.error instanceof ApiRequestError ? createMutation.error: undefined}
             pending={createMutation.isPending}
         />

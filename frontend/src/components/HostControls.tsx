@@ -117,8 +117,8 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
         )}
 
         <div className={styles.actions}>
-            <button className={styles.cancelBtn} onClick={handleCancel}>Cancel Outing</button>
-            <Link className={'btn'} to="/outings/$id/edit" params={{id: outingId}}>Edit Outing</Link>
+            <button className={styles.cancelBtn} onClick={handleCancel}>Cancel outing</button>
+            <Link className={'btn'} to="/outings/$id/edit" params={{id: outingId}}>Edit outing</Link>
         </div>
         </div>
 

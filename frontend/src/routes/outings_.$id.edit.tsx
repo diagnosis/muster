@@ -46,9 +46,9 @@ export function EditOutingPage() {
     }
 
   return <div>
-      <OutingForm heading={"Edit Outing"}
+      <OutingForm heading={"Edit outing"}
                   onSubmit={values => editMutation.mutate(values)}
-                  submitLabel={"Save Changes"}
+                  submitLabel={"Save changes"}
                   error={editMutation.error instanceof ApiRequestError ? editMutation.error : undefined}
                   pending={editMutation.isPending}
                   initial={detail.outing}

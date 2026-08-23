@@ -12,16 +12,16 @@ test.describe("edit", ()=> {
         await actorInBrowser(host, context)
         await page.goto(`/outings/${outing.id}`)
         await expect(page.getByRole('heading', { name: outing.title})).toBeVisible()
-        await page.getByRole('link', { name: 'Edit Outing' }).click()
+        await page.getByRole('link', { name: 'Edit outing' }).click()
 
         await expect(page.getByRole('textbox', {name:'Title'})).toHaveValue(outing.title)
         await expect(page.getByRole('textbox', { name: 'Destination' })).toHaveValue(outing.destination)
-        await expect(page.getByRole('textbox', { name: 'Meet Label' })).toHaveValue(outing.meet_label)
+        await expect(page.getByRole('textbox', { name: 'Meet label' })).toHaveValue(outing.meet_label)
 
 
         const newOuting = uniqueOuting()
         await page.getByRole('textbox', { name: 'Title' }).fill(newOuting.title)
-        await page.getByRole('button', { name: 'Save Changes' }).click()
+        await page.getByRole('button', { name: 'Save changes' }).click()
         await expect(page.getByRole('heading', { name: newOuting.title })).toBeVisible()
     });
     test('non-host is bounced from edit', async ({page, context})=>{
@@ -44,8 +44,8 @@ test.describe("edit", ()=> {
 
         await actorInBrowser(host, context)
         await page.goto(`/outings/${outing.id}/edit`)
-        await page.getByRole('spinbutton', { name: 'Max Size' }).fill('3')
-        await page.getByRole('button', {name:'Save Changes'}).click()
+        await page.getByRole('spinbutton', { name: 'Max size' }).fill('3')
+        await page.getByRole('button', {name:'Save changes'}).click()
         await expect(page.getByText(MAX_SIZE_SHRINK_CONFLICT)).toBeVisible()
     })
 })
