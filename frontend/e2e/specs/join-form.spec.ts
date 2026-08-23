@@ -12,7 +12,7 @@ test.describe('join form', ()=>{
     });
     test('seats visibility follow role', async ({page, context})=>{
         await openJoinForm(page, context)
-        const roles = page.getByRole('group', { name: 'Hiker Role' })
+        const roles = page.getByRole('group', { name: 'Hiker role' })
         await roles.getByText('Rider').click()
         await expect(page.getByRole('button', {name:'Request to join'})).toBeEnabled()
         await expect(page.getByRole('spinbutton', { name: 'Seats offered' })).not.toBeVisible()
@@ -21,9 +21,9 @@ test.describe('join form', ()=>{
     });
     test('role-flip resets seats', async({page, context})=>{
         await openJoinForm(page, context)
-        const roles = page.getByRole('group', { name: 'Hiker Role' })
+        const roles = page.getByRole('group', { name: 'Hiker role' })
         await roles.getByText('Driver').click()
-        await page.getByRole('spinbutton', {name: 'Seats Offered'}).fill('3')
+        await page.getByRole('spinbutton', {name: 'Seats offered'}).fill('3')
         await expect(page.getByRole('spinbutton', { name: 'Seats offered' })).toHaveValue('3')
         await roles.getByText('Rider').click()
         await roles.getByText('Driver').click()

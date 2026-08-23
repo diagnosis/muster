@@ -24,7 +24,7 @@ test.describe('create outing', ()=>{
         const outing = uniqueOuting()
         await page.getByRole('link', { name: 'Create outing' }).click()
         await fillCreateForm(page, outing)                      // ← the shared fill
-        await page.getByRole('button', { name: 'Create Outing' }).click()
+        await page.getByRole('button', { name: 'Create outing' }).click()
         await expect(page).toHaveURL(/\/outings\/[0-9a-f-]+/)
         await expect(page.getByRole('heading', { name: outing.title })).toBeVisible()
 

@@ -34,7 +34,7 @@ test.describe("auth flow", ()=> {
         await page.getByRole('link', { name: 'Sign up' }).click()
 
         await expect(page).toHaveURL(`${WEB_URL}/signup`)
-        await expect(page.getByRole('heading', { name: 'Sign Up' })).toBeVisible()
+        await expect(page.getByRole('heading', { name: 'Sign up' })).toBeVisible()
 
         await page.getByRole('textbox', { name: 'Name' }).fill("test-error")
         await page.getByRole('textbox', {name: 'Email'}).fill(email)

@@ -61,7 +61,7 @@ test.describe('slot testing', ()=> {
         await page.getByRole('button', { name: 'Request to join' }).click()
         const joinForm = page.getByRole('form',{name:'Join outing'})
         await expect(joinForm).toBeVisible()
-        const roles = page.getByRole('group', { name: 'Hiker Role' })
+        const roles = page.getByRole('group', { name: 'Hiker role' })
         await roles.getByText('Driver').click()
         await joinForm.getByRole('spinbutton', { name: 'Seats offered' }).fill('3')
         await joinForm.getByRole('spinbutton', { name: 'Guests' }).fill('1')

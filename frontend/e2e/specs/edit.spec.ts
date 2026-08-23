@@ -44,7 +44,7 @@ test.describe("edit", ()=> {
 
         await actorInBrowser(host, context)
         await page.goto(`/outings/${outing.id}/edit`)
-        await page.getByRole('spinbutton', { name: 'Max Size' }).fill('3')
+        await page.getByRole('spinbutton', { name: 'Max size' }).fill('3')
         await page.getByRole('button', {name:'Save changes'}).click()
         await expect(page.getByText(MAX_SIZE_SHRINK_CONFLICT)).toBeVisible()
     })
