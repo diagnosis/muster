@@ -79,7 +79,7 @@ export function JoinForm({outingId, onClose}:JoinProps){
                     value={seats}
                     onChange={e => setSeats(Number(e.target.value))}
                 />
-                <p className={styles.hint}>Includes your seat. 4 means you + 3 riders or you + 2 riders + 1 guest</p>
+                <p className={styles.hint}>Includes your seat — 4 means you + 3 riders</p>
             </label>
             }
             <label className={styles.label}>
