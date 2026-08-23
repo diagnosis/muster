@@ -33,4 +33,4 @@ jobs:
         run: ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} 'mv /var/www/muster/backend/muster.new /var/www/muster/backend/muster && sudo systemctl restart muster'
 
       - name: Verify
-        run: curl --retry 5 --retry-delay 2 --retry-connrefused -sSf https://muster-api.safadev.app/health
+        run: curl --retry 10 --retry-delay 5 --retry-all-errors --retry-connrefused -sSf https://muster-api.safadev.app/health
