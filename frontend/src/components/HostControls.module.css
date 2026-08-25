@@ -1,5 +1,13 @@
 
 /*src/components/HostControls.module.css*/
+
+.subheading{
+    font-family: var(--font-display);
+    font-size: var(--text-title);
+    line-height: var(--leading-title);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
 .requestRow{
     width: 100%;
     text-align: left;
@@ -19,23 +27,7 @@
     gap: var(--space-2);
     align-items: flex-start;
 }
-.modalHeader{
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3)
-}
-.closeBtn{
-    border:0;
-    padding: var(--space-1) var(--space-2);
-    font-size: 1.25rem;
-    line-height: 1;
-    color: var(--color-text-muted);
-}
-.closeBtn:hover{
-    color: var(--color-text);
-    background: var(--surface-page);
-}
+
 
 .actions {
     display: flex;
@@ -45,4 +37,9 @@
 .declineBtn {
     border-color: var(--color-danger);
     color: var(--color-danger);
+}
+.error {
+    color: var(--color-danger);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
 }
