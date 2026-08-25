@@ -78,7 +78,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
     return <div className={styles.host}>
             {requestsError&&<p>{requestsError.message}</p>}
             {requestsPending&&<p>requests loading...</p>}
-        <h3>Requests ({requestLen ?? 0})</h3>
+        <h3 className={styles.subheading}>Requests ({requestLen ?? 0})</h3>
         {requests?.map(r => (
             <button
                 className={styles.requestRow}
@@ -89,15 +89,11 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
             </button>
         ))}
         {selectedRequest&&(
-            <Modal onClose={() => setSelectedRequest(null)}>
-                <div className={styles.modalHeader}>
-                    <h3>{selectedRequest.hiker_name} · {selectedRequest.hiker_experience}</h3>
-                    <button className={styles.closeBtn} onClick={() => setSelectedRequest(null)}>✕</button>
-                </div>
+            <Modal title={`${selectedRequest.hiker_name} · ${selectedRequest.hiker_experience}`} onClose={() => setSelectedRequest(null)}>
                 <p>
                     {selectedRequest.role}
-                    {selectedRequest.seats_offered > 0 && ` · offering ${selectedRequest.seats_offered}`}
-                    {selectedRequest.guests > 0 && `  +${selectedRequest.guests} guest`}
+                    {selectedRequest.seats_offered > 0 && ` · offering ${selectedRequest.seats_offered} seat${selectedRequest.seats_offered > 1 ? 's' : ''}`}
+                    {selectedRequest.guests > 0 && ` · +${selectedRequest.guests} ${selectedRequest.guests===1?'guest':'guests'}`}
                 </p>
 
                 {selectedRequest.note && <p>{selectedRequest.note}</p>}
@@ -117,8 +113,8 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
         )}
 
         <div className={styles.actions}>
-            <button className={styles.cancelBtn} onClick={handleCancel}>Cancel outing</button>
             <Link className={'btn'} to="/outings/$id/edit" params={{id: outingId}}>Edit outing</Link>
+            <button className={styles.cancelBtn} onClick={handleCancel}>Cancel outing</button>
         </div>
         </div>
 
