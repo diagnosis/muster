@@ -195,8 +195,10 @@ export function OutingForm(props: OutingFormProps){
                         </label>
                     </div>
                 </div>
+
             </div>
-            <button className={`btn-primary ${layout.submit}`} type={"submit"} disabled={!title || !destination ||!meet_label|| !startsAt || !difficulty || !pace || props.pending}>{props.submitLabel}</button>
             {props.error&&<p className={styles.error}>{props.error.message}</p>}
+            <button className={`btn-primary ${layout.submit}`} type={"submit"} disabled={!title || !destination ||!meet_label|| !startsAt || !difficulty || !pace || props.pending}>{props.submitLabel}</button>
+
         </form></>
 }

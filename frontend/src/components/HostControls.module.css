@@ -39,7 +39,11 @@
     color: var(--color-danger);
 }
 .error {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius-control);
+    background: var(--surface-raised);
     color: var(--color-danger);
-    font-size: var(--text-meta);
-    line-height: var(--leading-meta);
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
 }
