@@ -41,7 +41,9 @@ export function ProfileForm({me}: ProfileFormProps){
         !isDirty ||
         meMutation.isPending
     return <div>
+
         <form className={styles.form} onSubmit={handleProfileUpdate}>
+            <h1>Profile</h1>
             <div className={styles.readOnlyRow}>
                 <span className={styles.readOnlyLabel}>Email</span>
                 <span>{me.email}</span>

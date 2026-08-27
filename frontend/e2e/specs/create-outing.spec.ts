@@ -13,7 +13,7 @@ test.describe('create outing', ()=>{
         await page.goto('/')
         await openNav(page)
         const outing = uniqueOuting()
-        await page.getByRole('link', { name: 'Create outing' }).click()
+        await page.getByRole('banner').getByRole('link', { name: 'Create outing' }).click()
         await fillCreateForm(page, outing)
     });
     test('create lands on fresh detail', async ({page, context})=>{
@@ -22,7 +22,7 @@ test.describe('create outing', ()=>{
         await page.goto('/')
         await openNav(page)
         const outing = uniqueOuting()
-        await page.getByRole('link', { name: 'Create outing' }).click()
+        await page.getByRole('banner').getByRole('link', { name: 'Create outing' }).click()
         await fillCreateForm(page, outing)                      // ← the shared fill
         await page.getByRole('button', { name: 'Create outing' }).click()
         await expect(page).toHaveURL(/\/outings\/[0-9a-f-]+/)

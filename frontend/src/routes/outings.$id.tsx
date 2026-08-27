@@ -128,12 +128,12 @@ export function OutingDetailPage() {
 
 
             <section className={styles.section}>
-                <h3 className={styles.subheading}>Who's going ({detail.roster.length + 1})</h3>
+                <h2 className={styles.subheading}>Who's going ({detail.roster.length + 1})</h2>
                 <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience} · host</p>
                 {detail.roster.map(m => <p key={m.hiker_id}>{m.name} · {m.experience}</p>)}
             </section>
             {detail.outing.notes&&<section className={styles.section}>
-                <h3 className={styles.subheading}>Notes</h3>
+                <h2 className={styles.subheading}>Notes</h2>
                 {detail.outing.notes && <p>{detail.outing.notes}</p>}
             </section>}
 
