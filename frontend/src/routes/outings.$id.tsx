@@ -7,6 +7,7 @@ import {useState} from "react";
 import {JoinForm} from "@/components/JoinForm.tsx";
 import {HostControls} from "@/components/HostControls.tsx";
 import styles from "@/routes/outings.$id.module.css"
+import {Badges} from "@/components/Badges.tsx";
 
 export const Route = createFileRoute('/outings/$id')({
   component: OutingDetailPage,
@@ -101,17 +102,17 @@ export function OutingDetailPage() {
 
     const effectiveCap = Math.min(detail.seat_capacity, detail.outing.max_size)
     const isFull = detail.people_count >= detail.outing.max_size
-    const seat_cost = `$${(detail.outing.cost_per_seat_cents / 100).toFixed(2)}/seat `
 
 
     return <>
         <div className={styles.container}>
             <section className={styles.section}>
                 <h1 className={styles.heading}>{detail.outing.title}</h1>
-                <p>{detail.outing.destination} · {detail.outing.meet_label} · {starts_at_date} · {starts_at_time}
-                    {' · '}{detail.outing.difficulty} · {detail.outing.pace}
-                    {detail.outing.cost_per_seat_cents > 0 && ` · ${seat_cost}`}
-                </p>
+                <p className={styles.metaLine}>{detail.outing.destination}</p>
+                <p className={styles.metaLine}>{detail.outing.meet_label}</p>
+                <p className={styles.metaLine}>{starts_at_date} - {starts_at_time}</p>
+                <Badges outing={detail.outing}/>
+
             </section>
 
             <section className={styles.section}>

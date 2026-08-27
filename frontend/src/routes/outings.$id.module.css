@@ -49,3 +49,7 @@
     font-size: var(--text-label);
     line-height: var(--leading-label);
 }
+.metaLine{
+    color: var(--color-text-muted);
+    text-wrap: pretty;
+}
