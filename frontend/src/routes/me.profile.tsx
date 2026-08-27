@@ -15,4 +15,5 @@ export function ProfilePage() {
     if (!me) return <div>no profile found</div>
 
     return <ProfileForm me={me} />
+
 }

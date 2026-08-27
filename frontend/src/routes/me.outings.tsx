@@ -17,12 +17,13 @@ export function MeOutingsPage() {
     const hostingOutings = data.hosting
     const joinedOutings = data.joined
     return <div className={styles.page}>
+        <h1 className={styles.heading}>My outings</h1>
         <section className={styles.section}>
-            <h2 className={styles.heading}>Hosting</h2>
+            <h2 className={styles.headingSecondary}>Hosting</h2>
             {hostingOutings.length === 0
                 ? <div className={styles.empty}>
                     <p>Not hosting anything yet.</p>
-                    <Link className="btn-primary btn" to="/outings/new">Create an outing</Link>
+                    <Link className="btn-primary btn" to="/outings/new">Create outing</Link>
                 </div>
                 : <div className={styles.list}>
                     {hostingOutings.map(o => (
@@ -35,9 +36,12 @@ export function MeOutingsPage() {
         </section>
 
         <section className={styles.section}>
-            <h2 className={styles.heading}>Joined</h2>
+            <h2 className={styles.headingSecondary}>Joined</h2>
             {joinedOutings.length === 0
-                ? <p className={styles.emptyText}>Not joined anything yet.</p>
+                ? <div className={styles.empty}>
+                    <p className={styles.emptyText}>Not joined anything yet.</p>
+                    <Link className="btn-primary btn" to="/">Browse outings</Link>
+                </div>
                 : <div className={styles.list}>
                     {joinedOutings.map(o => (
                         <Link className={styles.cardLink} key={o.id} to="/outings/$id" params={{id: o.id}}>

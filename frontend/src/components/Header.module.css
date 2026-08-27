@@ -81,9 +81,7 @@
 .hamburgerBtn:hover{
     background: var(--surface-raised);
 }
-.logoutBtn:hover{
-    background: var(--surface-sunken);
-}
+
 
 /* ---- 640px and up ---- */
 

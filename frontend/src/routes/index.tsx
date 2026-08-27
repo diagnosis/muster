@@ -25,13 +25,13 @@ export function OutingsPage() {
 
 
     return <>
-        <h2 className={styles.heading}>Outings</h2>
+        <h1 className={styles.heading}>Outings</h1>
 
 
             {outings.length === 0
                 ? <div className={styles.empty}>
-                    <p className={styles.emptyText}>No outing yet</p>
-                    <Link className={'btn-primary btn'} to={'/outings/new'}>Create new outing</Link>
+                    <p className={styles.emptyText}>No outings yet.</p>
+                    <Link className={'btn-primary btn'} to={'/outings/new'}>Create outing</Link>
                 </div>
                : <div className={styles.list}>
                     {outings.map(outing=>

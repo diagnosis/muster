@@ -78,7 +78,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
     return <div className={styles.host}>
             {requestsError&&<p>{requestsError.message}</p>}
             {requestsPending&&<p>requests loading...</p>}
-        <h3 className={styles.subheading}>Requests ({requestLen ?? 0})</h3>
+        <h2 className={styles.subheading}>Requests ({requestLen ?? 0})</h2>
         {requests?.map(r => (
             <button
                 className={styles.requestRow}

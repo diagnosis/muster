@@ -44,14 +44,14 @@ export function Header(){
     },[open])
 
     if (isPending) return (
-        <div className={styles.nav}>
+        <header className={styles.nav}>
             <div className={styles.inner}>
                 <Link className={styles.logo} to="/">Muster</Link>
             </div>
-        </div>
+        </header>
     )
     return (
-        <div className={styles.nav} ref={headerRef}>
+        <header className={styles.nav} ref={headerRef}>
             <div className={styles.inner}>
             <Link className={styles.logo} to={'/'} onClick={()=>setOpen(false)}>Muster</Link>
                 <button
@@ -63,8 +63,8 @@ export function Header(){
                         <div className={styles.userOutings}>
                             <Link className={styles.navLink} to="/me/outings" onClick={()=> setOpen(false)}>My outings</Link>
                             <Link className={styles.navLink} to="/outings/new" onClick={() => setOpen(false)}>Create outing</Link>
+                            <Link className={styles.navLink} onClick={()=>setOpen(false)} to={"/me/profile"}>{data.name}</Link>
                             <div className={styles.loginSignup}>
-                                <Link className={styles.navLink} onClick={()=>setOpen(false)} to={"/me/profile"}>{data.name}</Link>
                                 <button className={styles.logoutBtn} onClick={ () =>
                                     logout.mutate()
                                 }>Log out</button>
@@ -79,6 +79,6 @@ export function Header(){
                 }
             </div>
             </div>
-        </div>
+        </header>
     )
 }
