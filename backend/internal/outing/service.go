@@ -331,6 +331,8 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 		return joinRequest, nil
 	case RequestStatusDeclined:
 		return nil, apperr.Conflict("your request to this outing was declined", "declined is terminal")
+	case RequestStatusRemoved:
+		return nil, apperr.Conflict("you were removed from this outing", "removal is terminal")
 	default: // requested or accepted
 		return nil, apperr.Conflict("you already have an active request", "duplicate request")
 	}
@@ -397,8 +399,7 @@ func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) err
 	return s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusWithdrawn)
 }
 
-// RemoveMember removes an accepted member from the roster. Host-only;
-// v0 reuses the withdrawn status for host removals.
+// RemoveMember removes an accepted member from the roster. Host-only.
 func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID) error {
 	joinRequest, _, err := s.loadForHostAction(ctx, hostID, requestID)
 	if err != nil {
@@ -407,7 +408,7 @@ func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID)
 	if joinRequest.Status != RequestStatusAccepted {
 		return apperr.Conflict("member is not on the roster", "remove requires accepted status")
 	}
-	return s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusWithdrawn)
+	return s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusRemoved)
 }
 
 // ListUpcoming returns open outings that start in the future, soonest

@@ -108,12 +108,17 @@ test.describe("membership", ()=> {
 
       let detail = await unwrap<DetailResponse>(getDetail(ctxHiker, outing.id), 200)
       expect(detail.roster.length).toBe(1)
-
+      expect(detail.my_request?.status).toBe('accepted')
       let res = await removeMember(ctxHost, joinRequest.id)
       expect(res.status()).toBe(200)
       detail = await unwrap<DetailResponse>(getDetail(ctxHiker, outing.id), 200)
       expect(detail.roster.length).toBe(0)
       expect(detail.people_count).toBe(1)
+      const rejoin = await requestJoin(ctxHiker, outing.id)
+      expect(rejoin.status()).toBe(409)
+      detail = await unwrap<DetailResponse>(getDetail(ctxHiker, outing.id), 200)
+      expect(detail.my_request?.status).toBe('removed')
+
 
   });
   test('host cannot join own outing -> 400', async ()=> {
