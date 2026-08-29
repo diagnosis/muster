@@ -480,8 +480,8 @@ func Test_RemoveMember_AcceptedWorks(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected to remove but got error: %v", err)
 	}
-	if r.Status != RequestStatusWithdrawn {
-		t.Errorf("expected %v got %v", RequestStatusWithdrawn, r.Status)
+	if r.Status != RequestStatusRemoved {
+		t.Errorf("expected %v got %v", RequestStatusRemoved, r.Status)
 	}
 
 }
@@ -498,6 +498,31 @@ func Test_RemoveMember_PendingConflicts(t *testing.T) {
 
 	err := svc.RemoveMember(context.Background(), hostID, r.ID)
 	wantStatus(t, err, apperr.CodeConflict)
+
+}
+func TestService_RemoveMember_TryToJoinBack(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+
+	hostID := uuid.New()
+	hikerID := uuid.New()
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusRemoved, RoleRider, f, 1)
+
+	_, err := svc.RequestJoin(context.Background(), hikerID, o.ID, JoinInput{
+		Role:         "rider",
+		SeatsOffered: 0,
+		Guests:       0,
+		Note:         nil,
+	})
+	wantStatus(t, err, apperr.CodeConflict)
+	r, err := f.GetJoinRequestByHiker(context.Background(), o.ID, hikerID)
+	if err != nil {
+		t.Fatalf("re-fetch failed: %v", err)
+	}
+	if r.Status != RequestStatusRemoved {
+		t.Fatalf("failed re-request must not mutate the row: expected %v got %v", RequestStatusRemoved, r.Status)
+	}
 
 }
 

@@ -96,13 +96,14 @@ const (
 	RequestStatusAccepted  RequestStatus = "accepted"
 	RequestStatusDeclined  RequestStatus = "declined"
 	RequestStatusWithdrawn RequestStatus = "withdrawn"
+	RequestStatusRemoved   RequestStatus = "removed"
 )
 
 // Valid reports whether rs is a known request status.
 func (rs RequestStatus) Valid() bool {
 	switch rs {
 	case RequestStatusRequested, RequestStatusAccepted,
-		RequestStatusDeclined, RequestStatusWithdrawn:
+		RequestStatusDeclined, RequestStatusWithdrawn, RequestStatusRemoved:
 		return true
 	}
 	return false
@@ -158,9 +159,10 @@ type PendingRequest struct {
 // Member is a roster read-model: the public slice of a hiker as seen
 // on an outing (join_requests joined with hikers at the query level).
 type Member struct {
-	HikerID    uuid.UUID `json:"hiker_id"`
-	Name       string    `json:"name"`
-	Experience string    `json:"experience"`
+	RequestID  *uuid.UUID `json:"request_id,omitempty"`
+	HikerID    uuid.UUID  `json:"hiker_id"`
+	Name       string     `json:"name"`
+	Experience string     `json:"experience"`
 }
 
 // Detail is the full view of one outing for one viewer. The seat math

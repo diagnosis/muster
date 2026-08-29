@@ -26,6 +26,10 @@ button:hover,
 .btn-primary:hover{
     background: var(--color-primary-dark);
 }
+.btn-danger{
+    border-color: var(--color-danger);
+    color:var(--color-danger);
+}
 
 /* Disabled sits on the page surface behind a dashed edge, so it reads as
    "waiting on you" rather than as a faded-out colour. Must stay below the

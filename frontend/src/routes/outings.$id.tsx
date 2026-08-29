@@ -1,13 +1,16 @@
 import {createFileRoute, Link} from '@tanstack/react-router'
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
-import type {Detail} from "@/types.ts";
+import type {Detail, Member} from "@/types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useMeQuery, useOuting} from "@/queries.ts";
 import {useState} from "react";
 import {JoinForm} from "@/components/JoinForm.tsx";
 import {HostControls} from "@/components/HostControls.tsx";
 import styles from "@/routes/outings.$id.module.css"
+import formStyles from "@/routes/form.module.css"
 import {Badges} from "@/components/Badges.tsx";
+import {Modal} from "@/components/Modal.tsx";
+
 
 export const Route = createFileRoute('/outings/$id')({
   component: OutingDetailPage,
@@ -19,7 +22,7 @@ export function OutingDetailPage() {
     const [showForm, setShowForm] = useState(false)
     const {data: me} = useMeQuery()
     const {data:detail, isPending, error} = useOuting(id)
-
+    const [memberToRemove, setMemberToRemove] = useState<Member|null>(null)
 
     const withdrawMutation = useMutation({
         mutationFn: async () => {
@@ -32,6 +35,20 @@ export function OutingDetailPage() {
         onSuccess : () => {
             qc.invalidateQueries({queryKey: ['outing', id]})
             qc.invalidateQueries({queryKey: ['my-outings']})
+        }
+    })
+    const removeMemberMutation = useMutation({
+        mutationFn: async(requestId: string) => {
+            const res = await apiClient.del(`/api/requests/${requestId}/member`)
+            if (res.ok){
+                return res.data
+            }
+            throw new ApiRequestError(res.error, res.httpStatus)
+        },
+        onSuccess: () =>{
+            qc.invalidateQueries({queryKey: ['outing', id]})
+            qc.invalidateQueries({queryKey: ['my-outings']})
+            setMemberToRemove(null)
         }
     })
     function handleOnClose(){
@@ -68,6 +85,10 @@ export function OutingDetailPage() {
         if (st === 'declined')
             return <div className={styles.slot}>
                 <p>The host declined this request.</p>
+            </div>
+        if (st === 'removed')
+            return <div className={styles.slot}>
+                <p>The host removed you from this outing.</p>
             </div>
 
         return <>
@@ -130,7 +151,24 @@ export function OutingDetailPage() {
             <section className={styles.section}>
                 <h2 className={styles.subheading}>Who's going ({detail.roster.length + 1})</h2>
                 <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience} · host</p>
-                {detail.roster.map(m => <p key={m.hiker_id}>{m.name} · {m.experience}</p>)}
+                {detail.roster.map(m => <div className={styles.memberRow}
+                    key={m.hiker_id}>{m.name} · {m.experience}
+                    {me?.id === detail.outing.host_id &&
+                        <button aria-label={'Remove'} className={styles.removeBtn} onClick={()=>{
+                            setMemberToRemove(m)
+                        }}>🗑️</button>
+                    }
+                </div>)}
+                {memberToRemove&&<Modal title={`Remove ${memberToRemove.name}`} onClose={()=>setMemberToRemove(null)}>
+                    <p>This removes them from the roster and frees their seats. They won't be able to request again.</p>
+                    <div className={styles.actions}>
+                        <button className="btn-danger"
+                                onClick={()=>memberToRemove.request_id&&removeMemberMutation.mutate(memberToRemove.request_id)}>Yes, remove</button>
+                        <button className={formStyles.quietBtn}
+                                onClick={()=>setMemberToRemove(null)}>Never mind</button>
+                    </div>
+                    {removeMemberMutation.error&&<p className={formStyles.error}>{removeMemberMutation.error.message}</p>}
+                </Modal>}
             </section>
             {detail.outing.notes&&<section className={styles.section}>
                 <h2 className={styles.subheading}>Notes</h2>

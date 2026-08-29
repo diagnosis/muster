@@ -56,12 +56,13 @@ export interface Detail{
 
 export type Experience = 'beginner'|'intermediate'|'experienced'
 export interface Member{
+    request_id?: string
     hiker_id: string
     name: string
     experience: Experience
 }
 
-export type RequestStatus = 'requested'|'accepted'|'declined'|'withdrawn'
+export type RequestStatus = 'requested'|'accepted'|'declined'|'withdrawn'|'removed'
 export type HikerRole = 'rider'|'driver'
 export interface JoinRequest{
     id: string
