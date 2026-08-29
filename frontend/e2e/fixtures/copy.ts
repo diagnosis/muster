@@ -21,3 +21,9 @@ export const REMOVED = 'The host removed you from this outing.'
 export const REMOVE_CONFIRMATION = 'This removes them from the roster and frees their seats. They won\'t be able to request again.'
 export const REMOVE_BTN_TEXT = 'Yes, remove'
 export const REMOVE_ARIA = 'Remove'
+
+export const INVALID_NUMBER_FIELDS = 'Check the number fields — something is invalid.'
+
+export const INVALID_MAX_SIZE = 'Max size must be a whole number of at least 2.'
+export const INVALID_HOST_SEATS = 'Host seats must be a whole number, 0 or more.'
+export const INVALID_COST = 'Cost per seat must be a positive amount, up to two decimals.'

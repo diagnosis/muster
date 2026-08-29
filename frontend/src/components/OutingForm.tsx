@@ -25,7 +25,7 @@ export function OutingForm(props: OutingFormProps){
     const [meet_label, setMeet_label] = useState(props.initial?.meet_label ?? "")
     const [startsAt, setStartsAt] = useState(props.initial ? isoToLocalInput(props.initial.starts_at) : "")
     const [max_size, setMax_size] = useState<string>(props.initial?.max_size? `${props.initial.max_size}` : '2')
-    const [host_seats, setHost_seats] = useState<string>(props.initial?.host_seats ? `${props.initial.host_seats}`: '')
+    const [host_seats, setHost_seats] = useState<string>(props.initial ? String(props.initial.host_seats) : '')
     const [costDollar, setCostDollar] = useState<string>(props.initial ? `${props.initial.cost_per_seat_cents / 100}` : '')
     const [difficulty, setDifficulty] = useState<Difficulty|null>(props.initial?.difficulty ?? null)
     const [pace, setPace] = useState<Pace|null>(props.initial?.pace ?? null)
@@ -36,15 +36,12 @@ export function OutingForm(props: OutingFormProps){
         e.preventDefault()
         const parsedMaxSize = parsePositiveInt(max_size)
         const parsedHostSeats = host_seats.trim() === "" ? 0 : parseNonNegativeInt(host_seats)
-        const parsedCostDollar = parseNonNegativeFloat(costDollar, 2)
+        const parsedCostDollar = costDollar.trim() ===""? 0 : parseNonNegativeFloat(costDollar, 2)
         if (!difficulty || !pace|| parsedMaxSize===null || parsedHostSeats===null || parsedCostDollar===null){
-            setFormError("check the number fields - something is invalid")
+            setFormError("Check the number fields — something is invalid.")
             return;
         }
-        if (parsedHostSeats > parsedMaxSize){
-            setFormError("Host seats cannot exceed max size")
-            return;
-        }
+
         setFormError(null)
         props.onSubmit({
             title, destination, meet_label,
