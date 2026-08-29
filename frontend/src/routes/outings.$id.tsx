@@ -47,6 +47,7 @@ export function OutingDetailPage() {
         onSuccess: () =>{
             qc.invalidateQueries({queryKey: ['outing', id]})
             qc.invalidateQueries({queryKey: ['my-outings']})
+            setMemberToRemove(null)
         }
     })
     function handleOnClose(){
@@ -149,19 +150,23 @@ export function OutingDetailPage() {
             <section className={styles.section}>
                 <h2 className={styles.subheading}>Who's going ({detail.roster.length + 1})</h2>
                 <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience} · host</p>
-                {detail.roster.map(m => <p
+                {detail.roster.map(m => <div className={styles.memberRow}
                     key={m.hiker_id}>{m.name} · {m.experience}
                     {me?.id === detail.outing.host_id ?
-                        <button onClick={()=>{
+                        <button className={`${styles.warning} btn`} onClick={()=>{
                             setMemberToRemove(m)
-                        }}>remove</button>:''
+                        }}>🗑️</button>:''
                     }
-                </p>)}
+                </div>)}
                 {memberToRemove&&<Modal title={`Remove ${memberToRemove.name}`} onClose={()=>setMemberToRemove(null)}>
-                    <p>Remove this guy</p>
-                    <button onClick={()=> {
-                        memberToRemove.request_id&&removeMemberMutation.mutate(memberToRemove.request_id)
-                    }}>Yes, Remove</button>
+                    <p>Are you sure?</p>
+                    <div className={styles.actions}>
+                        <button className={'btn-primary'}
+                                onClick={()=>memberToRemove.request_id&&removeMemberMutation.mutate(memberToRemove.request_id)}>Yes, remove!</button>
+                        <button className={styles.declineBtn}
+                                onClick={()=>setMemberToRemove(null)}>No, keep this member.</button>
+                    </div>
+                    {removeMemberMutation.error&&<p className={styles.error}>{removeMemberMutation.error.message}</p>}
                 </Modal>}
             </section>
             {detail.outing.notes&&<section className={styles.section}>
