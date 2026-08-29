@@ -88,3 +88,8 @@ export async function declineRequest(actor:Actor, requestId: string){
     const res = await  actor.api.post(`/api/requests/${requestId}/decline`)
     return unwrap<JoinRequest>(res, 'decline request')
 }
+
+export async function removeMember(actor:Actor, requestId: string){
+    const res = await actor.api.delete(`/api/requests/${requestId}/member`)
+    return unwrap<JoinRequest>(res, 'remove member')
+}
