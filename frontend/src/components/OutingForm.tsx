@@ -6,6 +6,7 @@ import {type ApiRequestError} from "@/lib/api.ts";
 import {useState} from "react";
 import layout from "@/routes/outings.new.module.css"
 import {isoToLocalInput} from "@/utils/date.ts";
+import {parseNonNegativeFloat, parseNonNegativeInt, parsePositiveInt} from "@/utils/parser.ts";
 
 interface OutingFormProps {
     heading: string
@@ -23,20 +24,29 @@ export function OutingForm(props: OutingFormProps){
     const [destination, setDestination] = useState(props.initial?.destination ?? "")
     const [meet_label, setMeet_label] = useState(props.initial?.meet_label ?? "")
     const [startsAt, setStartsAt] = useState(props.initial ? isoToLocalInput(props.initial.starts_at) : "")
-    const [max_size, setMax_size] = useState(props.initial?.max_size ?? 2)
-    const [host_seats, setHost_seats] = useState(props.initial?.host_seats ?? 0)
-    const [costDollar, setCostDollar] = useState(props.initial ? props.initial.cost_per_seat_cents / 100 : 0)
+    const [max_size, setMax_size] = useState<string>(props.initial?.max_size? `${props.initial.max_size}` : '2')
+    const [host_seats, setHost_seats] = useState<string>(props.initial ? String(props.initial.host_seats) : '')
+    const [costDollar, setCostDollar] = useState<string>(props.initial ? `${props.initial.cost_per_seat_cents / 100}` : '')
     const [difficulty, setDifficulty] = useState<Difficulty|null>(props.initial?.difficulty ?? null)
     const [pace, setPace] = useState<Pace|null>(props.initial?.pace ?? null)
     const [notes, setNotes] = useState<string>(props.initial?.notes ?? "")
+    const [formError, setFormError] = useState<string|null>(null)
 
     function handleSubmit(e: React.SubmitEvent){
         e.preventDefault()
-        if (!difficulty || !pace) return
+        const parsedMaxSize = parsePositiveInt(max_size)
+        const parsedHostSeats = host_seats.trim() === "" ? 0 : parseNonNegativeInt(host_seats)
+        const parsedCostDollar = costDollar.trim() ===""? 0 : parseNonNegativeFloat(costDollar, 2)
+        if (!difficulty || !pace|| parsedMaxSize===null || parsedHostSeats===null || parsedCostDollar===null){
+            setFormError("Check the number fields — something is invalid.")
+            return;
+        }
+
+        setFormError(null)
         props.onSubmit({
             title, destination, meet_label,
             starts_at: new Date(startsAt).toISOString(),
-            max_size, host_seats, cost_per_seat_cents: Math.round(costDollar*100),
+            max_size:parsedMaxSize, host_seats:parsedHostSeats, cost_per_seat_cents: Math.round(parsedCostDollar*100),
             difficulty, pace,
             notes: notes || undefined,
         })
@@ -88,7 +98,7 @@ export function OutingForm(props: OutingFormProps){
                                 type="number"
                                 min={2}
                                 value={max_size}
-                                onChange={e => setMax_size(Number(e.target.value))}
+                                onChange={e => setMax_size(e.target.value)}
                             />
                         </label>
                         <label className={styles.label}>Host seats
@@ -96,16 +106,17 @@ export function OutingForm(props: OutingFormProps){
                                 type="number"
                                 min={0}
                                 value={host_seats}
-                                onChange={e => setHost_seats(Number(e.target.value))}
+                                onChange={e => setHost_seats(e.target.value)}
                             />
                             <span className={styles.hint}>Includes your seat — 4 means you + 3 riders</span>
                         </label>
                         <label className={styles.label}>Cost per seat
                             <input
                                 type="number"
+                                step={0.01}
                                 min={0}
                                 value={costDollar}
-                                onChange={e => setCostDollar(Number(e.target.value))}
+                                onChange={e => setCostDollar(e.target.value)}
                             />
                         </label>
                     </div>
@@ -198,6 +209,7 @@ export function OutingForm(props: OutingFormProps){
 
             </div>
             {props.error&&<p className={styles.error}>{props.error.message}</p>}
+            {formError&&<p className={styles.error}>{formError}</p>}
             <button className={`btn-primary ${layout.submit}`} type={"submit"} disabled={!title || !destination ||!meet_label|| !startsAt || !difficulty || !pace || props.pending}>{props.submitLabel}</button>
 
         </form></>
