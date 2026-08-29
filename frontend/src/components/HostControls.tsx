@@ -105,7 +105,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
 
                 <div className={styles.actions}>
                     <button className="btn-primary" onClick={() => acceptMutation.mutate(selectedRequest.id)}>Accept</button>
-                    <button className={styles.declineBtn} onClick={() => declineMutation.mutate(selectedRequest.id)}>Decline</button>
+                    <button className="btn-danger" onClick={() => declineMutation.mutate(selectedRequest.id)}>Decline</button>
                 </div>
                 {acceptMutation.error && <p className={styles.error}>{acceptMutation.error.message}</p>}
                 {declineMutation.error && <p className={styles.error}>{declineMutation.error.message}</p>}
@@ -114,7 +114,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
 
         <div className={styles.actions}>
             <Link className={'btn'} to="/outings/$id/edit" params={{id: outingId}}>Edit outing</Link>
-            <button className={styles.cancelBtn} onClick={handleCancel}>Cancel outing</button>
+            <button className={'btn-danger'} onClick={handleCancel}>Cancel outing</button>
         </div>
         </div>
 

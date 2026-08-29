@@ -162,7 +162,7 @@ export function OutingDetailPage() {
                 {memberToRemove&&<Modal title={`Remove ${memberToRemove.name}`} onClose={()=>setMemberToRemove(null)}>
                     <p>This removes them from the roster and frees their seats. They won't be able to request again.</p>
                     <div className={styles.actions}>
-                        <button className={formStyles.declineBtn}
+                        <button className="btn-danger"
                                 onClick={()=>memberToRemove.request_id&&removeMemberMutation.mutate(memberToRemove.request_id)}>Yes, remove</button>
                         <button className={formStyles.quietBtn}
                                 onClick={()=>setMemberToRemove(null)}>Never mind</button>
