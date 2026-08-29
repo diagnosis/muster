@@ -88,7 +88,7 @@ export function OutingDetailPage() {
             </div>
         if (st === 'removed')
             return <div className={styles.slot}>
-                <p>You were removed from this outing</p>
+                <p>You were removed from this outing.</p>
             </div>
 
         return <>
