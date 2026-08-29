@@ -149,3 +149,8 @@
     line-height: var(--leading-meta);
     font-weight: 400;
 }
+
+.declineBtn {
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+}

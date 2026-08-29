@@ -7,6 +7,7 @@ import {useState} from "react";
 import {JoinForm} from "@/components/JoinForm.tsx";
 import {HostControls} from "@/components/HostControls.tsx";
 import styles from "@/routes/outings.$id.module.css"
+import formStyles from "@/routes/form.module.css"
 import {Badges} from "@/components/Badges.tsx";
 import {Modal} from "@/components/Modal.tsx";
 
@@ -152,21 +153,21 @@ export function OutingDetailPage() {
                 <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience} · host</p>
                 {detail.roster.map(m => <div className={styles.memberRow}
                     key={m.hiker_id}>{m.name} · {m.experience}
-                    {me?.id === detail.outing.host_id ?
-                        <button className={styles.removeBtn} onClick={()=>{
+                    {me?.id === detail.outing.host_id &&
+                        <button aria-label={'Remove'} className={styles.removeBtn} onClick={()=>{
                             setMemberToRemove(m)
-                        }}>🗑️</button>:''
+                        }}>🗑️</button>
                     }
                 </div>)}
                 {memberToRemove&&<Modal title={`Remove ${memberToRemove.name}`} onClose={()=>setMemberToRemove(null)}>
-                    <p>Are you sure?</p>
+                    <p>This removes them from the roster and frees their seats. They won't be able to request again.</p>
                     <div className={styles.actions}>
-                        <button className={'btn-primary'}
-                                onClick={()=>memberToRemove.request_id&&removeMemberMutation.mutate(memberToRemove.request_id)}>Yes, remove!</button>
-                        <button className={styles.declineBtn}
-                                onClick={()=>setMemberToRemove(null)}>No, keep this member.</button>
+                        <button className={formStyles.declineBtn}
+                                onClick={()=>memberToRemove.request_id&&removeMemberMutation.mutate(memberToRemove.request_id)}>Yes, remove</button>
+                        <button className={formStyles.quietBtn}
+                                onClick={()=>setMemberToRemove(null)}>Never mind</button>
                     </div>
-                    {removeMemberMutation.error&&<p className={styles.error}>{removeMemberMutation.error.message}</p>}
+                    {removeMemberMutation.error&&<p className={formStyles.error}>{removeMemberMutation.error.message}</p>}
                 </Modal>}
             </section>
             {detail.outing.notes&&<section className={styles.section}>
