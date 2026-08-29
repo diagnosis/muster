@@ -16,6 +16,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with: { go-version-file: backend/go.mod }
+      - run: go install github.com/pressly/goose/v3/cmd/goose@latest
+
+        # Runs against prod BEFORE the new binary ships. Every migration must
+        # therefore be safe under the currently-running binary (expand-only;
+        # contract in a later release).
+      - name: Migrate
+        run: goose -dir ./migrations postgres "${{ secrets.NEON_PROD_URL }}" up
 
       - name: Build
         run: GOOS=linux GOARCH=amd64 go build -o muster ./cmd/muster
