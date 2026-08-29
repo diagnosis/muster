@@ -153,7 +153,7 @@ export function OutingDetailPage() {
                 {detail.roster.map(m => <div className={styles.memberRow}
                     key={m.hiker_id}>{m.name} · {m.experience}
                     {me?.id === detail.outing.host_id ?
-                        <button className={`${styles.warning} btn`} onClick={()=>{
+                        <button className={styles.removeBtn} onClick={()=>{
                             setMemberToRemove(m)
                         }}>🗑️</button>:''
                     }
