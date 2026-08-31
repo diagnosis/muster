@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/diagnosis/go-toolkit/v2/apperr"
-	"github.com/diagnosis/go-toolkit/v2/middleware"
+	"github.com/diagnosis/go-toolkit/v3/apperr"
+	"github.com/diagnosis/go-toolkit/v3/middleware"
 	"github.com/google/uuid"
 )
 

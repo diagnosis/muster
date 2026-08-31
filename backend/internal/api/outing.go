@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/diagnosis/go-toolkit/v2/logger"
-	"github.com/diagnosis/go-toolkit/v2/responder"
+	"github.com/diagnosis/go-toolkit/v3/logger"
+	"github.com/diagnosis/go-toolkit/v3/responder"
 	"github.com/diagnosis/muster/internal/outing"
 	"github.com/google/uuid"
 )

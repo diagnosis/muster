@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/diagnosis/go-toolkit/v2/logger"
-	"github.com/diagnosis/go-toolkit/v2/secure"
+	"github.com/diagnosis/go-toolkit/v3/logger"
+	"github.com/diagnosis/go-toolkit/v3/secure"
 	"github.com/diagnosis/muster/internal/api"
 	"github.com/diagnosis/muster/internal/config"
 	"github.com/diagnosis/muster/internal/hiker"

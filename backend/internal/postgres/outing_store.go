@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/diagnosis/go-toolkit/v2/apperr"
+	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/diagnosis/muster/internal/outing"
 	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"

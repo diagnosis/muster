@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/diagnosis/go-toolkit/v2/apperr"
-	"github.com/diagnosis/go-toolkit/v2/secure"
-	"github.com/diagnosis/go-toolkit/v2/validator"
+	"github.com/diagnosis/go-toolkit/v3/apperr"
+	"github.com/diagnosis/go-toolkit/v3/secure"
+	"github.com/diagnosis/go-toolkit/v3/validator"
 	"github.com/google/uuid"
 )
 
