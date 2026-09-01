@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
+	"github.com/diagnosis/go-toolkit/v3/logger"
+	"github.com/diagnosis/go-toolkit/v3/mailer"
 	"github.com/diagnosis/go-toolkit/v3/secure"
 	"github.com/diagnosis/go-toolkit/v3/validator"
 	"github.com/google/uuid"
@@ -27,13 +29,15 @@ type Storage interface {
 // Service implements hiker business rules over a Storage.
 type Service struct {
 	store Storage
+	mail  mailer.Mailer
 	jwt   *secure.JWTSigner
 }
 
 // NewService returns a Service backed by store, minting tokens with jwt.
-func NewService(store Storage, jwt *secure.JWTSigner) *Service {
+func NewService(store Storage, m mailer.Mailer, jwt *secure.JWTSigner) *Service {
 	return &Service{
 		store: store,
+		mail:  m,
 		jwt:   jwt,
 	}
 }
@@ -84,7 +88,13 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*Hiker, error
 		Bio:          in.Bio,
 		Gender:       in.Gender,
 	}
-	return h, s.store.CreateHiker(ctx, h)
+	if err = s.store.CreateHiker(ctx, h); err != nil {
+		return nil, err
+	}
+	if err = s.mail.Send(ctx, []string{email}, "email confirmation", "welcome to muster app. have fun!"); err != nil{
+		logger.Warn(ctx, "failed to send verificaiton email", "err", err)
+	}
+	return h, nil
 }
 
 // Platform identifies the client type a session belongs to.

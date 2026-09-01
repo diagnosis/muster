@@ -73,7 +73,7 @@ func (f *fakeStore) GetRefreshTokenByHash(ctx context.Context, hash string) (*Re
 func (f *fakeStore) DeleteRefreshTokens(ctx context.Context, hikerID uuid.UUID, platform Platform) error {
 
 	for _, token := range f.rt {
-		if token.HikerID == hikerID && token.Platform == platform{
+		if token.HikerID == hikerID && token.Platform == platform {
 			delete(f.rt, token.TokenHash)
 		}
 	}

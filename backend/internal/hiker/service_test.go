@@ -2,6 +2,7 @@ package hiker
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -36,11 +37,12 @@ func wantStatus(t *testing.T, err error, want apperr.Status) {
 
 func Test_Register_Hiker(t *testing.T) {
 	f := newFakeStore()
+	m := &fakeMailer{}
 	jwt, err := getTestJWTSigner()
 	if err != nil {
 		t.Fatalf("expected no error on jwt signer got %v", err)
 	}
-	svc := NewService(f, jwt)
+	svc := NewService(f, m, jwt)
 	hiker, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
@@ -64,13 +66,14 @@ func Test_Register_Hiker(t *testing.T) {
 	}
 }
 
-func Test_Register_ExistingEmail(t *testing.T){
+func Test_Register_ExistingEmail(t *testing.T) {
 	f := newFakeStore()
 	jwt, err := getTestJWTSigner()
+	m := &fakeMailer{}
 	if err != nil {
 		t.Fatalf("expected no error on jwt signer got %v", err)
 	}
-	svc := NewService(f, jwt)
+	svc := NewService(f,m, jwt)
 	_, err = svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
@@ -99,6 +102,87 @@ func Test_Register_ExistingEmail(t *testing.T){
 
 }
 
-func Test_Register_SendsVerificationEmail(t *testing.T){
+func Test_Register_SendsVerificationEmail(t *testing.T) {
+	f := newFakeStore()
+	jwt, err := getTestJWTSigner()
+	fm := &fakeMailer{}
+	if err != nil {
+		t.Fatalf("expected no error on jwt signer got %v", err)
+	}
+	svc := NewService(f, fm, jwt)
+	_, err = svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected error got %v", err)
+	}
+	if len(fm.sent) != 1 {
+		t.Fatalf("expected to send 1 mail got %d", len(fm.sent))
+	}
+
+}
+
+func Test_Register_ResendDown(t *testing.T){
+	f := newFakeStore()
+	jwt, err := getTestJWTSigner()
+	fm := &fakeMailer{ err: errors.New("resend down")}
+	if err != nil {
+		t.Fatalf("expected no error on jwt signer got %v", err)
+	}
+	svc := NewService(f, fm, jwt)
+
+	hiker, err := svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if hiker == nil {
+		t.Fatal("expected hiker is created but got nil")
+	}
+	if len(fm.sent) != 0 {
+		t.Errorf("expected nothing is sent but got %d item sent", len(fm.sent))
+	}
+
+}
+
+func Test_Register_Recipient(t *testing.T){
+	f := newFakeStore()
+	jwt, err := getTestJWTSigner()
+	if err != nil {
+		t.Fatalf("expected no error on jwt signer got %v", err)
+	}
+	fm := &fakeMailer{
+	}
+
+	svc := NewService(f, fm, jwt)
+	_, err = svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+
+	if fm.sent[0].to[0] != "test@test.com"{
+		t.Errorf("expected email is sent to test@test.com got %s", fm.sent[0].to[0])
+	}
 
 }

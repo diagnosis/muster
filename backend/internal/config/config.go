@@ -15,6 +15,7 @@ type Config struct {
 	Database    *DatabaseConfig
 	JWT         *JWTConfig
 	RateLimiter *RateLimiterConfig
+	Resend      *ResendConfig
 }
 
 // AppConfig holds app configurations. platform, env, port etc.
@@ -55,6 +56,12 @@ type RateLimiterConfig struct {
 	Burst int32
 }
 
+// ResendConfig holds resend apikey and from email
+type ResendConfig struct {
+	APIKey    string
+	EmailFrom string
+}
+
 // Load reads configuration from the environment, applying defaults for
 // optional values. It returns an error if a required variable is missing
 // or any present value fails to parse.
@@ -79,7 +86,12 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Config{App: appConfig, Database: databaseConfig, JWT: jwtConfig, RateLimiter: rateLimiterConfig}, nil
+
+	resendConfig, err := loadResendConfig(appConfig.Env)
+	if err != nil {
+		return nil, err
+	}
+	return &Config{App: appConfig, Database: databaseConfig, JWT: jwtConfig, RateLimiter: rateLimiterConfig, Resend: resendConfig}, nil
 }
 
 func loadAppConfig() (*AppConfig, error) {
@@ -201,6 +213,18 @@ func loadRateLimitConfig() (*RateLimiterConfig, error) {
 	return &RateLimiterConfig{
 		RPS:   rps,
 		Burst: burst,
+	}, nil
+}
+
+func loadResendConfig(env string) (*ResendConfig, error) {
+	apiKey := getEnv("RESEND_API_KEY", "")
+	if apiKey == "" && env == "prod" {
+		return nil, fmt.Errorf("RESEND_API_KEY required in production")
+	}
+	from := getEnv("RESEND_EMAIL_FROM", "noreply-muster@safadev.app")
+	return &ResendConfig{
+		APIKey:    apiKey,
+		EmailFrom: from,
 	}, nil
 }
 
