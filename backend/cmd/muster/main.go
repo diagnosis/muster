@@ -7,8 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/diagnosis/go-toolkit/v2/logger"
-	"github.com/diagnosis/go-toolkit/v2/secure"
+	"github.com/diagnosis/go-toolkit/v3/logger"
+	"github.com/diagnosis/go-toolkit/v3/mailer"
+	"github.com/diagnosis/go-toolkit/v3/secure"
 	"github.com/diagnosis/muster/internal/api"
 	"github.com/diagnosis/muster/internal/config"
 	"github.com/diagnosis/muster/internal/hiker"
@@ -61,8 +62,15 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("signer err: %w", err)
 	}
+	var m mailer.Mailer
+	if cfg.Resend.APIKey == "" {
+		logger.Warn(ctx, "mail disabled: RESEND_API_KEY not set")
+		m = noopMailer{}
+	} else {
+		m = mailer.NewResendMailer(cfg.Resend.APIKey, cfg.Resend.EmailFrom)
+	}
 
-	hikers := hiker.NewService(hikerStore, signer)
+	hikers := hiker.NewService(hikerStore, m, signer)
 	outings := outing.NewService(outingsStore)
 	srv := api.NewServer(cfg, hikers, signer, outings)
 
@@ -93,3 +101,9 @@ func openPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 
 	return pool, err
 }
+
+type noopMailer struct{}
+
+func (noopMailer) Send(context.Context, []string, string, string) error { return nil }
+
+var _ mailer.Mailer = noopMailer{}
