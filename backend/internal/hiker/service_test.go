@@ -73,7 +73,7 @@ func Test_Register_ExistingEmail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error on jwt signer got %v", err)
 	}
-	svc := NewService(f,m, jwt)
+	svc := NewService(f, m, jwt)
 	_, err = svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
@@ -128,10 +128,10 @@ func Test_Register_SendsVerificationEmail(t *testing.T) {
 
 }
 
-func Test_Register_ResendDown(t *testing.T){
+func Test_Register_ResendDown(t *testing.T) {
 	f := newFakeStore()
 	jwt, err := getTestJWTSigner()
-	fm := &fakeMailer{ err: errors.New("resend down")}
+	fm := &fakeMailer{err: errors.New("resend down")}
 	if err != nil {
 		t.Fatalf("expected no error on jwt signer got %v", err)
 	}
@@ -158,14 +158,13 @@ func Test_Register_ResendDown(t *testing.T){
 
 }
 
-func Test_Register_Recipient(t *testing.T){
+func Test_Register_Recipient(t *testing.T) {
 	f := newFakeStore()
 	jwt, err := getTestJWTSigner()
 	if err != nil {
 		t.Fatalf("expected no error on jwt signer got %v", err)
 	}
-	fm := &fakeMailer{
-	}
+	fm := &fakeMailer{}
 
 	svc := NewService(f, fm, jwt)
 	_, err = svc.Register(context.Background(), RegisterInput{
@@ -181,7 +180,7 @@ func Test_Register_Recipient(t *testing.T){
 		t.Fatalf("expected no error but got %v", err)
 	}
 
-	if fm.sent[0].to[0] != "test@test.com"{
+	if fm.sent[0].to[0] != "test@test.com" {
 		t.Errorf("expected email is sent to test@test.com got %s", fm.sent[0].to[0])
 	}
 

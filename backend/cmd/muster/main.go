@@ -63,13 +63,12 @@ func run() error {
 		return fmt.Errorf("signer err: %w", err)
 	}
 	var m mailer.Mailer
-	if cfg.Resend.APIKey == ""{
+	if cfg.Resend.APIKey == "" {
 		logger.Warn(ctx, "mail disabled: RESEND_API_KEY not set")
 		m = noopMailer{}
-	} else{
+	} else {
 		m = mailer.NewResendMailer(cfg.Resend.APIKey, cfg.Resend.EmailFrom)
 	}
-
 
 	hikers := hiker.NewService(hikerStore, m, signer)
 	outings := outing.NewService(outingsStore)
@@ -103,7 +102,8 @@ func openPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	return pool, err
 }
 
-type noopMailer struct {}
+type noopMailer struct{}
 
-func (noopMailer) Send(context.Context, []string, string, string)error{return nil}
+func (noopMailer) Send(context.Context, []string, string, string) error { return nil }
+
 var _ mailer.Mailer = noopMailer{}
