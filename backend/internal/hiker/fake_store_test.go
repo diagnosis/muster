@@ -26,7 +26,6 @@ func (f *fakeStore) CreateHiker(ctx context.Context, h *Hiker) error {
 			return apperr.EmailExists("email exists", "duplicate email violation")
 		}
 	}
-	h.ID = uuid.New()
 
 	f.hikers[h.ID] = h
 	return nil

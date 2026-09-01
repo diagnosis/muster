@@ -91,7 +91,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*Hiker, error
 	if err = s.store.CreateHiker(ctx, h); err != nil {
 		return nil, err
 	}
-	if err = s.mail.Send(ctx, []string{email}, "email confirmation", "welcome to muster app. have fun!"); err != nil{
+	if err = s.mail.Send(ctx, []string{email}, "Welcome to Muster", "welcome to muster app. have fun!"); err != nil{
 		logger.Warn(ctx, "failed to send verificaiton email", "err", err)
 	}
 	return h, nil
