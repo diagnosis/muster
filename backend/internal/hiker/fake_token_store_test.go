@@ -10,7 +10,8 @@ import (
 )
 
 type tokenFakeStore struct {
-	tokens map[string]*authtoken.Token
+	tokens  map[string]*authtoken.Token
+	saveErr error
 }
 
 func newTokenFakeStore() *tokenFakeStore {
@@ -21,6 +22,9 @@ func newTokenFakeStore() *tokenFakeStore {
 
 func (f *tokenFakeStore) Save(ctx context.Context, t *authtoken.Token) error {
 	f.tokens[t.Hash] = t
+	if f.saveErr != nil {
+		return f.saveErr
+	}
 	return nil
 }
 
