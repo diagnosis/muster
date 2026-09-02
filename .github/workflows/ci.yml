@@ -67,7 +67,10 @@ jobs:
 
       - name: Run suite
         if: inputs.suite != 'frontend'
-        env: { BASE_URL: "http://localhost:8088" }
+        env:
+          BASE_URL: "http://localhost:8088"
+          DATABASE_URL: ${{ steps.neon.outputs.db_url_with_pooler }}
+
         run: make e2e
 
       - name: Install e2e frontend deps

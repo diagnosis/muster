@@ -39,7 +39,7 @@ type Hiker struct {
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 	DeletedAt    *time.Time `json:"-"`
-	VerifiedAt   *time.Time `json:"verified_at,omitempty"`
+	VerifiedAt   *time.Time `json:"verified_at"`
 }
 
 // RefreshToken is a stored refresh-token record. Only the SHA-256 hash
