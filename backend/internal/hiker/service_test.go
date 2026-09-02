@@ -3,11 +3,13 @@ package hiker
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/diagnosis/go-toolkit/v3/secure"
+	"github.com/diagnosis/muster/internal/authtoken"
 	"github.com/google/uuid"
 )
 
@@ -35,14 +37,28 @@ func wantStatus(t *testing.T, err error, want apperr.Status) {
 	}
 }
 
-func Test_Register_Hiker(t *testing.T) {
+func newTestService(t *testing.T, fm *fakeMailer) (*Service, *fakeStore, *tokenFakeStore) {
 	f := newFakeStore()
-	m := &fakeMailer{}
 	jwt, err := getTestJWTSigner()
 	if err != nil {
 		t.Fatalf("expected no error on jwt signer got %v", err)
 	}
-	svc := NewService(f, m, jwt)
+	tf := newTokenFakeStore()
+	ts := authtoken.NewService(tf)
+	cfg := ServiceConfig{
+		Store:     f,
+		Token:     ts,
+		Mail:      fm,
+		JWT:       jwt,
+		BaseURL:   "http://test.com",
+		VerifyTTL: 24 * time.Hour,
+	}
+	svc := NewService(cfg)
+	return svc, f, tf
+}
+
+func Test_Register_Hiker(t *testing.T) {
+	svc, _, _ := newTestService(t, &fakeMailer{})
 	hiker, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
@@ -67,14 +83,8 @@ func Test_Register_Hiker(t *testing.T) {
 }
 
 func Test_Register_ExistingEmail(t *testing.T) {
-	f := newFakeStore()
-	jwt, err := getTestJWTSigner()
-	m := &fakeMailer{}
-	if err != nil {
-		t.Fatalf("expected no error on jwt signer got %v", err)
-	}
-	svc := NewService(f, m, jwt)
-	_, err = svc.Register(context.Background(), RegisterInput{
+	svc, _, _ := newTestService(t, &fakeMailer{})
+	_, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
 		Name:       "safa test",
@@ -103,14 +113,10 @@ func Test_Register_ExistingEmail(t *testing.T) {
 }
 
 func Test_Register_SendsVerificationEmail(t *testing.T) {
-	f := newFakeStore()
-	jwt, err := getTestJWTSigner()
+
 	fm := &fakeMailer{}
-	if err != nil {
-		t.Fatalf("expected no error on jwt signer got %v", err)
-	}
-	svc := NewService(f, fm, jwt)
-	_, err = svc.Register(context.Background(), RegisterInput{
+	svc, _, _ := newTestService(t, fm)
+	_, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
 		Name:       "safa test2",
@@ -129,13 +135,9 @@ func Test_Register_SendsVerificationEmail(t *testing.T) {
 }
 
 func Test_Register_ResendDown(t *testing.T) {
-	f := newFakeStore()
-	jwt, err := getTestJWTSigner()
+
 	fm := &fakeMailer{err: errors.New("resend down")}
-	if err != nil {
-		t.Fatalf("expected no error on jwt signer got %v", err)
-	}
-	svc := NewService(f, fm, jwt)
+	svc, _, _ := newTestService(t, fm)
 
 	hiker, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
@@ -159,15 +161,11 @@ func Test_Register_ResendDown(t *testing.T) {
 }
 
 func Test_Register_Recipient(t *testing.T) {
-	f := newFakeStore()
-	jwt, err := getTestJWTSigner()
-	if err != nil {
-		t.Fatalf("expected no error on jwt signer got %v", err)
-	}
+
 	fm := &fakeMailer{}
 
-	svc := NewService(f, fm, jwt)
-	_, err = svc.Register(context.Background(), RegisterInput{
+	svc, _, _ := newTestService(t, fm)
+	_, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
 		Name:       "safa test2",
@@ -182,6 +180,27 @@ func Test_Register_Recipient(t *testing.T) {
 
 	if fm.sent[0].to[0] != "test@test.com" {
 		t.Errorf("expected email is sent to test@test.com got %s", fm.sent[0].to[0])
+	}
+
+}
+
+func Test_Register_EmailContainsVerificationLink(t *testing.T) {
+
+	fm := &fakeMailer{}
+
+	svc, _, _ := newTestService(t, fm)
+	_, _ = svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	emailBody := fm.sent[0].body
+	if !strings.Contains(emailBody, "/verify-email") {
+		t.Error("expected to contain verification link")
 	}
 
 }
