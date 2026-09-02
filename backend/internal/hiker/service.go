@@ -22,6 +22,7 @@ type Storage interface {
 	GetHikerByEmail(ctx context.Context, email string) (*Hiker, error)
 	GetHikerByID(ctx context.Context, id uuid.UUID) (*Hiker, error)
 	UpdateHiker(ctx context.Context, h *Hiker) error
+	SetVerified(ctx context.Context, hikerID uuid.UUID) error
 
 	SaveRefreshToken(ctx context.Context, t *RefreshToken) error
 	GetRefreshTokenByHash(ctx context.Context, hash string) (*RefreshToken, error)
@@ -293,4 +294,18 @@ func (s *Service) mintSession(ctx context.Context, h *Hiker, platform Platform) 
 		AccessToken:  accessToken,
 		RefreshToken: newRawRefresh,
 	}, nil
+}
+
+// VerifyEmail set raw token provided by verification url verified.
+func (s *Service) VerifyEmail(ctx context.Context, raw string) error {
+	hikerID, err := s.tokens.Consume(ctx, raw, authtoken.PurposeEmailVerification)
+	if err != nil {
+		return err
+	}
+	err = s.store.SetVerified(ctx, hikerID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

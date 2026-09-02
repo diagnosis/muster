@@ -58,6 +58,32 @@ func newTestService(t *testing.T, fm *fakeMailer) (*Service, *fakeStore, *tokenF
 	return svc, f, tf
 }
 
+func getRawFromEmailBody(t *testing.T, fm *fakeMailer) string {
+	if len(fm.sent) != 1 {
+		t.Fatalf("expected 1 mail got %d", len(fm.sent))
+	}
+	emailSubject := fm.sent[0].subject
+	if emailSubject != "Welcome to Muster - Please verify your email" {
+		t.Errorf("expected Welcome to Muster - Please verify your email got %s", emailSubject)
+	}
+	emailBody := fm.sent[0].body
+	var link string
+	for _, section := range strings.Split(emailBody, " ") {
+		if strings.HasPrefix(section, "http://") || strings.HasPrefix(section, "https://") {
+			link = section
+		}
+	}
+	linkURL, err := url.Parse(link)
+	if err != nil {
+		t.Errorf("expected no parse error got %v", err)
+	}
+	params, ok := linkURL.Query()["token"]
+	if !ok || len(params) == 0 || params[0] == "" {
+		t.Errorf("no token in link %q", link)
+	}
+	raw := params[0]
+	return raw
+}
 func Test_Register_Hiker(t *testing.T) {
 	svc, _, _ := newTestService(t, &fakeMailer{})
 	hiker, err := svc.Register(context.Background(), RegisterInput{
@@ -202,29 +228,7 @@ func Test_Register_EmailContainsVerificationLink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-	if len(fm.sent) != 1 {
-		t.Fatalf("expected 1 mail got %d", len(fm.sent))
-	}
-	emailSubject := fm.sent[0].subject
-	if emailSubject != "Welcome to Muster - Please verify your email" {
-		t.Errorf("expected Welcome to Muster - Please verify your email got %s", emailSubject)
-	}
-	emailBody := fm.sent[0].body
-	var link string
-	for _, section := range strings.Split(emailBody, " ") {
-		if strings.HasPrefix(section, "http://") || strings.HasPrefix(section, "https://") {
-			link = section
-		}
-	}
-	linkURL, err := url.Parse(link)
-	if err != nil {
-		t.Errorf("expected no parse error got %v", err)
-	}
-	params, ok := linkURL.Query()["token"]
-	if !ok || len(params) == 0 || params[0] == "" {
-		t.Errorf("no token in link %q", link)
-	}
-	raw := params[0]
+	raw := getRawFromEmailBody(t, fm)
 
 	hash := secure.HashRefreshToken(raw)
 
@@ -284,5 +288,38 @@ func Test_Register_MintFails(t *testing.T) {
 	if len(fm.sent) != 0 {
 		t.Errorf("expected no mail sent got %d", len(fm.sent))
 	}
+
+}
+
+func Test_Register_VerifyEmail(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, f, _ := newTestService(t, fm)
+	_, err := svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	raw := getRawFromEmailBody(t, fm)
+
+	err = svc.VerifyEmail(context.Background(), raw)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	h, err := f.GetHikerByEmail(context.Background(), "test@test.com")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if h.VerifiedAt == nil {
+		t.Error("expected verified_at set")
+	}
+	err = svc.VerifyEmail(context.Background(), raw)
+	wantStatus(t, err, apperr.CodeConflict)
 
 }

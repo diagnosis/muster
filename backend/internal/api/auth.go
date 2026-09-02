@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/diagnosis/go-toolkit/v3/logger"
@@ -30,6 +31,38 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	responder.JSON(w, http.StatusCreated, h, correlationID)
+}
+
+type verifyEmailInput struct {
+	Token string `json:"token"`
+}
+
+func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	var in verifyEmailInput
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		logger.Error(r.Context(), "invalid body", "err", err)
+		responder.Error(w, apperr.BadRequest("invalid request body", "json decode failed", err), correlationID)
+		return
+	}
+	token := strings.TrimSpace(in.Token)
+	if token == "" {
+		responder.Error(w, apperr.BadRequest("empty token", "empty token"), correlationID)
+		return
+	}
+
+	if err := s.hikers.VerifyEmail(r.Context(), token); err != nil {
+		logger.Error(r.Context(), "failed to verify email", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	responder.JSON(w, http.StatusOK, map[string]string{
+		"message": "Email is verified",
+	}, correlationID)
+
 }
 
 type loginRequest struct {

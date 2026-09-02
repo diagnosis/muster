@@ -51,7 +51,7 @@ func (s *HikerStore) CreateHiker(ctx context.Context, h *hiker.Hiker) error {
 func (s *HikerStore) GetHikerByEmail(ctx context.Context, email string) (*hiker.Hiker, error) {
 	q := `
     SELECT id, email, password_hash, name, experience, home_area, bio, gender,
-           created_at, updated_at, deleted_at
+           created_at, updated_at, deleted_at, verified_at
     FROM hikers
     WHERE email = $1 AND deleted_at IS NULL`
 
@@ -70,7 +70,7 @@ func (s *HikerStore) GetHikerByEmail(ctx context.Context, email string) (*hiker.
 func (s *HikerStore) GetHikerByID(ctx context.Context, id uuid.UUID) (*hiker.Hiker, error) {
 	q := `
     SELECT id, email, password_hash, name, experience, home_area, bio, gender,
-           created_at, updated_at, deleted_at
+           created_at, updated_at, deleted_at, verified_at
     FROM hikers
     WHERE id = $1 AND deleted_at IS NULL`
 
@@ -102,6 +102,24 @@ func (s *HikerStore) UpdateHiker(ctx context.Context, h *hiker.Hiker) error {
 			return apperr.NotFound("hiker not found", "no row for id")
 		}
 		return apperr.Database("could not update hiker", "update hikers failed", err)
+	}
+	return nil
+}
+
+// SetVerified sets verified_at to now.
+// zero rows: unknown, already-verified, or deleted — all NotFound for v1.
+func (s *HikerStore) SetVerified(ctx context.Context, hikerID uuid.UUID) error {
+	q := `
+		UPDATE hikers
+		SET verified_at = now(), updated_at = now()
+		WHERE id = $1 AND verified_at IS NULL AND deleted_at IS NULL
+`
+	ct, err := s.pool.Exec(ctx, q, hikerID)
+	if err != nil {
+		return apperr.Database("cannot verify email", "failed to verify email", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return apperr.NotFound("row not found", "row not found")
 	}
 	return nil
 }
@@ -164,7 +182,7 @@ func scanHiker(row pgx.Row) (*hiker.Hiker, error) {
 	err := row.Scan(
 		&h.ID, &h.Email, &h.PasswordHash, &h.Name, &h.Experience,
 		&h.HomeArea, &h.Bio, &h.Gender,
-		&h.CreatedAt, &h.UpdatedAt, &h.DeletedAt,
+		&h.CreatedAt, &h.UpdatedAt, &h.DeletedAt, &h.VerifiedAt,
 	)
 	return h, err
 }
