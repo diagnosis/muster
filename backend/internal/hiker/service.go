@@ -110,7 +110,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*Hiker, error
 	if err == nil {
 		link := fmt.Sprintf("%s/verify-email?token=%s", s.baseURL, raw)
 		subj := "Welcome to Muster - Please verify your email"
-		body := "Please click to link to verify your account " + link
+		body := "Please click to the link to verify your account " + link
 		if err = s.mail.Send(ctx, []string{email}, subj, body); err != nil {
 			logger.Warn(ctx, "failed to send verification email", "err", err)
 		}

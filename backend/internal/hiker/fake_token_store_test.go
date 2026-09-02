@@ -21,10 +21,10 @@ func newTokenFakeStore() *tokenFakeStore {
 }
 
 func (f *tokenFakeStore) Save(ctx context.Context, t *authtoken.Token) error {
-	f.tokens[t.Hash] = t
 	if f.saveErr != nil {
 		return f.saveErr
 	}
+	f.tokens[t.Hash] = t
 	return nil
 }
 
