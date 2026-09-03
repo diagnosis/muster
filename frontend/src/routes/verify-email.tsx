@@ -20,7 +20,6 @@ function VerifyEmailPage() {
             mutationFn: async (token:string) => {
               const res =
                   await apiClient.post<VerifyEmailResponse>('/api/auth/verify-email', {token})
-                console.log('mutationFn got:', res)
               if (res.ok){
                   return res.data
               }
@@ -34,20 +33,21 @@ function VerifyEmailPage() {
             verifyEmailMutation.mutate(token)
         }
     }, [token])
-    console.log('mutation status:', verifyEmailMutation.status, verifyEmailMutation.error)
     if (!token) return <div><p>Invalid verification token</p></div>
     if (verifyEmailMutation.isSuccess){
         return <div className={styles.form}>
-            <p>{verifyEmailMutation.data?.message}</p>
-            <p></p>
+            <p>Your email is verified.</p>
             <Link className={"btn btn-primary"} to={'/login'}>Log in</Link>
         </div>
     }
     if (verifyEmailMutation.isError){
         return <div className={styles.form}>
-            <p className={styles.error}>{verifyEmailMutation.error.message}</p>
+            {verifyEmailMutation.error instanceof ApiRequestError && verifyEmailMutation.error.httpStatus === 409 ?
+                <p className={styles.error}>This link has expired or was already used.</p>
+                :<p className={styles.error}>This link is not valid.</p>
+            }
         </div>
     }
-    return <div>loading..</div>
+    return <div>Verifying...</div>
 
 }
