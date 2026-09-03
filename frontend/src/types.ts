@@ -127,3 +127,7 @@ export interface CreateOutingInput {
     pace: Pace
     notes?: string
 }
+
+export interface VerifyEmailResponse {
+    message: string
+}

@@ -27,3 +27,11 @@ export const INVALID_NUMBER_FIELDS = 'Check the number fields — something is i
 export const INVALID_MAX_SIZE = 'Max size must be a whole number of at least 2.'
 export const INVALID_HOST_SEATS = 'Host seats must be a whole number, 0 or more.'
 export const INVALID_COST = 'Cost per seat must be a positive amount, up to two decimals.'
+
+
+// verify email page
+export const VERIFY_SUCCESS = 'Your email is verified.'
+export const VERIFY_SUCCESS_CTA = 'Log in'
+export const VERIFY_EXPIRED_OR_USED = 'This link has expired or was already used.'
+export const VERIFY_INVALID = 'This link is not valid.'
+export const VERIFY_PENDING = 'Verifying…'
