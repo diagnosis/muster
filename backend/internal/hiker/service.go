@@ -2,6 +2,7 @@ package hiker
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/diagnosis/go-toolkit/v3/mailer"
 	"github.com/diagnosis/go-toolkit/v3/secure"
 	"github.com/diagnosis/go-toolkit/v3/validator"
+	"github.com/diagnosis/muster/internal/authtoken"
 	"github.com/google/uuid"
 )
 
@@ -20,25 +22,38 @@ type Storage interface {
 	GetHikerByEmail(ctx context.Context, email string) (*Hiker, error)
 	GetHikerByID(ctx context.Context, id uuid.UUID) (*Hiker, error)
 	UpdateHiker(ctx context.Context, h *Hiker) error
+	SetVerified(ctx context.Context, hikerID uuid.UUID) error
 
 	SaveRefreshToken(ctx context.Context, t *RefreshToken) error
 	GetRefreshTokenByHash(ctx context.Context, hash string) (*RefreshToken, error)
 	DeleteRefreshTokens(ctx context.Context, hikerID uuid.UUID, platform Platform) error
 }
 
+// ServiceConfig provides deps for extending services
+type ServiceConfig struct {
+	Store     Storage
+	Token     *authtoken.Service
+	Mail      mailer.Mailer
+	JWT       *secure.JWTSigner
+	BaseURL   string
+	VerifyTTL time.Duration
+}
+
 // Service implements hiker business rules over a Storage.
 type Service struct {
-	store Storage
-	mail  mailer.Mailer
-	jwt   *secure.JWTSigner
+	store     Storage
+	tokens    *authtoken.Service
+	mail      mailer.Mailer
+	jwt       *secure.JWTSigner
+	baseURL   string
+	verifyTTL time.Duration
 }
 
 // NewService returns a Service backed by store, minting tokens with jwt.
-func NewService(store Storage, m mailer.Mailer, jwt *secure.JWTSigner) *Service {
+func NewService(cfg ServiceConfig) *Service {
 	return &Service{
-		store: store,
-		mail:  m,
-		jwt:   jwt,
+		store: cfg.Store, tokens: cfg.Token, mail: cfg.Mail, jwt: cfg.JWT,
+		baseURL: cfg.BaseURL, verifyTTL: cfg.VerifyTTL,
 	}
 }
 
@@ -91,9 +106,19 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*Hiker, error
 	if err = s.store.CreateHiker(ctx, h); err != nil {
 		return nil, err
 	}
-	if err = s.mail.Send(ctx, []string{email}, "Welcome to Muster", "welcome to muster app. have fun!"); err != nil {
-		logger.Warn(ctx, "failed to send verification email", "err", err)
+
+	raw, err := s.tokens.Mint(ctx, h.ID, authtoken.PurposeEmailVerification, s.verifyTTL)
+	if err == nil {
+		link := fmt.Sprintf("%s/verify-email?token=%s", s.baseURL, raw)
+		subj := "Welcome to Muster - Please verify your email"
+		body := "Please click the link to verify your account: " + link
+		if err = s.mail.Send(ctx, []string{email}, subj, body); err != nil {
+			logger.Warn(ctx, "failed to send verification email", "err", err)
+		}
+	} else {
+		logger.Warn(ctx, "failed to mint raw token for email verification", "err", err)
 	}
+
 	return h, nil
 }
 
@@ -269,4 +294,18 @@ func (s *Service) mintSession(ctx context.Context, h *Hiker, platform Platform) 
 		AccessToken:  accessToken,
 		RefreshToken: newRawRefresh,
 	}, nil
+}
+
+// VerifyEmail set raw token provided by verification url verified.
+func (s *Service) VerifyEmail(ctx context.Context, raw string) error {
+	hikerID, err := s.tokens.Consume(ctx, raw, authtoken.PurposeEmailVerification)
+	if err != nil {
+		return err
+	}
+	err = s.store.SetVerified(ctx, hikerID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

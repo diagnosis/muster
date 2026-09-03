@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as MeOutingsRouteImport } from './routes/me.outings'
 import { Route as MeProfileRouteImport } from './routes/me.profile'
 import { Route as OutingsIdRouteImport } from './routes/outings.$id'
@@ -31,6 +32,11 @@ const LoginRoute = LoginRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MeOutingsRoute = MeOutingsRouteImport.update({
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/me/outings': typeof MeOutingsRoute
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/me/outings': typeof MeOutingsRoute
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/me/outings': typeof MeOutingsRoute
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
+    | '/verify-email'
     | '/me/outings'
     | '/me/profile'
     | '/outings/$id'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
+    | '/verify-email'
     | '/me/outings'
     | '/me/profile'
     | '/outings/$id'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
+    | '/verify-email'
     | '/me/outings'
     | '/me/profile'
     | '/outings/$id'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
   MeOutingsRoute: typeof MeOutingsRoute
   MeProfileRoute: typeof MeProfileRoute
   OutingsIdRoute: typeof OutingsIdRoute
@@ -155,6 +168,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/me/outings': {
@@ -199,6 +219,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
   MeOutingsRoute: MeOutingsRoute,
   MeProfileRoute: MeProfileRoute,
   OutingsIdRoute: OutingsIdRoute,

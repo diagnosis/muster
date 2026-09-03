@@ -2,7 +2,14 @@ import {test, expect} from '@playwright/test'
 import {WEB_URL} from "../fixtures/config.ts";
 import {actorInBrowser, createActor, uniqueIdentity} from "../fixtures/actor.ts";
 import {expectLoggedIn, expectLoggedOut, expectNavClosed, openNav} from "../fixtures/assertions.ts";
-import {EMAIL_EXISTS, INVALID_LOGIN, INVALID_PASSWORD, SHORT_PASSWORD, VALIDATION_FAILED} from "../fixtures/copy.ts";
+import {
+    EMAIL_EXISTS,
+    INVALID_LOGIN,
+    INVALID_PASSWORD,
+    SHORT_PASSWORD,
+    VALIDATION_FAILED,
+} from "../fixtures/copy.ts";
+
 
 
 
@@ -135,7 +142,6 @@ test.describe("auth flow", ()=> {
         await expectLoggedOut(page)
 
     })
-
 })
 
 

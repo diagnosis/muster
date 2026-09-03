@@ -64,3 +64,6 @@ export const updateProfile = (ctx: APIRequestContext, data:UpdateMeInput) =>
 
 export const getHiker = (ctx: APIRequestContext, hikerID:string)=>
     ctx.get(`/api/hikers/${hikerID}`)
+
+export const verifyEmail = (ctx:APIRequestContext, token:string) =>
+    ctx.post("/api/auth/verify-email", {data: {token}})

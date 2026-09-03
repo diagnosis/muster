@@ -3,6 +3,7 @@ package hiker
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/google/uuid"
@@ -75,6 +76,15 @@ func (f *fakeStore) DeleteRefreshTokens(ctx context.Context, hikerID uuid.UUID, 
 		if token.HikerID == hikerID && token.Platform == platform {
 			delete(f.rt, token.TokenHash)
 		}
+	}
+	return nil
+}
+func (f *fakeStore) SetVerified(ctx context.Context, hikerID uuid.UUID) error {
+	if _, ok := f.hikers[hikerID]; ok {
+		now := time.Now()
+		f.hikers[hikerID].VerifiedAt = &now
+	} else {
+		return apperr.NotFound("not found", "not founf")
 	}
 	return nil
 }

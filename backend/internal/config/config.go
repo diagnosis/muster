@@ -23,6 +23,7 @@ type AppConfig struct {
 	Env            string
 	Port           string
 	Host           string
+	BaseURL        string
 	CORSOrigins    []string
 	CookieSameSite http.SameSite
 }
@@ -98,6 +99,7 @@ func loadAppConfig() (*AppConfig, error) {
 	env := getEnv("APP_ENV", "dev")
 	port := getEnv("APP_PORT", "8088")
 	host := getEnv("APP_HOST", "")
+	baseURL := getEnv("APP_BASE_URL", "http://localhost:5173")
 
 	corsOrigins := []string{}
 	corsRaw := getEnv("CORS_ORIGINS", "")
@@ -119,6 +121,7 @@ func loadAppConfig() (*AppConfig, error) {
 		Env:            env,
 		Port:           port,
 		Host:           host,
+		BaseURL:        baseURL,
 		CORSOrigins:    corsOrigins,
 		CookieSameSite: cookieSameSite,
 	}, nil

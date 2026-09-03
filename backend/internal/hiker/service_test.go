@@ -3,11 +3,14 @@ package hiker
 import (
 	"context"
 	"errors"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/diagnosis/go-toolkit/v3/secure"
+	"github.com/diagnosis/muster/internal/authtoken"
 	"github.com/google/uuid"
 )
 
@@ -35,14 +38,54 @@ func wantStatus(t *testing.T, err error, want apperr.Status) {
 	}
 }
 
-func Test_Register_Hiker(t *testing.T) {
+func newTestService(t *testing.T, fm *fakeMailer) (*Service, *fakeStore, *tokenFakeStore) {
 	f := newFakeStore()
-	m := &fakeMailer{}
 	jwt, err := getTestJWTSigner()
 	if err != nil {
 		t.Fatalf("expected no error on jwt signer got %v", err)
 	}
-	svc := NewService(f, m, jwt)
+	tf := newTokenFakeStore()
+	ts := authtoken.NewService(tf)
+	cfg := ServiceConfig{
+		Store:     f,
+		Token:     ts,
+		Mail:      fm,
+		JWT:       jwt,
+		BaseURL:   "http://test.com",
+		VerifyTTL: 24 * time.Hour,
+	}
+	svc := NewService(cfg)
+	return svc, f, tf
+}
+
+func getRawFromEmailBody(t *testing.T, fm *fakeMailer) string {
+	if len(fm.sent) != 1 {
+		t.Fatalf("expected 1 mail got %d", len(fm.sent))
+	}
+	emailSubject := fm.sent[0].subject
+	if emailSubject != "Welcome to Muster - Please verify your email" {
+		t.Errorf("expected Welcome to Muster - Please verify your email got %s", emailSubject)
+	}
+	emailBody := fm.sent[0].body
+	var link string
+	for _, section := range strings.Split(emailBody, " ") {
+		if strings.HasPrefix(section, "http://") || strings.HasPrefix(section, "https://") {
+			link = section
+		}
+	}
+	linkURL, err := url.Parse(link)
+	if err != nil {
+		t.Errorf("expected no parse error got %v", err)
+	}
+	params, ok := linkURL.Query()["token"]
+	if !ok || len(params) == 0 || params[0] == "" {
+		t.Errorf("no token in link %q", link)
+	}
+	raw := params[0]
+	return raw
+}
+func Test_Register_Hiker(t *testing.T) {
+	svc, _, _ := newTestService(t, &fakeMailer{})
 	hiker, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
@@ -67,14 +110,8 @@ func Test_Register_Hiker(t *testing.T) {
 }
 
 func Test_Register_ExistingEmail(t *testing.T) {
-	f := newFakeStore()
-	jwt, err := getTestJWTSigner()
-	m := &fakeMailer{}
-	if err != nil {
-		t.Fatalf("expected no error on jwt signer got %v", err)
-	}
-	svc := NewService(f, m, jwt)
-	_, err = svc.Register(context.Background(), RegisterInput{
+	svc, _, _ := newTestService(t, &fakeMailer{})
+	_, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
 		Name:       "safa test",
@@ -103,14 +140,10 @@ func Test_Register_ExistingEmail(t *testing.T) {
 }
 
 func Test_Register_SendsVerificationEmail(t *testing.T) {
-	f := newFakeStore()
-	jwt, err := getTestJWTSigner()
+
 	fm := &fakeMailer{}
-	if err != nil {
-		t.Fatalf("expected no error on jwt signer got %v", err)
-	}
-	svc := NewService(f, fm, jwt)
-	_, err = svc.Register(context.Background(), RegisterInput{
+	svc, _, _ := newTestService(t, fm)
+	_, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
 		Name:       "safa test2",
@@ -129,13 +162,9 @@ func Test_Register_SendsVerificationEmail(t *testing.T) {
 }
 
 func Test_Register_ResendDown(t *testing.T) {
-	f := newFakeStore()
-	jwt, err := getTestJWTSigner()
+
 	fm := &fakeMailer{err: errors.New("resend down")}
-	if err != nil {
-		t.Fatalf("expected no error on jwt signer got %v", err)
-	}
-	svc := NewService(f, fm, jwt)
+	svc, _, _ := newTestService(t, fm)
 
 	hiker, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
@@ -159,15 +188,11 @@ func Test_Register_ResendDown(t *testing.T) {
 }
 
 func Test_Register_Recipient(t *testing.T) {
-	f := newFakeStore()
-	jwt, err := getTestJWTSigner()
-	if err != nil {
-		t.Fatalf("expected no error on jwt signer got %v", err)
-	}
+
 	fm := &fakeMailer{}
 
-	svc := NewService(f, fm, jwt)
-	_, err = svc.Register(context.Background(), RegisterInput{
+	svc, _, _ := newTestService(t, fm)
+	_, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
 		Name:       "safa test2",
@@ -183,5 +208,118 @@ func Test_Register_Recipient(t *testing.T) {
 	if fm.sent[0].to[0] != "test@test.com" {
 		t.Errorf("expected email is sent to test@test.com got %s", fm.sent[0].to[0])
 	}
+
+}
+
+func Test_Register_EmailContainsVerificationLink(t *testing.T) {
+
+	fm := &fakeMailer{}
+
+	svc, f, tf := newTestService(t, fm)
+	_, err := svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	raw := getRawFromEmailBody(t, fm)
+
+	hash := secure.HashRefreshToken(raw)
+
+	tok, err := tf.GetByHash(context.Background(), hash)
+	if err != nil {
+		t.Errorf("expected no error on getting token by hash got %v", err)
+	}
+	hiker, err := f.GetHikerByEmail(context.Background(), "test@test.com")
+	if err != nil {
+		t.Fatalf("expected no error on getting hiker got %v", err)
+	}
+	if tok.HikerID != hiker.ID {
+		t.Errorf("expected %q got %q", hiker.ID, tok.HikerID)
+	}
+	if tok.Purpose != authtoken.PurposeEmailVerification {
+		t.Errorf("expected %s got %s", authtoken.PurposeEmailVerification, tok.Purpose)
+	}
+
+}
+
+func Test_Register_MintFails(t *testing.T) {
+	f := newFakeStore()
+	jwt, err := getTestJWTSigner()
+	if err != nil {
+		t.Fatalf("expected no error on jwt signer got %v", err)
+	}
+	tf := &tokenFakeStore{
+		tokens:  make(map[string]*authtoken.Token),
+		saveErr: errors.New("minting fail test"),
+	}
+	ts := authtoken.NewService(tf)
+	fm := &fakeMailer{}
+	cfg := ServiceConfig{
+		Store:     f,
+		Token:     ts,
+		Mail:      fm,
+		JWT:       jwt,
+		BaseURL:   "http://test.com",
+		VerifyTTL: 24 * time.Hour,
+	}
+	svc := NewService(cfg)
+	h, err := svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if h == nil {
+		t.Error("expected hiker created")
+	}
+	if len(fm.sent) != 0 {
+		t.Errorf("expected no mail sent got %d", len(fm.sent))
+	}
+
+}
+
+func Test_Register_VerifyEmail(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, f, _ := newTestService(t, fm)
+	_, err := svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	raw := getRawFromEmailBody(t, fm)
+
+	err = svc.VerifyEmail(context.Background(), raw)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	h, err := f.GetHikerByEmail(context.Background(), "test@test.com")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if h.VerifiedAt == nil {
+		t.Error("expected verified_at set")
+	}
+	err = svc.VerifyEmail(context.Background(), raw)
+	wantStatus(t, err, apperr.CodeConflict)
 
 }

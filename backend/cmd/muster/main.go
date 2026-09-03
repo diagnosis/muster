@@ -11,6 +11,7 @@ import (
 	"github.com/diagnosis/go-toolkit/v3/mailer"
 	"github.com/diagnosis/go-toolkit/v3/secure"
 	"github.com/diagnosis/muster/internal/api"
+	"github.com/diagnosis/muster/internal/authtoken"
 	"github.com/diagnosis/muster/internal/config"
 	"github.com/diagnosis/muster/internal/hiker"
 	"github.com/diagnosis/muster/internal/outing"
@@ -48,7 +49,10 @@ func run() error {
 	logger.Info(ctx, "muster connected")
 
 	hikerStore := postgres.NewHikerStore(pool)
+	tokenStore := postgres.NewAuthTokenStore(pool)
 	outingsStore := postgres.NewOutingStore(pool)
+
+	tokenService := authtoken.NewService(tokenStore)
 
 	signer, err := secure.NewJWTSigner(secure.JWTConfig{
 		AccessSecret:       cfg.JWT.AccessSecret,
@@ -69,8 +73,15 @@ func run() error {
 	} else {
 		m = mailer.NewResendMailer(cfg.Resend.APIKey, cfg.Resend.EmailFrom)
 	}
-
-	hikers := hiker.NewService(hikerStore, m, signer)
+	hikerServiceConfig := hiker.ServiceConfig{
+		Store:     hikerStore,
+		Token:     tokenService,
+		Mail:      m,
+		JWT:       signer,
+		BaseURL:   cfg.App.BaseURL,
+		VerifyTTL: 24 * time.Hour,
+	}
+	hikers := hiker.NewService(hikerServiceConfig)
 	outings := outing.NewService(outingsStore)
 	srv := api.NewServer(cfg, hikers, signer, outings)
 
