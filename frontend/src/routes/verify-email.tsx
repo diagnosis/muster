@@ -33,7 +33,7 @@ function VerifyEmailPage() {
             verifyEmailMutation.mutate(token)
         }
     }, [token])
-    if (!token) return <div><p>Invalid verification token</p></div>
+    if (!token) return <div><p>This link is not valid.</p></div>
     if (verifyEmailMutation.isSuccess){
         return <div className={styles.form}>
             <p>Your email is verified.</p>
@@ -48,6 +48,6 @@ function VerifyEmailPage() {
             }
         </div>
     }
-    return <div>Verifying...</div>
+    return <div>Verifying…</div>
 
 }
