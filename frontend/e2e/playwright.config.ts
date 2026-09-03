@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
+import * as dotenv from 'dotenv';
+
+dotenv.config({ path: fileURLToPath(new URL('.env', import.meta.url)) })
 
 const frontendRoot = fileURLToPath(new URL('..', import.meta.url))
 const CI = !!process.env.CI

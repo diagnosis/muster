@@ -1,12 +1,14 @@
 import { request, type APIRequestContext, type BrowserContext} from '@playwright/test'
-import type {RegisterRequest} from "./types.ts";
+import type {Hiker, RegisterRequest} from "./types.ts";
 import {BASE_URL} from "./config.ts";
 import {tag} from "./mint.ts";
+import {unwrap} from "./api.ts";
 
 
 export interface Actor{
     api: APIRequestContext
     user: RegisterRequest
+    hikerID: string
     dispose: () => Promise<void>
 }
 
@@ -21,15 +23,18 @@ export async function createActor(overrides: Partial<RegisterRequest> = {}): Pro
     }
 
     const api = await request.newContext({baseURL:BASE_URL})
+
+
     let res = await api.post('api/auth/signup', {data:user})
     if (!res.ok()){
         throw new Error(`login failed: ${res.status()} ${await res.text()}`)
     }
+    const hiker = await unwrap<Hiker>(res, "sign-up")
     res = await api.post('/api/auth/login', {
         data: { email: user.email, password: user.password },
     })
     if (!res.ok()) throw new Error(`login failed: ${res.status()} ${await res.text()}`)
-    return {api,user, dispose: ()=> api.dispose()}
+    return {api,user, hikerID:hiker.id , dispose: ()=> api.dispose()}
 }
 
 export async function actorInBrowser(actor: Actor, context: BrowserContext){

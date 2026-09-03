@@ -66,3 +66,15 @@ export interface JoinRequest {
     created_at: string
     updated_at: string
 }
+export interface Hiker{
+    id: string
+    email: string
+    name: string
+    experience:'beginner'|'intermediate'|'experienced'
+    home_area?: string
+    bio?:string
+    gender?:string
+    created_at:string
+    updated_at:string
+    verified_at?:string
+}
