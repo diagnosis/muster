@@ -1,0 +1,1 @@
+export const  CODE_EMAIL_NOT_VERIFIED = 11

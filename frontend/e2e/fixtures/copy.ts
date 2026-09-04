@@ -35,3 +35,7 @@ export const VERIFY_SUCCESS_CTA = 'Log in'
 export const VERIFY_EXPIRED_OR_USED = 'This link has expired or was already used.'
 export const VERIFY_INVALID = 'This link is not valid.'
 export const VERIFY_PENDING = 'Verifying…'
+
+// login gate
+export const EMAIL_NEED_VERIFICATION = 'Email needs to be verified.'
+export const RESEND_RESPONSE = 'If email provided matches our record, you will receive a verification email'

@@ -119,3 +119,5 @@ export interface Hiker{
 export interface VerifyEmailResponse{
     message: string
 }
+
+export const CODE_ACCOUNT_INACTIVE = 11

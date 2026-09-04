@@ -4,9 +4,10 @@ import {createFileRoute, useNavigate} from '@tanstack/react-router'
 import {useState} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient, ApiRequestError} from "@/lib/api";
-import type {MeResponse} from "@/types";
+import type {MeResponse, ResendEmailResponse} from "@/types";
 import styles from "@/routes/form.module.css"
 import {requireGuest} from "@/queries.ts";
+import {CODE_EMAIL_NOT_VERIFIED} from "@/lib/copy.ts";
 
 export const Route = createFileRoute('/login')({
     beforeLoad: async ({context}) => requireGuest(context.queryClient),
@@ -34,6 +35,16 @@ export function LoginPage(){
         }
     })
 
+    const resendMutation = useMutation({
+        mutationFn: async (email:{email:string}) => {
+            const res = await apiClient.post<ResendEmailResponse>('/api/auth/resend-verification', email)
+            if (res.ok){
+                return res.data
+            }
+            throw new ApiRequestError(res.error, res.httpStatus)
+    }
+    })
+
 
     function handleSubmit(e : React.SubmitEvent){
         e.preventDefault()
@@ -58,10 +69,17 @@ export function LoginPage(){
                     onChange={e => setPassword(e.target.value)}
                 />
             </label>
-            {login.error && <p className={styles.error}>{login.error.message}</p>}
             <button className="btn-primary"
                 type="submit" disabled={login.isPending}>Log in</button>
         </form>
+        <div className={styles.messageContainer}>
+            {login.error &&
+                <p className={styles.error}>{login.error.message}</p>}
+            {login.error instanceof ApiRequestError && login.error.apiError.status === CODE_EMAIL_NOT_VERIFIED &&
+                <button className={styles.quietBtn} disabled={resendMutation.isPending} onClick={()=>resendMutation.mutate({email})}>Resend verification</button>}
+            {resendMutation.error && <p className={styles.error}>{resendMutation.error.message}</p>}
+            {resendMutation.isSuccess&& <p>{resendMutation.data.message}</p>}
+        </div>
     </>
 }
 

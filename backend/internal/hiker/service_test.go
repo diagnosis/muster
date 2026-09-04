@@ -84,6 +84,24 @@ func getRawFromEmailBody(t *testing.T, fm *fakeMailer) string {
 	raw := params[0]
 	return raw
 }
+func getRawFromEmailBodyString(t *testing.T, body string) string {
+	var link string
+	for _, section := range strings.Split(body, " ") {
+		if strings.HasPrefix(section, "http://") || strings.HasPrefix(section, "https://") {
+			link = section
+		}
+	}
+	linkURL, err := url.Parse(link)
+	if err != nil {
+		t.Errorf("expected no parse error got %v", err)
+	}
+	params, ok := linkURL.Query()["token"]
+	if !ok || len(params) == 0 || params[0] == "" {
+		t.Errorf("no token in link %q", link)
+	}
+	raw := params[0]
+	return raw
+}
 func Test_Register_Hiker(t *testing.T) {
 	svc, _, _ := newTestService(t, &fakeMailer{})
 	hiker, err := svc.Register(context.Background(), RegisterInput{
@@ -321,5 +339,163 @@ func Test_Register_VerifyEmail(t *testing.T) {
 	}
 	err = svc.VerifyEmail(context.Background(), raw)
 	wantStatus(t, err, apperr.CodeConflict)
+
+}
+
+func Test_ResendEmailVerification(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, tf := newTestService(t, fm)
+	h, err := svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	err = svc.ResendEmailVerification(context.Background(), h.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fm.sent) != 2 {
+		t.Errorf("expected 2 mails got %d", len(fm.sent))
+	}
+	body := fm.sent[1].body
+	raw := getRawFromEmailBodyString(t, body)
+	token, err := tf.GetByHash(context.Background(), secure.HashRefreshToken(raw))
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if token.HikerID != h.ID {
+		t.Errorf("expected %s got %s", h.ID, token.HikerID)
+	}
+
+}
+
+func Test_ResendEmailVerification_UnknownEmail(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	err := svc.ResendEmailVerification(context.Background(), "zafer@deliburun.com")
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if len(fm.sent) != 0 {
+		t.Errorf("expected 0 but got %d", len(fm.sent))
+	}
+}
+
+func Test_ResendEmailVerification_Verified(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h, err := svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	raw := getRawFromEmailBody(t, fm)
+	err = svc.VerifyEmail(context.Background(), raw)
+	if err != nil {
+		t.Fatalf("expected no error got error %v", err)
+	}
+	err = svc.ResendEmailVerification(context.Background(), h.Email)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if len(fm.sent) != 1 {
+		t.Errorf("expected 1 but got %d", len(fm.sent))
+	}
+}
+
+func TestService_ResendEmailVerification_EmailServiceError(t *testing.T) {
+	fm := &fakeMailer{err: apperr.Internal("something internal happened", "internal error")}
+	svc, _, _ := newTestService(t, fm)
+	h, err := svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+
+	err = svc.ResendEmailVerification(context.Background(), h.Email)
+	if err == nil {
+		t.Fatalf("expected error got no error")
+	}
+	if len(fm.sent) != 0 {
+		t.Fatalf("expected 0 got %d", len(fm.sent))
+	}
+	wantStatus(t, err, apperr.CodeInternalError)
+}
+
+func Test_Login_EmailNotVerified(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h, err := svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if _, err = svc.Login(context.Background(), h.Email, "Password123", PlatformWeb); err == nil {
+		t.Fatalf("expected error got no error")
+	}
+	wantStatus(t, err, apperr.CodeAccountInactive)
+}
+
+func Test_Login_EmailVerified(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h, err := svc.Register(context.Background(), RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "safa test2",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fm.sent) == 0 {
+		t.Fatal("expected 1 got 0 mail")
+	}
+	raw := getRawFromEmailBodyString(t, fm.sent[0].body)
+	err = svc.VerifyEmail(context.Background(), raw)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	sess, err := svc.Login(context.Background(), h.Email, "Password123", PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if sess.RefreshToken == "" {
+		t.Error("expected refresh token is not empty got empty")
+	}
+	if sess.AccessToken == "" {
+		t.Error("expected access token is not empty got empty")
+	}
 
 }
