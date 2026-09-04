@@ -131,3 +131,7 @@ export interface CreateOutingInput {
 export interface VerifyEmailResponse {
     message: string
 }
+
+export interface ResendEmailResponse{
+    message: string
+}

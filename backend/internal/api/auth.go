@@ -65,6 +65,38 @@ func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 
 }
 
+type resendVerificationInput struct {
+	Email string `json:"email"`
+}
+
+func (s *Server) handleResendVerification(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+
+	var in resendVerificationInput
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&in)
+	if err != nil {
+		responder.Error(w, apperr.BadRequest("invalid request body", "json decode failed", err), correlationID)
+		return
+	}
+
+	email := strings.TrimSpace(in.Email)
+	if email == "" {
+		responder.Error(w, apperr.BadRequest("invalid email", "email cannot be empty"), correlationID)
+		return
+	}
+	err = s.hikers.ResendEmailVerification(r.Context(), email)
+	if err != nil {
+		logger.Error(r.Context(), "failed to send email", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	responder.JSON(w, 200, map[string]string{
+		"message": "If email provided matches our record, you will receive a verification email",
+	}, correlationID)
+}
+
 type loginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`

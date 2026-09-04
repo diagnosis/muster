@@ -3,6 +3,7 @@ import type {Hiker, RegisterRequest} from "./types.ts";
 import {BASE_URL} from "./config.ts";
 import {tag} from "./mint.ts";
 import {unwrap} from "./api.ts";
+import {mintVerificationToken} from "./db.ts";
 
 
 export interface Actor{
@@ -12,9 +13,9 @@ export interface Actor{
     dispose: () => Promise<void>
 }
 
-export async function createActor(overrides: Partial<RegisterRequest> = {}): Promise<Actor>{
+export async function createUnverifiedActor(overrides: Partial<RegisterRequest> = {}):Promise<Actor>{
     const { name, email } = uniqueIdentity()
-    const user: RegisterRequest = {
+    const user : RegisterRequest = {
         email: email,
         password: 'Passw0rd!123',
         name: name,
@@ -22,19 +23,29 @@ export async function createActor(overrides: Partial<RegisterRequest> = {}): Pro
         ...overrides,
     }
 
-    const api = await request.newContext({baseURL:BASE_URL})
+    const api  = await request.newContext({baseURL:BASE_URL})
 
-
-    let res = await api.post('api/auth/signup', {data:user})
+    let res = await api.post('/api/auth/signup', {data:user})
     if (!res.ok()){
-        throw new Error(`login failed: ${res.status()} ${await res.text()}`)
+        throw new Error(`signup failed: ${res.status()} ${await res.text()}`)
     }
-    const hiker = await unwrap<Hiker>(res, "sign-up")
-    res = await api.post('/api/auth/login', {
-        data: { email: user.email, password: user.password },
+    const hiker = await unwrap<Hiker>(res, "hiker")
+    return {api,user, hikerID:hiker.id , dispose: ()=> api.dispose()}
+}
+
+export async function createActor(overrides: Partial<RegisterRequest> = {}): Promise<Actor>{
+    const actor = await createUnverifiedActor(overrides)
+    const raw = await mintVerificationToken(actor.hikerID)
+    let res = await actor.api.post('/api/auth/verify-email', {data: {token: raw}})
+    if (!res.ok()){
+        throw new Error(`email verification failed: ${res.status()} ${await res.text()}`)
+    }
+
+    res = await actor.api.post('/api/auth/login', {
+        data: { email: actor.user.email, password: actor.user.password },
     })
     if (!res.ok()) throw new Error(`login failed: ${res.status()} ${await res.text()}`)
-    return {api,user, hikerID:hiker.id , dispose: ()=> api.dispose()}
+    return actor
 }
 
 export async function actorInBrowser(actor: Actor, context: BrowserContext){

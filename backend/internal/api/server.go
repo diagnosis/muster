@@ -40,6 +40,7 @@ func (s *Server) Routes() http.Handler {
 	// public auth routes
 	mux.HandleFunc("POST /api/auth/signup", s.handleSignup)
 	mux.HandleFunc("POST /api/auth/verify-email", s.handleVerifyEmail)
+	mux.HandleFunc("POST /api/auth/resend-verification", s.handleResendVerification)
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
 	mux.HandleFunc("POST /api/auth/refresh", s.handleRefresh)
 	// optionalAuth

@@ -1,12 +1,12 @@
 import {test, expect} from '@playwright/test'
-import {createActor} from "../fixtures/actor.ts";
+import {createUnverifiedActor} from "../fixtures/actor.ts";
 import {mintVerificationToken} from "../fixtures/db.ts";
 import {VERIFY_EXPIRED_OR_USED, VERIFY_INVALID, VERIFY_SUCCESS} from "../fixtures/copy.ts";
 import {WEB_URL} from "../fixtures/config.ts";
 
 test.describe("verify email", ()=>{
     test('verify email success', async ({page})=> {
-        const actor = await createActor()
+        const actor = await createUnverifiedActor()
         const { hikerID } = actor
         const raw = await mintVerificationToken(hikerID)
         await page.goto(`/verify-email?token=${raw}`)
@@ -15,7 +15,7 @@ test.describe("verify email", ()=>{
         await expect(page).toHaveURL(`${WEB_URL}/login`)
     })
     test('verify email - used token', async ({page})=>{
-        const actor = await createActor()
+        const actor = await createUnverifiedActor()
         const { hikerID } = actor
         const raw = await mintVerificationToken(hikerID)
         await page.goto(`/verify-email?token=${raw}`)

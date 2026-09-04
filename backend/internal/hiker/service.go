@@ -107,19 +107,40 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*Hiker, error
 		return nil, err
 	}
 
-	raw, err := s.tokens.Mint(ctx, h.ID, authtoken.PurposeEmailVerification, s.verifyTTL)
-	if err == nil {
-		link := fmt.Sprintf("%s/verify-email?token=%s", s.baseURL, raw)
-		subj := "Welcome to Muster - Please verify your email"
-		body := "Please click the link to verify your account: " + link
-		if err = s.mail.Send(ctx, []string{email}, subj, body); err != nil {
-			logger.Warn(ctx, "failed to send verification email", "err", err)
-		}
-	} else {
-		logger.Warn(ctx, "failed to mint raw token for email verification", "err", err)
-	}
+	_ = s.sendEmailVerificationToken(ctx, h.ID, email)
 
 	return h, nil
+}
+
+// ResendEmailVerification sends email verification token when requested
+func (s *Service) ResendEmailVerification(ctx context.Context, email string) error {
+	h, err := s.store.GetHikerByEmail(ctx, email)
+	if err != nil {
+		return nil
+	}
+	if h.VerifiedAt != nil {
+		return nil
+	}
+	if err = s.sendEmailVerificationToken(ctx, h.ID, email); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Service) sendEmailVerificationToken(ctx context.Context, hikerID uuid.UUID, hikerEmail string) error {
+	raw, err := s.tokens.Mint(ctx, hikerID, authtoken.PurposeEmailVerification, s.verifyTTL)
+	if err != nil {
+		logger.Warn(ctx, "failed to mint raw token for email verification", "err", err)
+		return apperr.Internal("internal error", "internal error", err)
+	}
+	link := fmt.Sprintf("%s/verify-email?token=%s", s.baseURL, raw)
+	subj := "Welcome to Muster - Please verify your email"
+	body := "Please click the link to verify your account: " + link
+	if err = s.mail.Send(ctx, []string{hikerEmail}, subj, body); err != nil {
+		logger.Warn(ctx, "failed to send verification email", "err", err)
+		return apperr.Internal("internal error", "internal error", err)
+	}
+	return nil
 }
 
 // Platform identifies the client type a session belongs to.
@@ -161,10 +182,13 @@ func (s *Service) Login(ctx context.Context, email, password string, platform Pl
 
 	ok, err := secure.VerifyPassword(password, h.PasswordHash)
 	if err != nil {
-		return nil, apperr.InvalidCredentials("invalid login credentials", "failed to verify password", err)
+		return nil, apperr.InvalidCredentials("Invalid login credentials", "failed to verify password", err)
 	}
 	if !ok {
-		return nil, apperr.InvalidCredentials("invalid login credentials", "password not match")
+		return nil, apperr.InvalidCredentials("Invalid login credentials", "password not match")
+	}
+	if h.VerifiedAt == nil {
+		return nil, apperr.AccountInactive("Email needs to be verified.", "account nor verified")
 	}
 
 	return s.mintSession(ctx, h, platform)

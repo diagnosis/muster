@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-import {asUser, BASE} from '../fixtures'
-import {unwrap} from "../envelope";
+import {asUnverifiedUser, asUser, BASE} from '../fixtures'
+import {unwrap, unwrapError} from "../envelope";
 import {getMe, login, logout, refresh, signup, verifyEmail} from "../api";
-import {MeResponse, RegisterRequest, VerifyEmailResponse} from "../types";
+import {ApiErrorBody, CODE_ACCOUNT_INACTIVE, MeResponse, RegisterRequest, VerifyEmailResponse} from "../types";
 import {mintVerificationToken} from "../db";
 
 
@@ -94,27 +94,44 @@ test.describe('auth', ()=>{
 
   })
 
-  test("register -> get_me -> verified_at:null -> mint_verification -> verified_at:non-null", async ()=> {
-    const { ctx, user, id} = await asUser(BASE)
-    let me = await unwrap<MeResponse>(getMe(ctx), 200)
-    expect(me.verified_at).toBe(null)
+  test("register(unverified) -> login -> 403 -> mint & verify -> 200 -> get_me -> truthy", async () => {
+    const {ctx, user, id} = await asUnverifiedUser(BASE)
+
+    let res = await login(ctx, {email:user.email, password:user.password})
+    await unwrap(res, 403)
+
+    const err  = await unwrapError(res)
+    expect(err.message).toBe("Email needs to be verified.")
+    expect(err.status).toBe(CODE_ACCOUNT_INACTIVE)
+
     const raw = await mintVerificationToken(id)
-    const verifyEmailResponse = await unwrap<VerifyEmailResponse>(verifyEmail(ctx, raw), 200)
-    expect(verifyEmailResponse.message).toBe("Email is verified")
-    me = await unwrap<MeResponse>(getMe(ctx), 200)
+    res = await verifyEmail(ctx, raw)
+    await unwrap(res, 200)
+
+    res = await login(ctx, {email:user.email, password:user.password})
+    await unwrap(res, 200)
+
+    res = await getMe(ctx)
+    const me = await unwrap<MeResponse>(res, 200)
     expect(me.verified_at).toBeTruthy()
-    await unwrap(verifyEmail(ctx, raw), 409)
+
   })
 
   test('mint_verification(ttlHours:-1) -> verify_email -> 409', async () => {
-    const { ctx, user, id } = await asUser(BASE)
+    const { ctx, user, id } = await asUnverifiedUser(BASE)
     const raw = await mintVerificationToken(id, {ttlHours:-1})
     await unwrap<VerifyEmailResponse>(verifyEmail(ctx, raw),409)
 
   })
 
-  test('mint_verification -> verify_email -> verify_email -> 409', async () => {
+  test('register(verified) -> mint&verify -> 404', async () => {
     const {ctx, user, id } = await asUser(BASE)
+    const raw = await mintVerificationToken(id)
+    await unwrap<VerifyEmailResponse>(verifyEmail(ctx, raw), 404)
+  })
+
+  test("register(unverified) -> mint_raw -> verify -> 200 -> verify ->  409", async () =>{
+    const { ctx, user, id} = await asUnverifiedUser(BASE)
     const raw = await mintVerificationToken(id)
     await unwrap<VerifyEmailResponse>(verifyEmail(ctx, raw), 200)
     await unwrap<VerifyEmailResponse>(verifyEmail(ctx, raw), 409)
