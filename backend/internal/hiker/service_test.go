@@ -461,7 +461,7 @@ func Test_Login_EmailNotVerified(t *testing.T) {
 	if _, err = svc.Login(context.Background(), h.Email, "Password123", PlatformWeb); err == nil {
 		t.Fatalf("expected error got no error")
 	}
-	wantStatus(t, err, apperr.CodeAccountInactive)
+	wantStatus(t, err, apperr.CodeEmailNotVerified)
 }
 
 func Test_Login_EmailVerified(t *testing.T) {

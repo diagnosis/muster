@@ -1,8 +1,8 @@
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/diagnosis/go-toolkit/v3 v3.0.1 h1:YK+dWSOFtFHKXTz7hoaybBzdhUjnYtOuAd4v0PnRIro=
-github.com/diagnosis/go-toolkit/v3 v3.0.1/go.mod h1:rhwjINu0gWCVDdw7AVEGxFLo7rEe0pjGu7hRQBLh/vo=
+github.com/diagnosis/go-toolkit/v3 v3.1.0 h1:sjjq6oVHL3pPJP7IrwUh7Fn6zt9onVaUe3W+dOdtsZI=
+github.com/diagnosis/go-toolkit/v3 v3.1.0/go.mod h1:rhwjINu0gWCVDdw7AVEGxFLo7rEe0pjGu7hRQBLh/vo=
 github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=
 github.com/golang-jwt/jwt/v5 v5.3.1/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=

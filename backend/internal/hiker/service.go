@@ -188,7 +188,7 @@ func (s *Service) Login(ctx context.Context, email, password string, platform Pl
 		return nil, apperr.InvalidCredentials("Invalid login credentials", "password not match")
 	}
 	if h.VerifiedAt == nil {
-		return nil, apperr.AccountInactive("Email needs to be verified.", "account nor verified")
+		return nil, apperr.EmailNotVerified("Email needs to be verified.", "account not verified")
 	}
 
 	return s.mintSession(ctx, h, platform)

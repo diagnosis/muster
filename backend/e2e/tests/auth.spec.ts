@@ -2,7 +2,13 @@ import { test, expect } from '@playwright/test';
 import {asUnverifiedUser, asUser, BASE} from '../fixtures'
 import {unwrap, unwrapError} from "../envelope";
 import {getMe, login, logout, refresh, signup, verifyEmail} from "../api";
-import {ApiErrorBody, CODE_ACCOUNT_INACTIVE, MeResponse, RegisterRequest, VerifyEmailResponse} from "../types";
+import {
+  ApiErrorBody,
+  CODE_EMAIL_NOT_VERIFIED,
+  MeResponse,
+  RegisterRequest,
+  VerifyEmailResponse
+} from "../types";
 import {mintVerificationToken} from "../db";
 
 
@@ -102,7 +108,7 @@ test.describe('auth', ()=>{
 
     const err  = await unwrapError(res)
     expect(err.message).toBe("Email needs to be verified.")
-    expect(err.status).toBe(CODE_ACCOUNT_INACTIVE)
+    expect(err.code).toBe(CODE_EMAIL_NOT_VERIFIED)
 
     const raw = await mintVerificationToken(id)
     res = await verifyEmail(ctx, raw)

@@ -14,6 +14,7 @@ export type ApiResponse<T> = {
 
 export interface ApiError{
     status: number
+    code: string
     message: string
     details?: Record<string,string>
     correlation_id?: string
