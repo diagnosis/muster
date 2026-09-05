@@ -3,7 +3,7 @@ module github.com/diagnosis/muster
 go 1.26.2
 
 require (
-	github.com/diagnosis/go-toolkit/v3 v3.0.1
+	github.com/diagnosis/go-toolkit/v3 v3.1.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
 	github.com/jackc/pgx/v5 v5.10.0

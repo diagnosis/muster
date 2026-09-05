@@ -9,6 +9,7 @@ export interface ApiEnvelope<T> {
 export interface ApiErrorBody{
     error: {
         status: number
+        code: string
         message: string
         correlation_id: string
         timestamp: string
@@ -120,4 +121,4 @@ export interface VerifyEmailResponse{
     message: string
 }
 
-export const CODE_ACCOUNT_INACTIVE = 11
+export const CODE_EMAIL_NOT_VERIFIED = "email_not_verified"

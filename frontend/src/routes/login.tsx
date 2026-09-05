@@ -75,7 +75,7 @@ export function LoginPage(){
         <div className={styles.messageContainer}>
             {login.error &&
                 <p className={styles.error}>{login.error.message}</p>}
-            {login.error instanceof ApiRequestError && login.error.apiError.status === CODE_EMAIL_NOT_VERIFIED &&
+            {login.error instanceof ApiRequestError && login.error.apiError.code === CODE_EMAIL_NOT_VERIFIED &&
                 <button className={styles.quietBtn} disabled={resendMutation.isPending} onClick={()=>resendMutation.mutate({email})}>Resend verification</button>}
             {resendMutation.error && <p className={styles.error}>{resendMutation.error.message}</p>}
             {resendMutation.isSuccess&& <p>{resendMutation.data.message}</p>}
