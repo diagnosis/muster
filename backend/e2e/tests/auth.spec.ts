@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 import {asUnverifiedUser, asUser, BASE} from '../fixtures'
 import {unwrap, unwrapError} from "../envelope";
-import {getMe, login, logout, refresh, signup, verifyEmail} from "../api";
+import {forgotPassword, getMe, login, logout, refresh, resetPassword, signup, verifyEmail} from "../api";
 import {
   ApiErrorBody,
-  CODE_EMAIL_NOT_VERIFIED,
+  CODE_EMAIL_NOT_VERIFIED, FORGOT_SENTENCE, ForgotPasswordResponse,
   MeResponse,
-  RegisterRequest,
+  RegisterRequest, ResetPasswordResponse,
   VerifyEmailResponse
 } from "../types";
 import {mintVerificationToken} from "../db";
@@ -146,6 +146,42 @@ test.describe('auth', ()=>{
   test('verify_email(raw:garbage)->404', async () => {
     const { ctx, user, id } = await asUser(BASE)
     await unwrap<VerifyEmailResponse>(verifyEmail(ctx, 'trump'), 404)
+  })
+  // forgot / reset password
+  test("forgot-password->200", async ()=>{
+    const {ctx, user, id} = await asUser(BASE)
+    const res = await unwrap<ForgotPasswordResponse>(await forgotPassword(ctx, user.email), 200)
+    expect(res.message).toBe(FORGOT_SENTENCE)
+
+  })
+  test("forgot-password->200 for unknown email", async () => {
+    const {ctx} = await asUser(BASE)
+    const res =  await unwrap<ForgotPasswordResponse>(await forgotPassword(ctx, "test@unknow.com"), 200)
+    expect(res.message).toBe(FORGOT_SENTENCE)
+  })
+  test("mint_forgot_password -> reset-password -> 200-> login with new password -> 200 -> login with old -> 401", async()=>{
+    const {ctx, user, id} = await asUser(BASE)
+    const raw = await mintVerificationToken(id, {purpose:"forgot_password"})
+    await unwrap<ResetPasswordResponse>(await resetPassword(ctx, "Secure123", raw), 200)
+    await unwrap(await login(ctx, {email:user.email, password:"Secure123"}),200)
+    await unwrap(await login(ctx, {email:user.email, password:user.password}), 401)
+  })
+  test("mint_forgot_password -> reset-password -> reset-password -> 409", async()=>{
+    const {ctx, user, id} = await asUser(BASE)
+    const raw = await mintVerificationToken(id, {purpose:"forgot_password"})
+    await unwrap<ResetPasswordResponse>(await resetPassword(ctx, "Secure123", raw), 200)
+    await unwrap<ResetPasswordResponse>(await resetPassword(ctx, "Secure456", raw), 409)
+  })
+  test("mint_garbage -> reset-password -> 404", async ()=> {
+    const {ctx} = await asUser(BASE)
+    const garbage = "iwilldoitoneday"
+    await unwrap<ResetPasswordResponse>(await resetPassword(ctx, "Secure123", garbage),404)
+  })
+  test("mint_forgot_password -> reset-password with weak password -> 400", async ()=> {
+    const {ctx, user, id} = await asUser(BASE)
+    const weakPassword = "weak12"
+    const raw = await mintVerificationToken(id, {purpose:"forgot_password"})
+    await unwrap(await resetPassword(ctx, weakPassword, raw), 400)
   })
 
 })

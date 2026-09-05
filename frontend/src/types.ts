@@ -136,3 +136,11 @@ export interface VerifyEmailResponse {
 export interface ResendEmailResponse{
     message: string
 }
+
+export interface ForgotPasswordResponse{
+    message: string
+}
+
+export interface ResetPasswordResponse{
+    message: string
+}

@@ -120,5 +120,14 @@ export interface Hiker{
 export interface VerifyEmailResponse{
     message: string
 }
+export interface ForgotPasswordResponse{
+    message: string
+}
+export interface ResetPasswordResponse{
+    message: string
+}
+
 
 export const CODE_EMAIL_NOT_VERIFIED = "email_not_verified"
+
+export const FORGOT_SENTENCE = "If email provided matches our record, you will receive a password reset email shortly."

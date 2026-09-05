@@ -34,7 +34,7 @@ func wantStatus(t *testing.T, err error, want apperr.Status) {
 	t.Helper()
 	se, ok := apperr.AsStatusErr(err)
 	if !ok || se.Status != want {
-		t.Fatalf("got %v, want status %v", err, want)
+		t.Fatalf("got error %v with code: %s, want status code: %s", err, se.Code, want.Code())
 	}
 }
 
@@ -498,4 +498,250 @@ func Test_Login_EmailVerified(t *testing.T) {
 		t.Error("expected access token is not empty got empty")
 	}
 
+}
+
+func registerAndVerify(t *testing.T, in RegisterInput, svc *Service, fm *fakeMailer) (*Hiker, string) {
+	h, err := svc.Register(context.Background(), in)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fm.sent) == 0 {
+		t.Fatal("expected 1 got 0 mail")
+	}
+	raw := getRawFromEmailBodyString(t, fm.sent[0].body)
+	err = svc.VerifyEmail(context.Background(), raw)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	return h, raw
+}
+
+// forgot password
+func Test_ForgotPassword_SendEmail(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+
+	if len(fm.sent) == 0 {
+		t.Fatalf("expected 1 got %d mail", len(fm.sent))
+	}
+
+	err := svc.ForgotPassword(context.Background(), h.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fm.sent) != 2 {
+		t.Fatalf("expected 2 got %d mail", len(fm.sent))
+	}
+	raw := getRawFromEmailBodyString(t, fm.sent[1].body)
+	if raw == "" {
+		t.Error("expected get raw got empty string")
+	}
+	err = svc.ResetPassword(context.Background(), raw, "Secure123")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fm.sent) != 3 {
+		t.Fatalf("expected 3 got %d", len(fm.sent))
+	}
+	if fm.sent[2].subject != "Muster - Password Changed" {
+		t.Errorf(`expected "Muster - Password Changed" got %s`, fm.sent[2].subject)
+	}
+
+	if _, err = svc.Login(context.Background(), h.Email, "Secure123", PlatformWeb); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+
+	_, err = svc.Login(context.Background(), h.Email, "Password123", PlatformWeb)
+	wantStatus(t, err, apperr.CodeInvalidCredentials)
+}
+
+func Test_ForgotPassword_SendEmail_UnknowEmail(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	_, _ = registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+
+	if len(fm.sent) == 0 {
+		t.Fatalf("expected 1 got %d mail", len(fm.sent))
+	}
+
+	err := svc.ForgotPassword(context.Background(), "unknown@email.com")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fm.sent) != 1 {
+		t.Fatalf("expected 1 got %d mail", len(fm.sent))
+	}
+}
+
+func Test_ForgotPassword_SendEmail_MailerFails(t *testing.T) {
+	fm := &fakeMailer{}
+
+	svc, _, _ := newTestService(t, fm)
+	h, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+
+	if len(fm.sent) == 0 {
+		t.Fatalf("expected 1 got %d mail", len(fm.sent))
+	}
+	fm.err = apperr.Internal("test mailer error", "test mailer error")
+
+	err := svc.ForgotPassword(context.Background(), h.Email)
+	wantStatus(t, err, apperr.CodeInternalError)
+
+}
+
+func Test_ForgotPassword_SenEmail_ReusedRaw(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+
+	if len(fm.sent) == 0 {
+		t.Fatalf("expected 1 got %d mail", len(fm.sent))
+	}
+
+	err := svc.ForgotPassword(context.Background(), h.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fm.sent) != 2 {
+		t.Fatalf("expected 2 got %d mail", len(fm.sent))
+	}
+	raw := getRawFromEmailBodyString(t, fm.sent[1].body)
+	if raw == "" {
+		t.Error("expected get raw got empty string")
+	}
+
+	err = svc.ResetPassword(context.Background(), raw, "Secure123")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	err = svc.ResetPassword(context.Background(), raw, "Secure123")
+	wantStatus(t, err, apperr.CodeConflict)
+}
+
+func Test_ForgotPassword_SenEmail_Garbage(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+
+	if len(fm.sent) == 0 {
+		t.Fatalf("expected 1 got %d mail", len(fm.sent))
+	}
+
+	err := svc.ForgotPassword(context.Background(), h.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fm.sent) != 2 {
+		t.Fatalf("expected 2 got %d mail", len(fm.sent))
+	}
+
+	err = svc.ResetPassword(context.Background(), "receptayyip", "Secure123")
+	wantStatus(t, err, apperr.CodeNotFound)
+}
+
+func Test_ForgotPassword_SenEmail_CrossPurposeConflict(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+
+	if len(fm.sent) == 0 {
+		t.Fatalf("expected 1 got %d mail", len(fm.sent))
+	}
+	raw, err := svc.tokens.Mint(context.Background(), h.ID, authtoken.PurposeLoginCode, 15*time.Minute)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	err = svc.ResetPassword(context.Background(), raw, "haci$5Huso")
+	wantStatus(t, err, apperr.CodeConflict)
+}
+
+func Test_ForgotPassword_SendEmail_WeakPassword(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+
+	if len(fm.sent) == 0 {
+		t.Fatalf("expected 1 got %d mail", len(fm.sent))
+	}
+
+	err := svc.ForgotPassword(context.Background(), h.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fm.sent) != 2 {
+		t.Fatalf("expected 2 got %d mail", len(fm.sent))
+	}
+	raw := getRawFromEmailBodyString(t, fm.sent[1].body)
+	if raw == "" {
+		t.Error("expected get raw got empty string")
+	}
+	err = svc.ResetPassword(context.Background(), raw, "1234")
+	if err == nil {
+		t.Fatal("expected error got no error")
+	}
+	wantStatus(t, err, apperr.CodeValidationError)
+
+	if _, err = svc.Login(context.Background(), h.Email, "Password123", PlatformWeb); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+
+	_, err = svc.Login(context.Background(), h.Email, "1234", PlatformWeb)
+	wantStatus(t, err, apperr.CodeInvalidCredentials)
 }

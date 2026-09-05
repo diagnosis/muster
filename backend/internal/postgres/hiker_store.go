@@ -124,6 +124,23 @@ func (s *HikerStore) SetVerified(ctx context.Context, hikerID uuid.UUID) error {
 	return nil
 }
 
+// SetPassword sets new password
+func (s *HikerStore) SetPassword(ctx context.Context, hikerID uuid.UUID, hash string) error {
+	q := `
+		UPDATE hikers
+		SET password_hash = $2, updated_at = now()
+		WHERE id = $1 AND deleted_at IS NULL
+`
+	ct, err := s.pool.Exec(ctx, q, hikerID, hash)
+	if err != nil {
+		return apperr.Database("cannot set password", "failed to set password", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return apperr.NotFound("row not found", "row not found")
+	}
+	return nil
+}
+
 // SaveRefreshToken stores a hashed refresh-token record. A duplicate
 // (hiker, platform) pair translates to apperr.Conflict
 func (s *HikerStore) SaveRefreshToken(ctx context.Context, t *hiker.RefreshToken) error {

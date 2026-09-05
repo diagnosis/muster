@@ -4,7 +4,7 @@ import {createFileRoute, useNavigate} from '@tanstack/react-router'
 import {useState} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient, ApiRequestError} from "@/lib/api";
-import type {MeResponse, ResendEmailResponse} from "@/types";
+import type {ForgotPasswordResponse, MeResponse, ResendEmailResponse} from "@/types";
 import styles from "@/routes/form.module.css"
 import {requireGuest} from "@/queries.ts";
 import {CODE_EMAIL_NOT_VERIFIED} from "@/lib/copy.ts";
@@ -45,6 +45,16 @@ export function LoginPage(){
     }
     })
 
+    const forgotPasswordMutation = useMutation({
+        mutationFn: async (email:{email:string}) =>{
+            const res = await apiClient.post<ForgotPasswordResponse>('/api/auth/forgot-password', email)
+            if (res.ok){
+                return res.data
+            }
+            throw new ApiRequestError(res.error, res.httpStatus)
+        }
+    })
+
 
     function handleSubmit(e : React.SubmitEvent){
         e.preventDefault()
@@ -57,7 +67,7 @@ export function LoginPage(){
             <h1>Log in</h1>
             <label className={styles.label}>Email
                 <input
-                    type="text"
+                    type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                 />
@@ -72,6 +82,7 @@ export function LoginPage(){
             <button className="btn-primary"
                 type="submit" disabled={login.isPending}>Log in</button>
         </form>
+
         <div className={styles.messageContainer}>
             {login.error &&
                 <p className={styles.error}>{login.error.message}</p>}
@@ -79,7 +90,11 @@ export function LoginPage(){
                 <button className={styles.quietBtn} disabled={resendMutation.isPending} onClick={()=>resendMutation.mutate({email})}>Resend verification</button>}
             {resendMutation.error && <p className={styles.error}>{resendMutation.error.message}</p>}
             {resendMutation.isSuccess&& <p>{resendMutation.data.message}</p>}
+            <button className={styles.quietBtn} disabled={forgotPasswordMutation.isPending || email.trim() == ""} onClick={()=> forgotPasswordMutation.mutate({email})}>Forgot password</button>
+            {forgotPasswordMutation.error && <p className={styles.error}>{forgotPasswordMutation.error.message}</p>}
+            {forgotPasswordMutation.isSuccess && <p className={styles.readOnlyRow}>{forgotPasswordMutation.data.message}</p>}
         </div>
+
     </>
 }
 

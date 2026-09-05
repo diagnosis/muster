@@ -67,3 +67,9 @@ export const getHiker = (ctx: APIRequestContext, hikerID:string)=>
 
 export const verifyEmail = (ctx:APIRequestContext, token:string) =>
     ctx.post("/api/auth/verify-email", {data: {token}})
+
+export const forgotPassword = (ctx:APIRequestContext, email:string) =>
+    ctx.post("/api/auth/forgot-password", {data:{email}})
+
+export const resetPassword = (ctx:APIRequestContext, new_password:string, token:string) =>
+    ctx.post("/api/auth/reset-password", {data:{new_password, token}})
