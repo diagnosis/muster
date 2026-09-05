@@ -23,6 +23,7 @@ type Storage interface {
 	GetHikerByID(ctx context.Context, id uuid.UUID) (*Hiker, error)
 	UpdateHiker(ctx context.Context, h *Hiker) error
 	SetVerified(ctx context.Context, hikerID uuid.UUID) error
+	SetPassword(ctx context.Context, hikerID uuid.UUID, hash string) error
 
 	SaveRefreshToken(ctx context.Context, t *RefreshToken) error
 	GetRefreshTokenByHash(ctx context.Context, hash string) (*RefreshToken, error)
@@ -123,22 +124,6 @@ func (s *Service) ResendEmailVerification(ctx context.Context, email string) err
 	}
 	if err = s.sendEmailVerificationToken(ctx, h.ID, email); err != nil {
 		return err
-	}
-	return nil
-}
-
-func (s *Service) sendEmailVerificationToken(ctx context.Context, hikerID uuid.UUID, hikerEmail string) error {
-	raw, err := s.tokens.Mint(ctx, hikerID, authtoken.PurposeEmailVerification, s.verifyTTL)
-	if err != nil {
-		logger.Warn(ctx, "failed to mint raw token for email verification", "err", err)
-		return apperr.Internal("internal error", "internal error", err)
-	}
-	link := fmt.Sprintf("%s/verify-email?token=%s", s.baseURL, raw)
-	subj := "Welcome to Muster - Please verify your email"
-	body := "Please click the link to verify your account: " + link
-	if err = s.mail.Send(ctx, []string{hikerEmail}, subj, body); err != nil {
-		logger.Warn(ctx, "failed to send verification email", "err", err)
-		return apperr.Internal("internal error", "internal error", err)
 	}
 	return nil
 }
@@ -331,5 +316,87 @@ func (s *Service) VerifyEmail(ctx context.Context, raw string) error {
 		return err
 	}
 
+	return nil
+}
+
+// ForgotPassword sends special link to user which will take them to password reset page
+func (s *Service) ForgotPassword(ctx context.Context, email string) error {
+	h, err := s.store.GetHikerByEmail(ctx, email)
+	if err != nil {
+		return nil
+	}
+	if err = s.sendPasswordResetEmail(ctx, h.ID, email); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ResetPassword set new function for user login.
+func (s *Service) ResetPassword(ctx context.Context, raw, newPassword string) error {
+
+	v := validator.New()
+	v.Required("password", newPassword)
+	v.Password("password", newPassword)
+	verr := v.Errors()
+	if verr != nil {
+		return verr
+	}
+
+	hikerID, err := s.tokens.Consume(ctx, raw, authtoken.PurposeForgotPassword)
+	if err != nil {
+		return err
+	}
+
+	hash, err := secure.HashPassword(newPassword)
+	if err != nil {
+		return apperr.Internal("failed to set password", "argon2 hash failed", err)
+	}
+
+	err = s.store.SetPassword(ctx, hikerID, hash)
+	if err != nil {
+		return err
+	}
+
+	subj := "Muster - Password Changed"
+	body := "If this wasn't you, reset your password again immediately."
+	if h, err := s.store.GetHikerByID(ctx, hikerID); err != nil {
+		logger.Warn(ctx, "failed to load hiker for change notification", "err", err)
+	} else if err = s.mail.Send(ctx, []string{h.Email}, subj, body); err != nil {
+		logger.Warn(ctx, "failed to send password changed email", "err", err)
+	}
+	return nil
+}
+
+// Private Helper Methods
+
+func (s *Service) sendEmailVerificationToken(ctx context.Context, hikerID uuid.UUID, hikerEmail string) error {
+	raw, err := s.tokens.Mint(ctx, hikerID, authtoken.PurposeEmailVerification, s.verifyTTL)
+	if err != nil {
+		logger.Warn(ctx, "failed to mint raw token for email verification", "err", err)
+		return apperr.Internal("internal error", "internal error", err)
+	}
+	link := fmt.Sprintf("%s/verify-email?token=%s", s.baseURL, raw)
+	subj := "Welcome to Muster - Please verify your email"
+	body := "Please click the link to verify your account: " + link
+	if err = s.mail.Send(ctx, []string{hikerEmail}, subj, body); err != nil {
+		logger.Warn(ctx, "failed to send verification email", "err", err)
+		return apperr.Internal("internal error", "internal error", err)
+	}
+	return nil
+}
+
+func (s *Service) sendPasswordResetEmail(ctx context.Context, hikerID uuid.UUID, hikerEmail string) error {
+	raw, err := s.tokens.Mint(ctx, hikerID, authtoken.PurposeForgotPassword, 1*time.Hour)
+	if err != nil {
+		logger.Warn(ctx, "failed to mint raw token for reset password", "err", err)
+		return apperr.Internal("internal error", "minting reset token failed", err)
+	}
+	link := fmt.Sprintf("%s/reset-password?token=%s", s.baseURL, raw)
+	subj := "Muster - Reset Password"
+	body := "Please click the link to reset your password: " + link
+	if err = s.mail.Send(ctx, []string{hikerEmail}, subj, body); err != nil {
+		logger.Warn(ctx, "failed to send reset password email", "err", err)
+		return apperr.Internal("internal error", "could not send reset email", err)
+	}
 	return nil
 }

@@ -244,6 +244,73 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 }
 
+type forgotPasswordInput struct {
+	Email string `json:"email"`
+}
+
+func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	var in forgotPasswordInput
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&in)
+	if err != nil {
+		responder.Error(w, apperr.BadRequest("invalid request body", "json decode failed", err), correlationID)
+		return
+	}
+
+	email := strings.TrimSpace(in.Email)
+	if email == "" {
+		responder.Error(w, apperr.BadRequest("invalid email", "email cannot be empty"), correlationID)
+		return
+	}
+
+	err = s.hikers.ForgotPassword(r.Context(), email)
+	if err != nil {
+		logger.Error(r.Context(), "failed to send reset password email", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	responder.JSON(w, http.StatusOK, map[string]string{
+		"message": "If email provided matches our record, you will receive a password reset email shortly.",
+	}, correlationID)
+}
+
+type resetPasswordInput struct {
+	NewPassword string `json:"new_password"`
+	Token       string `json:"token"`
+}
+
+func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+
+	var in resetPasswordInput
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&in)
+	if err != nil {
+		responder.Error(w, apperr.BadRequest("invalid request body", "json decode failed", err), correlationID)
+		return
+	}
+	token := strings.TrimSpace(in.Token)
+	if token == "" {
+		responder.Error(w, apperr.BadRequest("empty token", "empty token"), correlationID)
+		return
+	}
+
+	err = s.hikers.ResetPassword(r.Context(), token, in.NewPassword)
+	if err != nil {
+		logger.Error(r.Context(), "failed to reset password", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	responder.JSON(w, http.StatusOK, map[string]string{
+		"message": "Password was changed successfully!",
+	}, correlationID)
+}
+
 func (s *Server) setSessionCookies(w http.ResponseWriter, sess *hiker.Session) {
 	secure, sameSite := s.cookieFlags()
 	http.SetCookie(w, &http.Cookie{

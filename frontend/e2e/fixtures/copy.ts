@@ -39,3 +39,6 @@ export const VERIFY_PENDING = 'Verifying…'
 // login gate
 export const EMAIL_NEED_VERIFICATION = 'Email needs to be verified.'
 export const RESEND_RESPONSE = 'If email provided matches our record, you will receive a verification email'
+
+export const RESET_EMAIL_TEXT = 'If email provided matches our record, you will receive a password reset email shortly.'
+export const PASS_CHANGE_SUCCESS = 'Password was changed successfully!'

@@ -88,5 +88,13 @@ func (f *fakeStore) SetVerified(ctx context.Context, hikerID uuid.UUID) error {
 	}
 	return nil
 }
+func (f *fakeStore) SetPassword(ctx context.Context, hikerID uuid.UUID, hash string) error {
+	h, ok := f.hikers[hikerID]
+	if !ok {
+		return apperr.NotFound("row not found", "row not found")
+	}
+	h.PasswordHash = hash
+	return nil
+}
 
 var _ Storage = (*fakeStore)(nil)
