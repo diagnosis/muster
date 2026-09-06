@@ -12,6 +12,7 @@ import (
 	"github.com/diagnosis/go-toolkit/v3/secure"
 	"github.com/diagnosis/go-toolkit/v3/validator"
 	"github.com/diagnosis/muster/internal/authtoken"
+	"github.com/diagnosis/muster/internal/email"
 	"github.com/google/uuid"
 )
 
@@ -357,11 +358,19 @@ func (s *Service) ResetPassword(ctx context.Context, raw, newPassword string) er
 		return err
 	}
 
-	subj := "Muster - Password Changed"
-	body := "If this wasn't you, reset your password again immediately."
+	c := email.Content{
+		Subject:  "Your Muster password was changed",
+		Heading:  "Password was changed",
+		Body:     "If this wasn't you, reset your password again immediately.",
+		CTALabel: "",
+		CTAURL:   "",
+	}
+
 	if h, err := s.store.GetHikerByID(ctx, hikerID); err != nil {
 		logger.Warn(ctx, "failed to load hiker for change notification", "err", err)
-	} else if err = s.mail.Send(ctx, []string{h.Email}, subj, body); err != nil {
+	} else if html, err := email.Render(c); err != nil {
+		logger.Warn(ctx, "failed to render change notification", "err", err)
+	} else if err = s.mail.Send(ctx, []string{h.Email}, c.Subject, html); err != nil {
 		logger.Warn(ctx, "failed to send password changed email", "err", err)
 	}
 	return nil
@@ -376,9 +385,20 @@ func (s *Service) sendEmailVerificationToken(ctx context.Context, hikerID uuid.U
 		return apperr.Internal("internal error", "internal error", err)
 	}
 	link := fmt.Sprintf("%s/verify-email?token=%s", s.baseURL, raw)
-	subj := "Welcome to Muster - Please verify your email"
-	body := "Please click the link to verify your account: " + link
-	if err = s.mail.Send(ctx, []string{hikerEmail}, subj, body); err != nil {
+
+	c := email.Content{
+		Subject:  "Verify your Muster email",
+		Heading:  "Email Verification",
+		Body:     "Click the button below to verify your account. This link expires in 24 hours.",
+		CTALabel: "Verify account",
+		CTAURL:   link,
+	}
+	html, err := email.Render(c)
+	if err != nil {
+		logger.Warn(ctx, "failed to render email content", "err", err)
+		return apperr.Internal("internal error", "failed to render email content", err)
+	}
+	if err = s.mail.Send(ctx, []string{hikerEmail}, c.Subject, html); err != nil {
 		logger.Warn(ctx, "failed to send verification email", "err", err)
 		return apperr.Internal("internal error", "internal error", err)
 	}
@@ -392,9 +412,19 @@ func (s *Service) sendPasswordResetEmail(ctx context.Context, hikerID uuid.UUID,
 		return apperr.Internal("internal error", "minting reset token failed", err)
 	}
 	link := fmt.Sprintf("%s/reset-password?token=%s", s.baseURL, raw)
-	subj := "Muster - Reset Password"
-	body := "Please click the link to reset your password: " + link
-	if err = s.mail.Send(ctx, []string{hikerEmail}, subj, body); err != nil {
+	c := email.Content{
+		Subject:  "Reset your Muster account password",
+		Heading:  "Reset Password",
+		Body:     "Click the button below to reset your password. This link expires in 1 hour.",
+		CTALabel: "Reset password",
+		CTAURL:   link,
+	}
+	html, err := email.Render(c)
+	if err != nil {
+		logger.Warn(ctx, "failed to render email content", "err", err)
+		return apperr.Internal("internal error", "failed to render email content", err)
+	}
+	if err = s.mail.Send(ctx, []string{hikerEmail}, c.Subject, html); err != nil {
 		logger.Warn(ctx, "failed to send reset password email", "err", err)
 		return apperr.Internal("internal error", "could not send reset email", err)
 	}
