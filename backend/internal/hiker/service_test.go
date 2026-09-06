@@ -3,8 +3,7 @@ package hiker
 import (
 	"context"
 	"errors"
-	"net/url"
-	"strings"
+	"regexp"
 	"testing"
 	"time"
 
@@ -58,49 +57,15 @@ func newTestService(t *testing.T, fm *fakeMailer) (*Service, *fakeStore, *tokenF
 	return svc, f, tf
 }
 
-func getRawFromEmailBody(t *testing.T, fm *fakeMailer) string {
-	if len(fm.sent) != 1 {
-		t.Fatalf("expected 1 mail got %d", len(fm.sent))
-	}
-	emailSubject := fm.sent[0].subject
-	if emailSubject != "Welcome to Muster - Please verify your email" {
-		t.Errorf("expected Welcome to Muster - Please verify your email got %s", emailSubject)
-	}
-	emailBody := fm.sent[0].body
-	var link string
-	for _, section := range strings.Split(emailBody, " ") {
-		if strings.HasPrefix(section, "http://") || strings.HasPrefix(section, "https://") {
-			link = section
-		}
-	}
-	linkURL, err := url.Parse(link)
-	if err != nil {
-		t.Errorf("expected no parse error got %v", err)
-	}
-	params, ok := linkURL.Query()["token"]
-	if !ok || len(params) == 0 || params[0] == "" {
-		t.Errorf("no token in link %q", link)
-	}
-	raw := params[0]
-	return raw
-}
+var tokenRe = regexp.MustCompile(`token=([0-9a-f]{64})`)
+
 func getRawFromEmailBodyString(t *testing.T, body string) string {
-	var link string
-	for _, section := range strings.Split(body, " ") {
-		if strings.HasPrefix(section, "http://") || strings.HasPrefix(section, "https://") {
-			link = section
-		}
+	t.Helper()
+	m := tokenRe.FindStringSubmatch(body)
+	if len(m) < 2 {
+		t.Fatalf("no token found in email body: %q", body)
 	}
-	linkURL, err := url.Parse(link)
-	if err != nil {
-		t.Errorf("expected no parse error got %v", err)
-	}
-	params, ok := linkURL.Query()["token"]
-	if !ok || len(params) == 0 || params[0] == "" {
-		t.Errorf("no token in link %q", link)
-	}
-	raw := params[0]
-	return raw
+	return m[1]
 }
 func Test_Register_Hiker(t *testing.T) {
 	svc, _, _ := newTestService(t, &fakeMailer{})
@@ -246,7 +211,7 @@ func Test_Register_EmailContainsVerificationLink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-	raw := getRawFromEmailBody(t, fm)
+	raw := getRawFromEmailBodyString(t, fm.sent[0].body)
 
 	hash := secure.HashRefreshToken(raw)
 
@@ -324,7 +289,7 @@ func Test_Register_VerifyEmail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-	raw := getRawFromEmailBody(t, fm)
+	raw := getRawFromEmailBodyString(t, fm.sent[0].body)
 
 	err = svc.VerifyEmail(context.Background(), raw)
 	if err != nil {
@@ -403,7 +368,7 @@ func Test_ResendEmailVerification_Verified(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-	raw := getRawFromEmailBody(t, fm)
+	raw := getRawFromEmailBodyString(t, fm.sent[0].body)
 	err = svc.VerifyEmail(context.Background(), raw)
 	if err != nil {
 		t.Fatalf("expected no error got error %v", err)
@@ -552,8 +517,8 @@ func Test_ForgotPassword_SendEmail(t *testing.T) {
 	if len(fm.sent) != 3 {
 		t.Fatalf("expected 3 got %d", len(fm.sent))
 	}
-	if fm.sent[2].subject != "Muster - Password Changed" {
-		t.Errorf(`expected "Muster - Password Changed" got %s`, fm.sent[2].subject)
+	if fm.sent[2].subject != "Your Muster password was changed" {
+		t.Errorf(`expected "Your Muster password was changed" got %q`, fm.sent[2].subject)
 	}
 
 	if _, err = svc.Login(context.Background(), h.Email, "Secure123", PlatformWeb); err != nil {
