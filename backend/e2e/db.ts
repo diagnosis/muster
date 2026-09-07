@@ -27,3 +27,11 @@ export async function mintVerificationToken(hikerID: string, overrides: Partial<
     )
     return raw
 }
+
+export async function getNotificationsFor(hikerID: string): Promise<{kind: string}[]> {
+    const res = await getPool().query(
+        `SELECT kind FROM notification_events WHERE hiker_id = $1`,
+        [hikerID],
+    )
+    return res.rows
+}

@@ -12,6 +12,7 @@ import {
 } from "../api";
 import {DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
 import {unwrap} from "../envelope";
+import {getNotificationsFor} from "../db";
 
 
 test.describe("membership", ()=> {
@@ -82,11 +83,15 @@ test.describe("membership", ()=> {
       const {ctx: ctxHost} = await asUser(BASE)
       const outing = await  unwrap<OutingResponse>(createOuting(ctxHost), 201)
 
-      const {ctx: ctxHiker} = await asUser(BASE)
+      const {ctx: ctxHiker, id: hikerID} = await asUser(BASE)
       const joinRequest = await unwrap<JoinRequestResponse>(requestJoin(ctxHiker, outing.id), 201)
 
       const res = await decline(ctxHost, joinRequest.id)
       expect(res.status()).toBe(200)
+
+      const notifications = await getNotificationsFor(hikerID)
+      expect(notifications.length).toBe(1)
+      expect(notifications[0].kind).toBe('join_request_declined')
 
       const detail = await unwrap<DetailResponse>(getDetail(ctxHiker, outing.id), 200)
       expect(detail.my_request?.status).toBe('declined')
