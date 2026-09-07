@@ -51,7 +51,7 @@ func run() error {
 	hikerStore := postgres.NewHikerStore(pool)
 	tokenStore := postgres.NewAuthTokenStore(pool)
 	outingsStore := postgres.NewOutingStore(pool)
-
+	notificationStore := postgres.NewNotificationStore(pool)
 	tokenService := authtoken.NewService(tokenStore)
 
 	signer, err := secure.NewJWTSigner(secure.JWTConfig{
@@ -82,7 +82,7 @@ func run() error {
 		VerifyTTL: 24 * time.Hour,
 	}
 	hikers := hiker.NewService(hikerServiceConfig)
-	outings := outing.NewService(outingsStore)
+	outings := outing.NewService(outingsStore, notificationStore)
 	srv := api.NewServer(cfg, hikers, signer, outings)
 
 	logger.Info(ctx, "muster listening", "addr", cfg.App.Host+":"+cfg.App.Port)

@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
+	"github.com/diagnosis/go-toolkit/v3/logger"
 	"github.com/diagnosis/go-toolkit/v3/validator"
+	"github.com/diagnosis/muster/internal/notification"
 	"github.com/google/uuid"
 )
 
@@ -38,12 +40,13 @@ type Storage interface {
 
 // Service implements outing business rules over a Storage.
 type Service struct {
-	store Storage
+	store         Storage
+	notifications notification.Storage
 }
 
 // NewService returns a Service backed by store.
-func NewService(store Storage) *Service {
-	return &Service{store: store}
+func NewService(store Storage, notifications notification.Storage) *Service {
+	return &Service{store: store, notifications: notifications}
 }
 
 // minLeadTime is how far in advance an outing must be scheduled —
@@ -375,14 +378,27 @@ func (s *Service) Accept(ctx context.Context, hostID, requestID uuid.UUID) error
 // Decline rejects a pending join request. Host-only; declined is
 // terminal for this outing.
 func (s *Service) Decline(ctx context.Context, hostID, requestID uuid.UUID) error {
-	joinRequest, _, err := s.loadForHostAction(ctx, hostID, requestID)
+	joinRequest, outing, err := s.loadForHostAction(ctx, hostID, requestID)
 	if err != nil {
 		return err
 	}
 	if joinRequest.Status != RequestStatusRequested {
 		return apperr.Conflict("request is not pending", "decline requires requested status")
 	}
-	return s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusDeclined)
+	if err = s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusDeclined); err != nil {
+		return err
+	}
+	if err = s.notifications.Insert(ctx, &notification.Event{
+		HikerID: joinRequest.HikerID,
+		Kind:    notification.KindJoinRequestDeclined,
+		Payload: map[string]any{
+			"outing_id":    outing.ID,
+			"outing_title": outing.Title,
+		},
+	}); err != nil {
+		logger.Warn(ctx, "failed to insert decline notification", "err", err)
+	}
+	return nil
 }
 
 // Withdraw pulls the caller's own request, whether pending or already
