@@ -32,6 +32,7 @@ test.describe("outing-crud actions", ()=> {
         expect(updatedRes.id).toBe(outing.id)
         expect(updatedRes.host_seats).toBe(outing.host_seats)
         expect(updatedRes.destination).toBe(outing.destination)
+
     });
     test("patch guards - nonhost patches", async () => {
         const {ctx: ctxHost} = await asUser(BASE)

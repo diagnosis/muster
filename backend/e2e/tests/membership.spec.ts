@@ -17,12 +17,15 @@ import {getNotificationsFor} from "../db";
 
 test.describe("membership", ()=> {
   test(`list upcoming request oldest first`, async () => {
-      const {ctx: ctxHost} = await  asUser(BASE)
+      const {ctx: ctxHost, id: hostID} = await  asUser(BASE)
       const outing = await unwrap<OutingResponse>(createOuting(ctxHost), 201)
 
       const {ctx: ctxHiker1} = await asUser(BASE)
       const joinReq1 = await unwrap<JoinRequestResponse>(requestJoin(ctxHiker1, outing.id), 201)
       const hiker1Id = joinReq1.hiker_id
+      const notifications = await getNotificationsFor(hostID)
+      expect(notifications.length).toBe(1)
+      expect(notifications[0].kind).toBe('join_request_created')
 
       const {ctx: ctxHiker2} = await asUser(BASE)
       const joinReq2 = await unwrap<JoinRequestResponse>(requestJoin(ctxHiker2, outing.id), 201)
@@ -40,7 +43,7 @@ test.describe("membership", ()=> {
   });
 
   test('withdrawn re-request applies the NEW payload', async ()=> {
-      const {ctx: ctxHost} = await  asUser(BASE)
+      const {ctx: ctxHost, id:hostID} = await  asUser(BASE)
 
       const outing = await unwrap<OutingResponse>(createOuting(ctxHost), 201)
 
@@ -50,6 +53,10 @@ test.describe("membership", ()=> {
       expect(res.status()).toBe(201)
       res = await withdraw(ctxHiker, outing.id)
       expect(res.status()).toBe(200)
+
+      const notifications = await getNotificationsFor(hostID)
+      expect(notifications.length).toBe(2)
+      expect(notifications[1].kind).toBe('join_request_withdrawn')
 
 
       const joinRequest =
@@ -65,12 +72,16 @@ test.describe("membership", ()=> {
       const {ctx: ctxHost} = await asUser(BASE)
       const outing = await  unwrap<OutingResponse>(createOuting(ctxHost), 201)
 
-      const {ctx: ctxHiker} = await asUser(BASE)
+      const {ctx: ctxHiker, id: hikerID} = await asUser(BASE)
       const joinRequest = await unwrap<JoinRequestResponse>(requestJoin(ctxHiker, outing.id), 201)
 
 
       const acceptRes = await accept(ctxHost, joinRequest.id)
       expect(acceptRes.status()).toBe(200)
+
+      const notifications = await getNotificationsFor(hikerID)
+      expect(notifications.length).toBe(1)
+      expect(notifications[0].kind).toBe('join_request_approved')
 
       const detail = await unwrap<DetailResponse>(getDetail(ctxHiker, outing.id), 200)
 
@@ -104,9 +115,8 @@ test.describe("membership", ()=> {
       const {ctx: ctxHost} = await asUser(BASE)
       const outing = await  unwrap<OutingResponse>(createOuting(ctxHost), 201)
 
-      const {ctx: ctxHiker} = await asUser(BASE)
+      const {ctx: ctxHiker, id: hikerID} = await asUser(BASE)
       const joinRequest = await unwrap<JoinRequestResponse>(requestJoin(ctxHiker, outing.id), 201)
-
 
       const acceptRes = await accept(ctxHost, joinRequest.id)
       expect(acceptRes.status()).toBe(200)
@@ -116,6 +126,11 @@ test.describe("membership", ()=> {
       expect(detail.my_request?.status).toBe('accepted')
       let res = await removeMember(ctxHost, joinRequest.id)
       expect(res.status()).toBe(200)
+
+      const notifications = await getNotificationsFor(hikerID)
+      expect(notifications.length).toBe(2)
+      expect(notifications[1].kind).toBe('member_removed')
+
       detail = await unwrap<DetailResponse>(getDetail(ctxHiker, outing.id), 200)
       expect(detail.roster.length).toBe(0)
       expect(detail.people_count).toBe(1)
