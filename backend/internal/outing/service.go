@@ -315,6 +315,17 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 			if err = s.store.CreateJoinRequest(ctx, joinRequest); err != nil {
 				return nil, err
 			}
+			if err = s.notifications.Insert(ctx, &notification.Event{
+				HikerID:  joinRequest.HikerID,
+				Kind:      notification.KindJoinRequestCreated,
+				Payload:   map[string]any{
+					"outing_id": o.ID,
+					"outing_title": o.Title,
+				},
+				CreatedAt: time.Now(),
+			}); err != nil {
+				logger.Warn(ctx, "failed to insert request created notification", "err", err)
+			}
 			return joinRequest, nil
 		}
 		return nil, err
@@ -365,14 +376,24 @@ func (s *Service) loadForHostAction(ctx context.Context, hostID, requestID uuid.
 // checked atomically in the store — a rider needs a seat and cap room,
 // a driver only cap room.
 func (s *Service) Accept(ctx context.Context, hostID, requestID uuid.UUID) error {
-	joinRequest, _, err := s.loadForHostAction(ctx, hostID, requestID)
+	joinRequest, o, err := s.loadForHostAction(ctx, hostID, requestID)
 	if err != nil {
 		return err
 	}
 	if joinRequest.Status != RequestStatusRequested {
 		return apperr.Conflict("request is not pending", "accept requires requested status")
 	}
-	return s.store.AcceptIfCapacity(ctx, requestID)
+	if err = s.store.AcceptIfCapacity(ctx, requestID); err != nil { return err }
+	if err = s.notifications.Insert(ctx, &notification.Event{
+		HikerID:   joinRequest.HikerID,
+		Kind:      notification.KindJoinRequestApproved,
+		Payload:   map[string]any{
+			"outing_id": o.ID,
+			"outing_title": o.Title,
+		},
+		CreatedAt: time.Now(),
+	}); err != nil { logger.Warn(ctx, "failed to insert accept notification", "err", err)}
+	return nil
 }
 
 // Decline rejects a pending join request. Host-only; declined is
@@ -405,6 +426,10 @@ func (s *Service) Decline(ctx context.Context, hostID, requestID uuid.UUID) erro
 // accepted. A withdrawing driver takes their seats — the shortage
 // shows in Detail; the host resolves it.
 func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) error {
+	outing, err := s.store.GetOuting(ctx, outingID)
+	if err != nil {
+		return err
+	}
 	joinRequest, err := s.store.GetJoinRequestByHiker(ctx, outingID, hikerID)
 	if err != nil {
 		return err
@@ -412,19 +437,40 @@ func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) err
 	if joinRequest.Status != RequestStatusRequested && joinRequest.Status != RequestStatusAccepted {
 		return apperr.Conflict("nothing to withdraw", "withdraw requires requested or accepted")
 	}
-	return s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusWithdrawn)
+	if err = s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusWithdrawn); err != nil { return err }
+	if err = s.notifications.Insert(ctx, &notification.Event{
+		HikerID: outing.HostID,
+		Kind:    notification.KindJoinRequestWithdrawn,
+		Payload: map[string]any{
+			"outing_id":    outing.ID,
+			"outing_title": outing.Title,
+		},
+	}); err != nil {
+		logger.Warn(ctx, "failed to insert withdraw notification", "err", err)
+	}
+	return nil
 }
 
 // RemoveMember removes an accepted member from the roster. Host-only.
 func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID) error {
-	joinRequest, _, err := s.loadForHostAction(ctx, hostID, requestID)
+	joinRequest, o, err := s.loadForHostAction(ctx, hostID, requestID)
 	if err != nil {
 		return err
 	}
 	if joinRequest.Status != RequestStatusAccepted {
 		return apperr.Conflict("member is not on the roster", "remove requires accepted status")
 	}
-	return s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusRemoved)
+	if err =  s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusRemoved); err != nil { return err }
+	if err = s.notifications.Insert(ctx, &notification.Event{
+		HikerID:   joinRequest.HikerID,
+		Kind:      notification.KindMemberRemoved,
+		Payload: map[string]any{
+			"outing_id":    o.ID,
+			"outing_title": o.Title,
+		},
+		CreatedAt: time.Now(),
+	}); err != nil { logger.Warn(ctx,"failed to insert remove notification")}
+	return nil
 }
 
 // ListUpcoming returns open outings that start in the future, soonest
