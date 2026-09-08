@@ -236,7 +236,13 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 	if verr := validateOuting(o); verr != nil {
 		return nil, verr
 	}
-	return o, s.store.UpdateOuting(ctx, o)
+	if err = s.store.UpdateOuting(ctx, o); err != nil {
+		return nil, err
+	}
+
+	s.notifyOutingAudience(ctx, o, notification.KindOutingUpdated)
+
+	return o, nil
 }
 
 // Cancel marks an open, future outing as cancelled. Host-only. Past
@@ -255,7 +261,11 @@ func (s *Service) Cancel(ctx context.Context, hostID, outingID uuid.UUID) error 
 	if o.StartsAt.Before(time.Now()) {
 		return apperr.BadRequest("cannot cancel a past outing", "outing already started")
 	}
-	return s.store.SetOutingStatus(ctx, outingID, StatusCancelled)
+	if err = s.store.SetOutingStatus(ctx, outingID, StatusCancelled); err != nil {
+		return err
+	}
+	s.notifyOutingAudience(ctx, o, notification.KindOutingCancelled)
+	return nil
 }
 
 // JoinInput carries a hiker's request to join an outing.
@@ -315,17 +325,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 			if err = s.store.CreateJoinRequest(ctx, joinRequest); err != nil {
 				return nil, err
 			}
-			if err = s.notifications.Insert(ctx, &notification.Event{
-				HikerID:  joinRequest.HikerID,
-				Kind:      notification.KindJoinRequestCreated,
-				Payload:   map[string]any{
-					"outing_id": o.ID,
-					"outing_title": o.Title,
-				},
-				CreatedAt: time.Now(),
-			}); err != nil {
-				logger.Warn(ctx, "failed to insert request created notification", "err", err)
-			}
+			s.notify(ctx, o.HostID, o, notification.KindJoinRequestCreated)
 			return joinRequest, nil
 		}
 		return nil, err
@@ -383,16 +383,10 @@ func (s *Service) Accept(ctx context.Context, hostID, requestID uuid.UUID) error
 	if joinRequest.Status != RequestStatusRequested {
 		return apperr.Conflict("request is not pending", "accept requires requested status")
 	}
-	if err = s.store.AcceptIfCapacity(ctx, requestID); err != nil { return err }
-	if err = s.notifications.Insert(ctx, &notification.Event{
-		HikerID:   joinRequest.HikerID,
-		Kind:      notification.KindJoinRequestApproved,
-		Payload:   map[string]any{
-			"outing_id": o.ID,
-			"outing_title": o.Title,
-		},
-		CreatedAt: time.Now(),
-	}); err != nil { logger.Warn(ctx, "failed to insert accept notification", "err", err)}
+	if err = s.store.AcceptIfCapacity(ctx, requestID); err != nil {
+		return err
+	}
+	s.notify(ctx, joinRequest.HikerID, o, notification.KindJoinRequestApproved)
 	return nil
 }
 
@@ -409,16 +403,9 @@ func (s *Service) Decline(ctx context.Context, hostID, requestID uuid.UUID) erro
 	if err = s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusDeclined); err != nil {
 		return err
 	}
-	if err = s.notifications.Insert(ctx, &notification.Event{
-		HikerID: joinRequest.HikerID,
-		Kind:    notification.KindJoinRequestDeclined,
-		Payload: map[string]any{
-			"outing_id":    outing.ID,
-			"outing_title": outing.Title,
-		},
-	}); err != nil {
-		logger.Warn(ctx, "failed to insert decline notification", "err", err)
-	}
+
+	s.notify(ctx, joinRequest.HikerID, outing, notification.KindJoinRequestDeclined)
+
 	return nil
 }
 
@@ -437,17 +424,10 @@ func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) err
 	if joinRequest.Status != RequestStatusRequested && joinRequest.Status != RequestStatusAccepted {
 		return apperr.Conflict("nothing to withdraw", "withdraw requires requested or accepted")
 	}
-	if err = s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusWithdrawn); err != nil { return err }
-	if err = s.notifications.Insert(ctx, &notification.Event{
-		HikerID: outing.HostID,
-		Kind:    notification.KindJoinRequestWithdrawn,
-		Payload: map[string]any{
-			"outing_id":    outing.ID,
-			"outing_title": outing.Title,
-		},
-	}); err != nil {
-		logger.Warn(ctx, "failed to insert withdraw notification", "err", err)
+	if err = s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusWithdrawn); err != nil {
+		return err
 	}
+	s.notify(ctx, outing.HostID, outing, notification.KindJoinRequestWithdrawn)
 	return nil
 }
 
@@ -460,16 +440,10 @@ func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID)
 	if joinRequest.Status != RequestStatusAccepted {
 		return apperr.Conflict("member is not on the roster", "remove requires accepted status")
 	}
-	if err =  s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusRemoved); err != nil { return err }
-	if err = s.notifications.Insert(ctx, &notification.Event{
-		HikerID:   joinRequest.HikerID,
-		Kind:      notification.KindMemberRemoved,
-		Payload: map[string]any{
-			"outing_id":    o.ID,
-			"outing_title": o.Title,
-		},
-		CreatedAt: time.Now(),
-	}); err != nil { logger.Warn(ctx,"failed to insert remove notification")}
+	if err = s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusRemoved); err != nil {
+		return err
+	}
+	s.notify(ctx, joinRequest.HikerID, o, notification.KindMemberRemoved)
 	return nil
 }
 
@@ -550,4 +524,32 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 	}
 
 	return detail, nil
+}
+
+// helpers
+
+func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, outing *Outing, kind notification.Kind){
+	if err := s.notifications.Insert(ctx, &notification.Event{
+		HikerID:  hikerID,
+		Kind:      kind,
+		Payload:   map[string]any{"outing_id": outing.ID, "outing_title": outing.Title},
+	}); err != nil {
+		logger.Warn(ctx, "failed to send notification", "err", err, "hikerID:", hikerID)
+	}
+}
+func (s *Service) notifyOutingAudience(ctx context.Context, outing *Outing, kind notification.Kind){
+	roster, err := s.store.Roster(ctx, outing.ID)
+	if err != nil {
+		logger.Warn(ctx, "failed to get roster for notification", "err", err)
+	} else {
+		for _, member := range roster {
+			s.notify(ctx, member.HikerID, outing, kind)
+		}
+	}
+	pending, err := s.store.ListJoinRequests(ctx, outing.ID, RequestStatusRequested)
+	if err != nil { logger.Warn(ctx, " failed to get pending request for notification", "err", err)}else {
+		for _, r := range pending{
+			s.notify(ctx, r.HikerID, outing, kind)
+		}
+	}
 }
