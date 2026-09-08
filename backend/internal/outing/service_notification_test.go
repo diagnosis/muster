@@ -188,16 +188,20 @@ func Test_CancelOuting_NotifiesEachMember(t *testing.T) {
 		t.Fatalf("expected 3 notification, got %d", len(fn.events))
 	}
 	got := make(map[uuid.UUID]bool)
-	for _, e := range fn.events{
-		if e.Kind != notification.KindOutingCancelled{
+	for _, e := range fn.events {
+		if e.Kind != notification.KindOutingCancelled {
 			t.Errorf("expected kind %s got %s", notification.KindOutingCancelled, e.Kind)
 		}
 		got[e.HikerID] = true
 	}
-	for _ , id := range []uuid.UUID{hiker1ID, hiker2ID, hiker3ID}{
-		if !got[id]{t.Errorf("hiker %v not notified", id)}
+	for _, id := range []uuid.UUID{hiker1ID, hiker2ID, hiker3ID} {
+		if !got[id] {
+			t.Errorf("hiker %v not notified", id)
+		}
 	}
-	if got[hostID] { t.Error("host notified of own cancel") }
+	if got[hostID] {
+		t.Error("host notified of own cancel")
+	}
 
 }
 
@@ -226,22 +230,26 @@ func Test_UpdateOuting_NotifiesEachMember(t *testing.T) {
 		Difficulty:       &difficulty,
 		Pace:             &pace,
 		Notes:            &note,
-	} ); err != nil {
+	}); err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
 	if len(fn.events) != 3 {
 		t.Fatalf("expected 3 notification, got %d", len(fn.events))
 	}
 	got := make(map[uuid.UUID]bool)
-	for _, e := range fn.events{
-		if e.Kind != notification.KindOutingUpdated{
+	for _, e := range fn.events {
+		if e.Kind != notification.KindOutingUpdated {
 			t.Errorf("expected kind %s got %s", notification.KindOutingUpdated, e.Kind)
 		}
 		got[e.HikerID] = true
 	}
-	for _ , id := range []uuid.UUID{hiker1ID, hiker2ID, hiker3ID}{
-		if !got[id]{t.Errorf("hiker %v not notified", id)}
+	for _, id := range []uuid.UUID{hiker1ID, hiker2ID, hiker3ID} {
+		if !got[id] {
+			t.Errorf("hiker %v not notified", id)
+		}
 	}
-	if got[hostID] { t.Error("host notified of own cancel") }
+	if got[hostID] {
+		t.Error("host notified of own cancel")
+	}
 
 }

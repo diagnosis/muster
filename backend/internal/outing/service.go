@@ -528,16 +528,16 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 
 // helpers
 
-func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, outing *Outing, kind notification.Kind){
+func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, outing *Outing, kind notification.Kind) {
 	if err := s.notifications.Insert(ctx, &notification.Event{
-		HikerID:  hikerID,
-		Kind:      kind,
-		Payload:   map[string]any{"outing_id": outing.ID, "outing_title": outing.Title},
+		HikerID: hikerID,
+		Kind:    kind,
+		Payload: map[string]any{"outing_id": outing.ID, "outing_title": outing.Title},
 	}); err != nil {
 		logger.Warn(ctx, "failed to send notification", "err", err, "hikerID:", hikerID)
 	}
 }
-func (s *Service) notifyOutingAudience(ctx context.Context, outing *Outing, kind notification.Kind){
+func (s *Service) notifyOutingAudience(ctx context.Context, outing *Outing, kind notification.Kind) {
 	roster, err := s.store.Roster(ctx, outing.ID)
 	if err != nil {
 		logger.Warn(ctx, "failed to get roster for notification", "err", err)
@@ -547,8 +547,10 @@ func (s *Service) notifyOutingAudience(ctx context.Context, outing *Outing, kind
 		}
 	}
 	pending, err := s.store.ListJoinRequests(ctx, outing.ID, RequestStatusRequested)
-	if err != nil { logger.Warn(ctx, " failed to get pending request for notification", "err", err)}else {
-		for _, r := range pending{
+	if err != nil {
+		logger.Warn(ctx, " failed to get pending request for notification", "err", err)
+	} else {
+		for _, r := range pending {
 			s.notify(ctx, r.HikerID, outing, kind)
 		}
 	}
