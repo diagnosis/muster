@@ -28,9 +28,9 @@ export async function mintVerificationToken(hikerID: string, overrides: Partial<
     return raw
 }
 
-export async function getNotificationsFor(hikerID: string): Promise<{kind: string}[]> {
+export async function getNotificationsFor(hikerID: string): Promise<{payload:Record<string, any>,kind: string}[]> {
     const res = await getPool().query(
-        `SELECT kind FROM notification_events WHERE hiker_id = $1`,
+        `SELECT payload, kind FROM notification_events WHERE hiker_id = $1 ORDER BY created_at`,
         [hikerID],
     )
     return res.rows

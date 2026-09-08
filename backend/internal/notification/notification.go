@@ -36,6 +36,7 @@ func (k Kind) Valid() bool {
 
 // Event is one notification to one recipient: a bell item and, until
 // EmailedAt is set, a pending email (outbox pattern).
+// recipient — the hiker this notification is for (host or requester, per event),
 type Event struct {
 	ID        uuid.UUID      `json:"id"`
 	HikerID   uuid.UUID      `json:"hiker_id"`
