@@ -253,3 +253,38 @@ func Test_UpdateOuting_NotifiesEachMember(t *testing.T) {
 	}
 
 }
+
+func Test_Rerequest_NotifiesHost(t *testing.T) {
+	svc, f, fn := newTestService(t)
+
+	hostID := uuid.New()
+	hiker1ID := uuid.New()
+
+	o := seedOuting(6, 4, StatusOpen, hostID, f)
+	_ = seedJoinRequest(o.ID, hiker1ID, RequestStatusAccepted, RoleRider, f, 1)
+	seedMember(hiker1ID, "mahmut", "experienced", f)
+
+	if err := svc.Withdraw(context.Background(), hiker1ID, o.ID); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+
+	if _, err := svc.RequestJoin(context.Background(), hiker1ID, o.ID, JoinInput{
+		Role:         RoleRider,
+		SeatsOffered: 0,
+		Guests:       1,
+		Note:         nil,
+	}); err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+
+	if len(fn.events) != 2 {
+		t.Fatalf("expected 2 got %d", len(fn.events))
+	}
+	if fn.events[0].Kind != notification.KindJoinRequestWithdrawn {
+		t.Errorf("expected %s got %s", notification.KindJoinRequestWithdrawn, fn.events[0].Kind)
+	}
+	if fn.events[1].Kind != notification.KindJoinRequestCreated {
+		t.Errorf("expected %s got %s", notification.KindJoinRequestCreated, fn.events[1].Kind)
+	}
+
+}
