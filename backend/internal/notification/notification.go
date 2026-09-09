@@ -46,3 +46,10 @@ type Event struct {
 	ReadAt    *time.Time     `json:"read_at"`
 	EmailedAt *time.Time     `json:"-"`
 }
+
+// Unsent pairs a pending notification event with its recipient's email,
+// joined at read time (email is not stored on notification_events).
+type Unsent struct {
+	Event Event
+	Email string
+}

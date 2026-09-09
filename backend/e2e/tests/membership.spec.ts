@@ -83,6 +83,7 @@ test.describe("membership", ()=> {
       expect(notifications.length).toBe(1)
       expect(notifications[0].kind).toBe('join_request_approved')
 
+
       const detail = await unwrap<DetailResponse>(getDetail(ctxHiker, outing.id), 200)
 
       expect(detail.roster.length).toBe(1)
@@ -103,6 +104,11 @@ test.describe("membership", ()=> {
       const notifications = await getNotificationsFor(hikerID)
       expect(notifications.length).toBe(1)
       expect(notifications[0].kind).toBe('join_request_declined')
+
+      await expect.poll(async () => {
+          const rows = await getNotificationsFor(hikerID)
+          return rows[0]?.emailed_at
+      }, { timeout: 10_000 }).not.toBeNull()
 
       const detail = await unwrap<DetailResponse>(getDetail(ctxHiker, outing.id), 200)
       expect(detail.my_request?.status).toBe('declined')

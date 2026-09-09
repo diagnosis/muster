@@ -20,12 +20,13 @@ type Config struct {
 
 // AppConfig holds app configurations. platform, env, port etc.
 type AppConfig struct {
-	Env            string
-	Port           string
-	Host           string
-	BaseURL        string
-	CORSOrigins    []string
-	CookieSameSite http.SameSite
+	Env                string
+	Port               string
+	Host               string
+	BaseURL            string
+	CORSOrigins        []string
+	CookieSameSite     http.SameSite
+	DispatcherInterval time.Duration
 }
 
 // DatabaseConfig holds connection settings and pool tuning for Postgres.
@@ -116,14 +117,19 @@ func loadAppConfig() (*AppConfig, error) {
 	if cookieSameSite == http.SameSiteNoneMode && env == "dev" {
 		return nil, fmt.Errorf("COOKIE_SAMESITE=none requires non-dev APP_ENV (Secure cookies)")
 	}
+	dispatcherInterval, err := getEnvDuration("APP_DISPATCHER_INTERVAL", 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
 
 	return &AppConfig{
-		Env:            env,
-		Port:           port,
-		Host:           host,
-		BaseURL:        baseURL,
-		CORSOrigins:    corsOrigins,
-		CookieSameSite: cookieSameSite,
+		Env:                env,
+		Port:               port,
+		Host:               host,
+		BaseURL:            baseURL,
+		CORSOrigins:        corsOrigins,
+		CookieSameSite:     cookieSameSite,
+		DispatcherInterval: dispatcherInterval,
 	}, nil
 }
 
