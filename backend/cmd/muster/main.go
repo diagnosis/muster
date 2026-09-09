@@ -14,6 +14,7 @@ import (
 	"github.com/diagnosis/muster/internal/authtoken"
 	"github.com/diagnosis/muster/internal/config"
 	"github.com/diagnosis/muster/internal/hiker"
+	"github.com/diagnosis/muster/internal/notification"
 	"github.com/diagnosis/muster/internal/outing"
 	"github.com/diagnosis/muster/internal/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -83,7 +84,12 @@ func run() error {
 	}
 	hikers := hiker.NewService(hikerServiceConfig)
 	outings := outing.NewService(outingsStore, notificationStore)
+	dispatcher := notification.NewDispatcher(notificationStore, m, cfg.App.DispatcherInterval, cfg.App.BaseURL)
 	srv := api.NewServer(cfg, hikers, signer, outings)
+
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go dispatcher.Run(ctxWithCancel)
 
 	logger.Info(ctx, "muster listening", "addr", cfg.App.Host+":"+cfg.App.Port)
 	return (&http.Server{

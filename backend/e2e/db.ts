@@ -28,10 +28,18 @@ export async function mintVerificationToken(hikerID: string, overrides: Partial<
     return raw
 }
 
-export async function getNotificationsFor(hikerID: string): Promise<{payload:Record<string, any>,kind: string}[]> {
+export async function getNotificationsFor(hikerID: string): Promise<{payload:Record<string, any>,kind: string, emailed_at: string|null}[]> {
     const res = await getPool().query(
-        `SELECT payload, kind FROM notification_events WHERE hiker_id = $1 ORDER BY created_at`,
+        `SELECT payload, kind, emailed_at FROM notification_events WHERE hiker_id = $1 ORDER BY created_at`,
         [hikerID],
     )
     return res.rows
+}
+
+export async function getNotificationEmailedAt(hikerID: string): Promise<(string | null)[]> {
+    const res = await getPool().query(
+        `SELECT emailed_at FROM notification_events WHERE hiker_id = $1 ORDER BY created_at`,
+        [hikerID],
+    )
+    return res.rows.map(r => r.emailed_at)
 }

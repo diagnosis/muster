@@ -53,6 +53,7 @@ jobs:
           DATABASE_URL: ${{ steps.neon.outputs.db_url_with_pooler }}
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          APP_DISPATCHER_INTERVAL: 3s
           RATE_LIMIT_RPS: "100"
           RATE_LIMIT_BURST: "200"
         run: |
