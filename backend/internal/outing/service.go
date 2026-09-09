@@ -342,6 +342,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 		if err = s.store.UpdateJoinRequest(ctx, joinRequest); err != nil {
 			return nil, err
 		}
+		s.notify(ctx, o.HostID, o, notification.KindJoinRequestCreated)
 		return joinRequest, nil
 	case RequestStatusDeclined:
 		return nil, apperr.Conflict("your request to this outing was declined", "declined is terminal")
