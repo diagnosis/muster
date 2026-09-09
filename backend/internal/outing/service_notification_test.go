@@ -284,7 +284,7 @@ func Test_Rerequest_NotifiesHost(t *testing.T) {
 		t.Errorf("expected %s got %s", notification.KindJoinRequestWithdrawn, fn.events[0].Kind)
 	}
 	if fn.events[1].Kind != notification.KindJoinRequestCreated {
-		t.Errorf("expected %s got %s", notification.KindJoinRequestWithdrawn, fn.events[1].Kind)
+		t.Errorf("expected %s got %s", notification.KindJoinRequestCreated, fn.events[1].Kind)
 	}
 
 }
