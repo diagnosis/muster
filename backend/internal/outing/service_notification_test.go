@@ -278,13 +278,13 @@ func Test_Rerequest_NotifiesHost(t *testing.T) {
 	}
 
 	if len(fn.events) != 2 {
-		t.Errorf("expected 2 got %d", len(fn.events))
+		t.Fatalf("expected 2 got %d", len(fn.events))
 	}
-	if fn.events[0].Kind != "join_request_withdrawn" {
-		t.Errorf("expected join_request_withdrawn got %s", fn.events[0].Kind)
+	if fn.events[0].Kind != notification.KindJoinRequestWithdrawn {
+		t.Errorf("expected %s got %s", notification.KindJoinRequestWithdrawn, fn.events[0].Kind)
 	}
-	if fn.events[1].Kind != "join_request_created" {
-		t.Errorf("expected join_request_created got %s", fn.events[1].Kind)
+	if fn.events[1].Kind != notification.KindJoinRequestCreated {
+		t.Errorf("expected %s got %s", notification.KindJoinRequestWithdrawn, fn.events[1].Kind)
 	}
 
 }
