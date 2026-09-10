@@ -73,3 +73,12 @@ export const forgotPassword = (ctx:APIRequestContext, email:string) =>
 
 export const resetPassword = (ctx:APIRequestContext, new_password:string, token:string) =>
     ctx.post("/api/auth/reset-password", {data:{new_password, token}})
+
+export const getNotifications = (ctx: APIRequestContext) =>
+    ctx.get('/api/notifications')
+
+export const readNotification = (ctx: APIRequestContext, id: string) =>
+    ctx.post(`/api/notifications/${id}/read`)
+
+export const readAllNotifications = (ctx: APIRequestContext) =>
+    ctx.post('/api/notifications/read-all')

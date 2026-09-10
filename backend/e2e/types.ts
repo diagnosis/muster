@@ -126,6 +126,18 @@ export interface ForgotPasswordResponse{
 export interface ResetPasswordResponse{
     message: string
 }
+export interface NotificationsResponse{
+    notifications:Event[]
+    unread_count:number
+}
+export interface Event{
+    id: string
+    hiker_id: string
+    kind: string
+    payload: {outing_id:string,outing_title:string}
+    created_at: string
+    read_at:  string|null
+}
 
 
 export const CODE_EMAIL_NOT_VERIFIED = "email_not_verified"
