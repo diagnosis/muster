@@ -11,25 +11,28 @@ import (
 	"github.com/diagnosis/go-toolkit/v3/secure"
 	"github.com/diagnosis/muster/internal/config"
 	"github.com/diagnosis/muster/internal/hiker"
+	"github.com/diagnosis/muster/internal/notification"
 	"github.com/diagnosis/muster/internal/outing"
 	"golang.org/x/time/rate"
 )
 
 // Server wires HTTP routes to the domain services.
 type Server struct {
-	hikers  *hiker.Service
-	jwt     *secure.JWTSigner
-	cfg     *config.Config
-	outings *outing.Service
+	hikers        *hiker.Service
+	jwt           *secure.JWTSigner
+	cfg           *config.Config
+	outings       *outing.Service
+	notifications notification.Storage
 }
 
 // NewServer returns a Server serving the given services.
-func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner, outings *outing.Service) *Server {
+func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner, outings *outing.Service, notifications notification.Storage) *Server {
 	return &Server{
-		hikers:  hikers,
-		jwt:     jwt,
-		cfg:     cfg,
-		outings: outings,
+		hikers:        hikers,
+		jwt:           jwt,
+		cfg:           cfg,
+		outings:       outings,
+		notifications: notifications,
 	}
 }
 
@@ -69,6 +72,11 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("GET /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handlePendingRequests)))
 	mux.Handle("GET /api/me/outings", requireAuth(http.HandlerFunc(s.handleMyOutings)))
 	mux.Handle("PATCH /api/outings/{id}", requireAuth(http.HandlerFunc(s.handleUpdateOuting)))
+
+	// protected notifications routes
+	mux.Handle("GET /api/notifications", requireAuth(http.HandlerFunc(s.handleGetNotifications)))
+	mux.Handle("POST /api/notifications/{id}/read", requireAuth(http.HandlerFunc(s.handleReadNotification)))
+	mux.Handle("POST /api/notifications/read-all", requireAuth(http.HandlerFunc(s.handleReadAllNotifications)))
 
 	// hikers public routes
 	mux.HandleFunc("GET /api/hikers/{id}", s.handleGetHiker)

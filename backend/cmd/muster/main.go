@@ -85,7 +85,7 @@ func run() error {
 	hikers := hiker.NewService(hikerServiceConfig)
 	outings := outing.NewService(outingsStore, notificationStore)
 	dispatcher := notification.NewDispatcher(notificationStore, m, cfg.App.DispatcherInterval, cfg.App.BaseURL)
-	srv := api.NewServer(cfg, hikers, signer, outings)
+	srv := api.NewServer(cfg, hikers, signer, outings, notificationStore)
 
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	defer cancel()
