@@ -68,5 +68,15 @@ func (f *fakeNotificationStore) getEventByID(id uuid.UUID) (*notification.Event,
 	}
 	return nil, false
 }
+func (f *fakeNotificationStore) ListForHiker(ctx context.Context, hikerID uuid.UUID, limit, offset int) ([]*notification.Event, error) {
+	return nil, nil // unused by dispatcher tests
+}
+func (f *fakeNotificationStore) MarkRead(ctx context.Context, hikerID, id uuid.UUID) error {
+	return nil
+}
+func (f *fakeNotificationStore) MarkAllRead(ctx context.Context, hikerID uuid.UUID) error { return nil }
+func (f *fakeNotificationStore) UnreadCount(ctx context.Context, hikerID uuid.UUID) (int, error) {
+	return 0, nil
+}
 
 var _ notification.Storage = (*fakeNotificationStore)(nil)

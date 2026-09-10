@@ -16,6 +16,74 @@ type NotificationStore struct {
 	pool *pgxpool.Pool
 }
 
+// ListForHiker returns hikerID's notifications, newest first, paginated by
+// limit and offset. Caller bounds limit.
+func (s *NotificationStore) ListForHiker(ctx context.Context, hikerID uuid.UUID, limit, offset int) ([]*notification.Event, error) {
+	q := `
+		SELECT id, hiker_id, kind, payload, created_at, read_at
+		FROM notification_events
+		WHERE hiker_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3
+`
+	rows, err := s.pool.Query(ctx, q, hikerID, limit, offset)
+	if err != nil {
+		return nil, apperr.Database("failed to list notification for hiker", "select events for hiker failed", err)
+	}
+	defer rows.Close()
+
+	var events []*notification.Event
+	for rows.Next() {
+		e := &notification.Event{}
+		if err = rows.Scan(&e.ID, &e.HikerID, &e.Kind, &e.Payload, &e.CreatedAt, &e.ReadAt); err != nil {
+			return nil, apperr.Database("failed to list notification for hiker", "scan event from row failed", err)
+		}
+		events = append(events, e)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, apperr.Database("failed to list notification for hiker", "iterate notifications failed", err)
+	}
+	return events, nil
+}
+
+// MarkRead marks one of hikerID's notifications read. Scoped by hiker_id so a
+// hiker can't touch another's row; a no-op (already read, or not theirs) is
+// tolerated, not an error.
+func (s *NotificationStore) MarkRead(ctx context.Context, hikerID, id uuid.UUID) error {
+	q := `
+	UPDATE notification_events 
+	SET read_at = now()
+	WHERE hiker_id = $1 AND id = $2 AND read_at IS NULL
+`
+	if _, err := s.pool.Exec(ctx, q, hikerID, id); err != nil {
+		return apperr.Database("failed to mark as read", "mark as read failed", err)
+	}
+	return nil
+}
+
+// MarkAllRead marks all of hikerID's unread notifications read in one statement.
+func (s *NotificationStore) MarkAllRead(ctx context.Context, hikerID uuid.UUID) error {
+	q := `
+       UPDATE notification_events
+       SET read_at = now()
+       WHERE hiker_id = $1 AND read_at IS NULL
+`
+	if _, err := s.pool.Exec(ctx, q, hikerID); err != nil {
+		return apperr.Database("failed to mark as read", "mark as read failed", err)
+	}
+	return nil
+}
+
+// UnreadCount returns number of unread notifications
+func (s *NotificationStore) UnreadCount(ctx context.Context, hikerID uuid.UUID) (int, error) {
+	q := `SELECT count(*) FROM notification_events WHERE hiker_id = $1 AND read_at IS NULL`
+	var n int
+	if err := s.pool.QueryRow(ctx, q, hikerID).Scan(&n); err != nil {
+		return 0, apperr.Database("failed to count unread", "count unread failed", err)
+	}
+	return n, nil
+}
+
 // ListUnsent returns up to limit notification events whose email has not
 // been sent (emailed_at IS NULL), oldest first, each joined with its
 // recipient's address. The dispatcher drains these.

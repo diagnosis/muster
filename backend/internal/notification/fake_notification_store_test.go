@@ -15,6 +15,17 @@ type fakeNotificationStore struct {
 	err    error
 }
 
+func (f *fakeNotificationStore) ListForHiker(ctx context.Context, hikerID uuid.UUID, limit, offset int) ([]*Event, error) {
+	return nil, nil // unused by dispatcher tests
+}
+func (f *fakeNotificationStore) MarkRead(ctx context.Context, hikerID, id uuid.UUID) error {
+	return nil
+}
+func (f *fakeNotificationStore) MarkAllRead(ctx context.Context, hikerID uuid.UUID) error { return nil }
+func (f *fakeNotificationStore) UnreadCount(ctx context.Context, hikerID uuid.UUID) (int, error) {
+	return 0, nil
+}
+
 func (f *fakeNotificationStore) ListUnsent(ctx context.Context, limit int) ([]*Unsent, error) {
 	if f.err != nil {
 		return nil, f.err
