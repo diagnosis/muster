@@ -146,10 +146,10 @@ export interface ResetPasswordResponse{
 }
 
 export interface NotificationsResponse{
-    notifications:Event[]
+    notifications:NotificationEvent[]
     unread_count:number
 }
-export interface Event{
+export interface NotificationEvent{
     id: string
     hiker_id: string
     kind: string

@@ -1,0 +1,86 @@
+/* NotificationBell.module.css — dropdown */
+.bellBtn{
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 1.25rem;
+    line-height: 1;
+    background: none;
+    border: 0;
+    border-radius: var(--radius-control);
+}
+.bellBtn:hover{
+    background: var(--surface-raised);
+}
+.badge {
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: var(--color-primary);   /* the alpine teal — muster's one accent */
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bellWrap { position: relative; }   /* anchor for the dropdown */
+
+.notifDropdown {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    right: 0;
+    width: 340px;
+    max-height: 420px;
+    overflow-y: auto;
+    background: var(--surface-raised);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-control);
+    box-shadow: 0 8px 16px -12px rgb(59 54 43 / 0.4);
+    z-index: 30;
+}
+.notifList { list-style: none; margin: 0; padding: 0; }
+.notifRow {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border-subtle);
+}
+.notifRow:last-child { border-bottom: 0; }
+.unread { background: color-mix(in srgb, var(--color-primary) 6%, transparent); }
+.notifTime { font-size: 12px; color: var(--color-text-muted); }
+.notifHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border-subtle);
+    font-weight: 600;
+    color: var(--color-text);
+}
+.markAll {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-primary);
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+.markAll:hover { text-decoration: underline; }
+
+.notifEmpty {
+    padding: var(--space-6) var(--space-4);
+    text-align: center;
+    color: var(--color-text-muted);
+}

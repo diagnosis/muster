@@ -57,7 +57,7 @@ export function Header(){
             <Link className={styles.logo} to={'/'} onClick={()=>setOpen(false)}>Muster</Link>
                 {data ? (
                     <div className={styles.headerActions}>
-                        <NotificationBell/>
+                        <span className={styles.mobileBell}><NotificationBell/></span>
                         <button
                             aria-label={'Menu'}
                             className={`${styles.toggle} ${styles.hamburgerBtn}`}
@@ -75,7 +75,7 @@ export function Header(){
                             <Link className={styles.navLink} to="/me/outings" onClick={()=> setOpen(false)}>My outings</Link>
                             <Link className={styles.navLink} to="/outings/new" onClick={() => setOpen(false)}>Create outing</Link>
                             <Link className={styles.navLink} onClick={()=>setOpen(false)} to={"/me/profile"}>{data.name}</Link>
-                            <NotificationBell/>
+                            <span className={styles.desktopBell}><NotificationBell/></span>
                             <div className={styles.loginSignup}>
                                 <button className={styles.logoutBtn} onClick={ () =>
                                     logout.mutate()

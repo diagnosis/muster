@@ -86,23 +86,11 @@ display: flex;
     background: var(--surface-raised);
 }
 
-.bellBtn{
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    font-size: 1.25rem;
-    line-height: 1;
-    background: none;
-    border: 0;
-    border-radius: var(--radius-control);
-}
-.bellBtn:hover{
-    background: var(--surface-raised);
-}
-.panel .bell { display: none; }
+
+.panel .bell{ display: none; }
+
+.desktopBell { display: none; }         /* mobile: hide desktop bell */
+.mobileBell  { display: inline-flex; }  /* mobile: show mobile bell */
 
 /* ---- 640px and up ---- */
 
@@ -141,5 +129,7 @@ display: flex;
     .inner { gap: var(--space-6); }
     .panel, .panelOpen { margin-left: auto; }   /* nav group shoves right, pulling bell with it via normal flow */
     .headerActions { display: none; }
-    .panel .bell { display: inline-flex; }
+    .panel .bell{ display: inline-flex; }
+    .desktopBell { display: inline-flex; }  /* desktop: show */
+    .mobileBell  { display: none; }         /* desktop: hide */
 }
