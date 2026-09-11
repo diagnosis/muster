@@ -52,6 +52,10 @@
     align-items: stretch;
     width: 100%;
 }
+.headerActions{
+display: flex;
+    align-items: center;
+}
 
 /* nav links get row treatment; buttons don't */
 .panelOpen .navLink{
@@ -82,6 +86,23 @@
     background: var(--surface-raised);
 }
 
+.bellBtn{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 1.25rem;
+    line-height: 1;
+    background: none;
+    border: 0;
+    border-radius: var(--radius-control);
+}
+.bellBtn:hover{
+    background: var(--surface-raised);
+}
+.panel .bell { display: none; }
 
 /* ---- 640px and up ---- */
 
@@ -117,4 +138,8 @@
         width: auto;
         margin-top: 0;
     }
+    .inner { gap: var(--space-6); }
+    .panel, .panelOpen { margin-left: auto; }   /* nav group shoves right, pulling bell with it via normal flow */
+    .headerActions { display: none; }
+    .panel .bell { display: inline-flex; }
 }

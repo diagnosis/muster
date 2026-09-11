@@ -1,7 +1,7 @@
 // src/queries.ts
 
 
-import type {Detail, MeResponse, MyOutings, Outing, PendingRequestResponse} from "@/types.ts";
+import type {Detail, MeResponse, MyOutings, NotificationsResponse, Outing, PendingRequestResponse} from "@/types.ts";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import {type QueryClient, useQuery} from "@tanstack/react-query";
 import {redirect} from "@tanstack/react-router";
@@ -109,4 +109,17 @@ export async function requireAuth(queryClient: QueryClient){
 export async function requireGuest(queryClient: QueryClient){
     const me = await queryClient.ensureQueryData(meQueryOptions())
     if (me) throw redirect({to:'/'})
+}
+
+
+export function useNotifications() {
+    return useQuery({
+        queryKey: ['notifications'],
+        queryFn: async () => {
+            const res = await apiClient.get<NotificationsResponse>('/api/notifications')
+            if (res.ok) return res.data
+            throw new ApiRequestError(res.error, res.httpStatus)
+        },
+        refetchInterval: 30_000,   // the polling bridge — "eventually fresh"
+    })
 }
