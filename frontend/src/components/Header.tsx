@@ -5,6 +5,7 @@ import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import styles from  "@/components/Header.module.css"
 import {useEffect, useRef, useState} from "react";
+import {NotificationBell} from "@/components/NotificationBell.tsx";
 
 
 export function Header(){
@@ -54,16 +55,27 @@ export function Header(){
         <header className={styles.nav} ref={headerRef}>
             <div className={styles.inner}>
             <Link className={styles.logo} to={'/'} onClick={()=>setOpen(false)}>Muster</Link>
-                <button
+                {data ? (
+                    <div className={styles.headerActions}>
+                        <span className={styles.mobileBell}><NotificationBell/></span>
+                        <button
+                            aria-label={'Menu'}
+                            className={`${styles.toggle} ${styles.hamburgerBtn}`}
+                            aria-expanded={open} onClick={()=> setOpen(o => !o)}>☰</button>
+                    </div>
+
+                ): <button
                     aria-label={'Menu'}
                     className={`${styles.toggle} ${styles.hamburgerBtn}`}
-                    aria-expanded={open} onClick={()=> setOpen(o => !o)}>☰</button>
+                    aria-expanded={open} onClick={()=> setOpen(o => !o)}>☰</button>}
+
             <div className={`${styles.panel} ${open ? styles.panelOpen : ""}`}>
                 {data ? (
                         <div className={styles.userOutings}>
                             <Link className={styles.navLink} to="/me/outings" onClick={()=> setOpen(false)}>My outings</Link>
                             <Link className={styles.navLink} to="/outings/new" onClick={() => setOpen(false)}>Create outing</Link>
                             <Link className={styles.navLink} onClick={()=>setOpen(false)} to={"/me/profile"}>{data.name}</Link>
+                            <span className={styles.desktopBell}><NotificationBell/></span>
                             <div className={styles.loginSignup}>
                                 <button className={styles.logoutBtn} onClick={ () =>
                                     logout.mutate()
