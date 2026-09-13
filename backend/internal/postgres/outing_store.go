@@ -19,6 +19,36 @@ type OutingStore struct {
 	pool *pgxpool.Pool
 }
 
+// CreateComment add
+func (s *OutingStore) CreateComment(ctx context.Context, c *outing.Comment) error {
+	return apperr.Internal("implement this", "implement this")
+}
+
+// ListComments check
+func (s *OutingStore) ListComments(ctx context.Context, outingID, viewerID uuid.UUID) ([]*outing.CommentView, error) {
+	return nil, apperr.Internal("implement this", "implement this")
+}
+
+// GetComment may
+func (s *OutingStore) GetComment(ctx context.Context, id uuid.UUID) (*outing.Comment, error) {
+	return nil, apperr.Internal("implement this", "implement this")
+}
+
+// SoftDeleteComment some
+func (s *OutingStore) SoftDeleteComment(ctx context.Context, id uuid.UUID) error {
+	return apperr.Internal("implement this", "implement this")
+}
+
+// LikeComment do
+func (s *OutingStore) LikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error {
+	return apperr.Internal("implement this", "implement this")
+}
+
+// UnlikeComment does
+func (s *OutingStore) UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error {
+	return apperr.Internal("implement this", "implement this")
+}
+
 // NewOutingStore returns a store backed by the given pool.
 func NewOutingStore(pool *pgxpool.Pool) *OutingStore {
 	return &OutingStore{pool: pool}

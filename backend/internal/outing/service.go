@@ -36,6 +36,14 @@ type Storage interface {
 
 	Roster(ctx context.Context, outingID uuid.UUID) ([]Member, error)
 	HostMember(ctx context.Context, hikerID uuid.UUID) (*Member, error)
+
+	// comments methods
+	CreateComment(ctx context.Context, c *Comment) error
+	ListComments(ctx context.Context, outingID, viewerID uuid.UUID) ([]*CommentView, error)
+	GetComment(ctx context.Context, id uuid.UUID) (*Comment, error)
+	SoftDeleteComment(ctx context.Context, id uuid.UUID) error
+	LikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error
+	UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error
 }
 
 // Service implements outing business rules over a Storage.
@@ -527,6 +535,62 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 	return detail, nil
 }
 
+// AddComment creates a comment for an outing. Only audiences(roster, host, pending users) can write comments.
+// outing must be open and not yet started. max 2000 chars per comment. comment can have 1 depth max
+func (s *Service) AddComment(ctx context.Context, hikerID, outingID uuid.UUID, body string, parentID *uuid.UUID) (*Comment, error) {
+	o, err := s.store.GetOuting(ctx, outingID)
+	if err != nil {
+		return nil, err
+	}
+	if o.Status == StatusCancelled || o.StartsAt.Before(time.Now()) {
+		return nil, apperr.Conflict("outing has been cancelled or already started", "failed to add comment on cancelled or started outing")
+	}
+
+	audience, err := s.isAudience(ctx, o, hikerID)
+	if err != nil {
+		return nil, err
+	}
+	if !audience {
+		return nil, apperr.Forbidden("only audiences can comment", "only audiences can comment")
+	}
+	v := validator.New()
+	v.Required("body", body)
+	v.MaxLength("body", body, 2000)
+	verr := v.Errors()
+	if verr != nil {
+		return nil, verr
+	}
+	var parent *Comment
+	if parentID != nil {
+		parent, err = s.store.GetComment(ctx, *parentID)
+		if err != nil {
+			return nil, err
+		}
+		if parent.OutingID != o.ID {
+			return nil, apperr.BadRequest("invalid parent comment", "parent comment is not part of this outing")
+		}
+		if parent.ParentID != nil {
+			return nil, apperr.Conflict("cannot reply on reply", "reply to a reply rejected: one level max")
+		}
+		if parent.DeletedAt != nil {
+			return nil, apperr.Conflict("comment was removed", "parent comment was deleted")
+		}
+	}
+	comment := &Comment{
+		ID:        uuid.New(),
+		OutingID:  outingID,
+		HikerID:   hikerID,
+		ParentID:  parentID,
+		Body:      body,
+		CreatedAt: time.Now(),
+	}
+
+	if err = s.store.CreateComment(ctx, comment); err != nil {
+		return nil, err
+	}
+	return comment, nil
+}
+
 // helpers
 
 func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, outing *Outing, kind notification.Kind) {
@@ -555,4 +619,31 @@ func (s *Service) notifyOutingAudience(ctx context.Context, outing *Outing, kind
 			s.notify(ctx, r.HikerID, outing, kind)
 		}
 	}
+}
+
+func (s *Service) isAudience(ctx context.Context, outing *Outing, hikerID uuid.UUID) (bool, error) {
+	if outing.HostID == hikerID {
+		return true, nil
+	}
+	pending, err := s.store.ListJoinRequests(ctx, outing.ID, RequestStatusRequested)
+	if err != nil {
+		return false, err
+	}
+	for _, r := range pending {
+		if r.HikerID == hikerID {
+			return true, nil
+		}
+	}
+	roster, err := s.store.Roster(ctx, outing.ID)
+	if err != nil {
+		return false, err
+	}
+	for _, m := range roster {
+		if m.HikerID == hikerID {
+			return true, nil
+		}
+	}
+
+	return false, nil
+
 }

@@ -9,10 +9,15 @@ import (
 	"github.com/google/uuid"
 )
 
+type likeKey struct {
+	commentID, hikerID uuid.UUID
+}
 type fakeStore struct {
 	outings  map[uuid.UUID]*Outing
 	requests map[uuid.UUID]*JoinRequest
 	hikers   map[uuid.UUID]*Member
+	comments map[uuid.UUID]*Comment
+	likes    map[likeKey]struct{}
 }
 
 func newFakeStore() *fakeStore {
@@ -20,6 +25,8 @@ func newFakeStore() *fakeStore {
 		outings:  map[uuid.UUID]*Outing{},
 		requests: map[uuid.UUID]*JoinRequest{},
 		hikers:   map[uuid.UUID]*Member{},
+		comments: map[uuid.UUID]*Comment{},
+		likes:    map[likeKey]struct{}{},
 	}
 }
 
@@ -210,5 +217,88 @@ func (f *fakeStore) UpdateJoinRequest(ctx context.Context, jr *JoinRequest) erro
 	}
 
 	f.requests[jr.ID] = jr
+	return nil
+}
+
+func (f *fakeStore) CreateComment(ctx context.Context, c *Comment) error {
+	f.comments[c.ID] = c
+	return nil
+}
+
+func (f *fakeStore) ListComments(ctx context.Context, outingID, viewerID uuid.UUID) ([]*CommentView, error) {
+	out := []*CommentView{}
+
+	for _, c := range f.comments {
+		if c.OutingID != outingID {
+			continue
+		}
+		likeCount := 0
+		for k := range f.likes {
+			if k.commentID == c.ID {
+				likeCount++
+			}
+		}
+		_, likeByMe := f.likes[likeKey{commentID: c.ID, hikerID: viewerID}]
+
+		author := ""
+		if m, ok := f.hikers[c.HikerID]; ok {
+			author = m.Name
+		}
+		out = append(out, &CommentView{
+			Comment:    *c,
+			AuthorName: author,
+			LikeCount:  likeCount,
+			LikedByMe:  likeByMe,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
+	return out, nil
+}
+
+// GetComment mirrors the real SELECT: returns the row whether or not it's
+// soft-deleted — the service interprets DeletedAt.
+func (f *fakeStore) GetComment(ctx context.Context, id uuid.UUID) (*Comment, error) {
+	v, ok := f.comments[id]
+	if !ok {
+		return nil, apperr.NotFound("comment not found", "comment not found")
+	}
+	return v, nil
+}
+
+// SoftDeleteComment mirrors UPDATE ... SET deleted_at = now() WHERE id = $1
+// AND deleted_at IS NULL — a missing row is NotFound; an already-deleted
+// row is a tolerated no-op (idempotent delete).
+func (f *fakeStore) SoftDeleteComment(ctx context.Context, id uuid.UUID) error {
+	v, ok := f.comments[id]
+	if !ok {
+		return apperr.NotFound("comment not found", "comment not found")
+	}
+	if v.DeletedAt == nil {
+		now := time.Now()
+		v.DeletedAt = &now
+	}
+	return nil
+}
+
+func (f *fakeStore) LikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error {
+	_, ok := f.comments[commentID]
+	if !ok {
+		return apperr.NotFound("comment not found", "comment not found")
+	}
+	f.likes[likeKey{
+		commentID: commentID,
+		hikerID:   hikerID,
+	}] = struct{}{}
+	return nil
+}
+
+func (f *fakeStore) UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error {
+	_, ok := f.comments[commentID]
+	if !ok {
+		return apperr.NotFound("comment not found", "comment not found")
+	}
+
+	delete(f.likes, likeKey{commentID: commentID, hikerID: hikerID})
+
 	return nil
 }
