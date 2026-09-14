@@ -169,3 +169,246 @@ func Test_AddComment_ReplyOnDeletedParentReturnsConflict(t *testing.T) {
 	_, err = svc.AddComment(context.Background(), memberID, o.ID, "sisme yatakta getirem mi?", &c.ID)
 	wantStatus(t, err, apperr.CodeConflict)
 }
+
+func Test_DeleteComment_DeleteSuccess(t *testing.T) {
+	svc, f, _ := newTestService(t)
+	hostID, hikerID := uuid.New(), uuid.New()
+	o := seedOuting(8, 4, StatusOpen, hostID, f)
+
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "driver", f, 0)
+	seedMember(hikerID, "jane", "beginner", f)
+
+	c, err := svc.AddComment(context.Background(), hikerID, o.ID, "hello, there was a wild fire, not sure if TH is open", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if len(f.comments) != 1 {
+		t.Errorf("expected 1 comment got %d", len(f.comments))
+	}
+
+	if err = svc.DeleteComment(context.Background(), o.ID, c.ID, hikerID); err != nil {
+		t.Fatalf("expected no error bot got %v", err)
+	}
+	if len(f.comments) != 1 {
+		t.Errorf("expected 1 comment got %d", len(f.comments))
+	}
+	if f.comments[c.ID].DeletedAt == nil {
+		t.Errorf("Expected comment sof-deleted, DeletedAt is nil")
+	}
+
+}
+
+func Test_DeleteComment_HostDeletes(t *testing.T) {
+	svc, f, _ := newTestService(t)
+	hostID, hikerID := uuid.New(), uuid.New()
+	o := seedOuting(8, 4, StatusOpen, hostID, f)
+
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "rider", f, 0)
+	seedMember(hikerID, "kelly", "experienced", f)
+
+	c, err := svc.AddComment(context.Background(), hikerID, o.ID, "I will bring some milkshake", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if len(f.comments) != 1 {
+		t.Errorf("expected 1 comment got %d", len(f.comments))
+	}
+	if err = svc.DeleteComment(context.Background(), o.ID, c.ID, hostID); err != nil {
+		t.Fatalf("expected no error bot got %v", err)
+	}
+	if len(f.comments) != 1 {
+		t.Errorf("expected 1 comment got %d", len(f.comments))
+	}
+	if f.comments[c.ID].DeletedAt == nil {
+		t.Errorf("Expected comment sof-deleted, DeletedAt is nil")
+	}
+}
+
+func Test_DeleteComment_StrangerTriesToDelete(t *testing.T) {
+	svc, f, _ := newTestService(t)
+	hostID, hikerID, stranger := uuid.New(), uuid.New(), uuid.New()
+	o := seedOuting(8, 4, StatusOpen, hostID, f)
+
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "rider", f, 0)
+	seedMember(hikerID, "john", "experienced", f)
+
+	cHiker, err := svc.AddComment(context.Background(), hikerID, o.ID, "Too many goats will be there", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	cHost, err := svc.AddComment(context.Background(), hostID, o.ID, "wild coyotes as well", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	err = svc.DeleteComment(context.Background(), o.ID, cHiker.ID, stranger)
+	wantStatus(t, err, apperr.CodeForbidden)
+	err = svc.DeleteComment(context.Background(), o.ID, cHost.ID, stranger)
+	wantStatus(t, err, apperr.CodeForbidden)
+}
+
+func Test_DeleteComment_DeletingParentKeepsReplies(t *testing.T) {
+	svc, f, _ := newTestService(t)
+	hostID, driverID, riderID := uuid.New(), uuid.New(), uuid.New()
+	o := seedOuting(10, 4, StatusOpen, hostID, f)
+	_ = seedJoinRequest(o.ID, driverID, RequestStatusRequested, "driver", f, 2)
+	_ = seedJoinRequest(o.ID, riderID, RequestStatusAccepted, "rider", f, 0)
+	seedMember(riderID, "hazer", "beginner", f)
+
+	cd, err := svc.AddComment(context.Background(), driverID, o.ID, "I can drive", nil)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	cr, err := svc.AddComment(context.Background(), riderID, o.ID, "can you pick me up from ikea?", &cd.ID)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	err = svc.DeleteComment(context.Background(), o.ID, cd.ID, driverID)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if cd.DeletedAt == nil {
+		t.Error("parent should be soft-deleted")
+	}
+	if cr.DeletedAt != nil {
+		t.Errorf("expected child is not deleted but deletedAt was updated")
+	}
+
+}
+
+func Test_LikeAndUnlikeComment_LikeSuccess(t *testing.T) {
+	svc, f, _ := newTestService(t)
+	hostID, hikerID := uuid.New(), uuid.New()
+	o := seedOuting(8, 4, StatusOpen, hostID, f)
+
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "driver", f, 0)
+	seedMember(hikerID, "mane", "beginner", f)
+
+	c, err := svc.AddComment(context.Background(), hikerID, o.ID, "bring water.", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if len(f.comments) != 1 {
+		t.Errorf("expected 1 comment got %d", len(f.comments))
+	}
+
+	if err = svc.LikeComment(context.Background(), c.ID, hikerID); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.likes) != 1 {
+		t.Fatalf("expected likes count 1 but got %d", len(f.likes))
+	}
+	_, ok := f.likes[likeKey{
+		commentID: c.ID,
+		hikerID:   hikerID,
+	}]
+	if !ok {
+		t.Errorf("expected liked got nothing")
+	}
+
+}
+func Test_LikeAndUnlikeComment_UnLikeSuccess(t *testing.T) {
+	svc, f, _ := newTestService(t)
+	hostID, hikerID := uuid.New(), uuid.New()
+	o := seedOuting(5, 4, StatusOpen, hostID, f)
+
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "rider", f, 0)
+	seedMember(hikerID, "sane", "experienced", f)
+
+	c, err := svc.AddComment(context.Background(), hikerID, o.ID, "diesel 7.60 lol :) ", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if len(f.comments) != 1 {
+		t.Errorf("expected 1 comment got %d", len(f.comments))
+	}
+
+	if err = svc.LikeComment(context.Background(), c.ID, hikerID); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.likes) != 1 {
+		t.Fatalf("expected likes count 1 but got %d", len(f.likes))
+	}
+	if err = svc.UnlikeComment(context.Background(), c.ID, hikerID); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.likes) != 0 {
+		t.Fatalf("expected 0 like got %d", len(f.likes))
+	}
+
+}
+
+func Test_LikeAndUnlikeComment_LikeADeletedCommentReturnsConflict(t *testing.T) {
+	svc, f, _ := newTestService(t)
+	hostID, hikerID := uuid.New(), uuid.New()
+	o := seedOuting(8, 4, StatusOpen, hostID, f)
+
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "driver", f, 0)
+	seedMember(hikerID, "mane", "beginner", f)
+
+	c, err := svc.AddComment(context.Background(), hikerID, o.ID, "bring water.", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if len(f.comments) != 1 {
+		t.Errorf("expected 1 comment got %d", len(f.comments))
+	}
+	dTime := time.Now().Add(-14 * time.Second)
+	c.DeletedAt = &dTime
+	err = svc.LikeComment(context.Background(), c.ID, hikerID)
+	wantStatus(t, err, apperr.CodeConflict)
+}
+
+func Test_LikeAndUnlikeComment_LikeByAStrangerForbidden(t *testing.T) {
+	svc, f, _ := newTestService(t)
+	hostID, hikerID, stranger := uuid.New(), uuid.New(), uuid.New()
+	o := seedOuting(8, 4, StatusOpen, hostID, f)
+
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "driver", f, 0)
+	seedMember(hikerID, "mane", "beginner", f)
+
+	c, err := svc.AddComment(context.Background(), hikerID, o.ID, "bring water.", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if len(f.comments) != 1 {
+		t.Errorf("expected 1 comment got %d", len(f.comments))
+	}
+
+	err = svc.LikeComment(context.Background(), c.ID, stranger)
+	wantStatus(t, err, apperr.CodeForbidden)
+}
+
+func Test_LikeAndUnlikeComment_DoubleLike(t *testing.T) {
+	svc, f, _ := newTestService(t)
+	hostID, hikerID := uuid.New(), uuid.New()
+	o := seedOuting(8, 4, StatusOpen, hostID, f)
+
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "driver", f, 0)
+	seedMember(hikerID, "mane", "beginner", f)
+
+	c, err := svc.AddComment(context.Background(), hikerID, o.ID, "bring water.", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if len(f.comments) != 1 {
+		t.Errorf("expected 1 comment got %d", len(f.comments))
+	}
+
+	if err = svc.LikeComment(context.Background(), c.ID, hikerID); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if err = svc.LikeComment(context.Background(), c.ID, hikerID); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.likes) != 1 {
+		t.Fatalf("expected likes count 1 but got %d", len(f.likes))
+	}
+	_, ok := f.likes[likeKey{
+		commentID: c.ID,
+		hikerID:   hikerID,
+	}]
+	if !ok {
+		t.Errorf("expected liked got nothing")
+	}
+
+}

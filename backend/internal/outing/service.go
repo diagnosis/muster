@@ -591,6 +591,85 @@ func (s *Service) AddComment(ctx context.Context, hikerID, outingID uuid.UUID, b
 	return comment, nil
 }
 
+// DeleteComment marks deleted_at. Only owner or host can delete a comment. deleted_at must be nil.
+// cancelled or passed outing comments can be deleted.
+func (s *Service) DeleteComment(ctx context.Context, outingID, commentID, hikerID uuid.UUID) error {
+	o, err := s.store.GetOuting(ctx, outingID)
+	if err != nil {
+		return err
+	}
+	c, err := s.store.GetComment(ctx, commentID)
+	if err != nil {
+		return err
+	}
+	if c.OutingID != outingID {
+		return apperr.Conflict("comment does not belong to this outing", "cannot delete comment from different outing")
+	}
+	if c.HikerID != hikerID && hikerID != o.HostID {
+		return apperr.Forbidden("only outing host or owner can delete", "stranger cannot delete the comment")
+	}
+	if err = s.store.SoftDeleteComment(ctx, commentID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// LikeComment increases like count. Soft deleted comment cannot be liked.
+// Comments of passed and cancelled events can be liked.
+// Only Audiences can like. (roster, host, pending)
+func (s *Service) LikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error {
+	c, err := s.store.GetComment(ctx, commentID)
+	if err != nil {
+		return err
+	}
+	if c.DeletedAt != nil {
+		return apperr.Conflict("comment was deleted.", "failed to like deleted comment")
+	}
+
+	o, err := s.store.GetOuting(ctx, c.OutingID)
+	if err != nil {
+		return err
+	}
+
+	audience, err := s.isAudience(ctx, o, hikerID)
+	if err != nil {
+		return err
+	}
+	if !audience {
+		return apperr.Forbidden("only audiences can like", "only audiences can like")
+	}
+	if err = s.store.LikeComment(ctx, commentID, hikerID); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UnlikeComment decreases like count. Also need to check if audience
+func (s *Service) UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error {
+	c, err := s.store.GetComment(ctx, commentID)
+	if err != nil {
+		return err
+	}
+	o, err := s.store.GetOuting(ctx, c.OutingID)
+	if err != nil {
+		return err
+	}
+	audience, err := s.isAudience(ctx, o, hikerID)
+	if err != nil {
+		return err
+	}
+	if !audience {
+		return apperr.Forbidden("only audiences can like", "only audiences can like")
+	}
+
+	if err = s.store.UnlikeComment(ctx, commentID, hikerID); err != nil {
+		return err
+	}
+	return nil
+
+}
+
 // helpers
 
 func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, outing *Outing, kind notification.Kind) {
