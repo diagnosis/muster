@@ -19,34 +19,99 @@ type OutingStore struct {
 	pool *pgxpool.Pool
 }
 
-// CreateComment add
+// CreateComment inserts comment into comments table.
 func (s *OutingStore) CreateComment(ctx context.Context, c *outing.Comment) error {
-	return apperr.Internal("implement this", "implement this")
+	q := `
+		INSERT INTO comments(id, outing_id, hiker_id, parent_id, body, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		`
+	if _, err := s.pool.Exec(ctx, q, c.ID, c.OutingID, c.HikerID, c.ParentID, c.Body, c.CreatedAt); err != nil {
+		return apperr.Database("failed to create comment", "inserting comment failed", err)
+	}
+	return nil
 }
 
-// ListComments check
+// ListComments lists all comments for outing and displays like count along with if viewer likes them.
 func (s *OutingStore) ListComments(ctx context.Context, outingID, viewerID uuid.UUID) ([]*outing.CommentView, error) {
-	return nil, apperr.Internal("implement this", "implement this")
+	q := `
+		SELECT c.id, c.outing_id, c.hiker_id, c.parent_id, c.body, c.created_at, c.deleted_at,
+		       h.name AS author_name,
+		       (SELECT count(*) FROM comment_likes l WHERE l.comment_id = c.id) AS like_count,
+		       EXISTS(SELECT 1 FROM comment_likes l WHERE l.comment_id = c.id AND l.hiker_id = $2) AS liked_by_me   
+		FROM comments c
+		JOIN hikers h ON h.id = c.hiker_id
+		WHERE c.outing_id = $1
+		ORDER BY c.created_at
+`
+	commentViews := []*outing.CommentView{}
+	rows, err := s.pool.Query(ctx, q, outingID, viewerID)
+	if err != nil {
+		return nil, apperr.Database("failed to list comments", "select comments failed", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		cv := &outing.CommentView{}
+		if err = rows.Scan(&cv.ID, &cv.OutingID, &cv.HikerID, &cv.ParentID,
+			&cv.Body, &cv.CreatedAt, &cv.DeletedAt, &cv.AuthorName, &cv.LikeCount, &cv.LikedByMe); err != nil {
+			return nil, apperr.Database("failed to list comments", "scan comment failed", err)
+		}
+		commentViews = append(commentViews, cv)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, apperr.Database("failed to list comments", "iterate comments failed", err)
+	}
+
+	return commentViews, nil
 }
 
-// GetComment may
+// GetComment returns *outing.Comment by id.
 func (s *OutingStore) GetComment(ctx context.Context, id uuid.UUID) (*outing.Comment, error) {
-	return nil, apperr.Internal("implement this", "implement this")
+	q := `
+		SELECT id, outing_id, hiker_id, parent_id, body, created_at, deleted_at
+		FROM comments WHERE id = $1
+`
+	c := &outing.Comment{}
+	if err := s.pool.QueryRow(ctx, q, id).Scan(&c.ID, &c.OutingID, &c.HikerID,
+		&c.ParentID, &c.Body, &c.CreatedAt, &c.DeletedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperr.NotFound("comment not found", "no row for id")
+		}
+		return nil, apperr.Database("could not fetch comment", "failed to scan comment", err)
+	}
+	return c, nil
 }
 
-// SoftDeleteComment some
+// SoftDeleteComment marks deleted_at.
 func (s *OutingStore) SoftDeleteComment(ctx context.Context, id uuid.UUID) error {
-	return apperr.Internal("implement this", "implement this")
+	q := `UPDATE comments SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL`
+	_, err := s.pool.Exec(ctx, q, id)
+	if err != nil {
+		return apperr.Database("failed delete comment", "failed to soft delete comment", err)
+	}
+	return nil
 }
 
-// LikeComment do
+// LikeComment inserts like into comment_likes
 func (s *OutingStore) LikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error {
-	return apperr.Internal("implement this", "implement this")
+	q := `
+		INSERT INTO comment_likes (comment_id, hiker_id)
+		VALUES($1, $2) ON CONFLICT (comment_id, hiker_id) DO NOTHING
+`
+	if _, err := s.pool.Exec(ctx, q, commentID, hikerID); err != nil {
+		return apperr.Database("failed to like comment", "failed to scan like", err)
+	}
+	return nil
 }
 
-// UnlikeComment does
+// UnlikeComment removes like from db.
 func (s *OutingStore) UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error {
-	return apperr.Internal("implement this", "implement this")
+	q := `DELETE FROM comment_likes WHERE comment_id = $1 AND hiker_id = $2`
+	_, err := s.pool.Exec(ctx, q, commentID, hikerID)
+	if err != nil {
+		return apperr.Database("failed to unlike comment", "failed to delete like-comment", err)
+	}
+	return nil
 }
 
 // NewOutingStore returns a store backed by the given pool.

@@ -412,3 +412,71 @@ func Test_LikeAndUnlikeComment_DoubleLike(t *testing.T) {
 	}
 
 }
+
+func Test_Comment_ListComments_Success(t *testing.T) {
+	svc, f, _ := newTestService(t)
+	hostID, hikerID := uuid.New(), uuid.New()
+	o := seedOuting(8, 4, StatusOpen, hostID, f)
+
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "rider", f, 0)
+	seedMember(hikerID, "john", "experienced", f)
+
+	_, err := svc.AddComment(context.Background(), hikerID, o.ID, "Too many goats will be there", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	cHost, err := svc.AddComment(context.Background(), hostID, o.ID, "wild coyotes as well", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	err = svc.LikeComment(context.Background(), cHost.ID, hikerID)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	cvs, err := svc.ListComments(context.Background(), o.ID, hikerID)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if len(f.comments) != 2 {
+		t.Errorf("expected 2 comments got %d", len(f.comments))
+	}
+
+	for _, cv := range cvs {
+		if cv.ID == cHost.ID {
+			if !cv.LikedByMe {
+				t.Errorf("expected true got false")
+			}
+			if cv.LikeCount != 1 {
+				t.Errorf("expected like count 1 got %d", cv.LikeCount)
+			}
+		} else {
+			if cv.LikedByMe {
+				t.Errorf("expected false got true")
+			}
+			if cv.LikeCount != 0 {
+				t.Errorf("Expected like count 1 got %d", cv.LikeCount)
+			}
+		}
+	}
+
+}
+
+func Test_Comment_ListComments_Stranger(t *testing.T) {
+	svc, f, _ := newTestService(t)
+	hostID, hikerID, stranger := uuid.New(), uuid.New(), uuid.New()
+	o := seedOuting(8, 4, StatusOpen, hostID, f)
+
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "driver", f, 0)
+	seedMember(hikerID, "mane", "beginner", f)
+
+	_, err := svc.AddComment(context.Background(), hikerID, o.ID, "bring water.", nil)
+	if err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+	if len(f.comments) != 1 {
+		t.Errorf("expected 1 comment got %d", len(f.comments))
+	}
+
+	_, err = svc.ListComments(context.Background(), o.ID, stranger)
+	wantStatus(t, err, apperr.CodeForbidden)
+}

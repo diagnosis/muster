@@ -670,6 +670,26 @@ func (s *Service) UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUI
 
 }
 
+// ListComments lists CommentView for outing. Only authed users can view.
+func (s *Service) ListComments(ctx context.Context, outingID, hikerID uuid.UUID) ([]*CommentView, error) {
+	o, err := s.store.GetOuting(ctx, outingID)
+	if err != nil {
+		return nil, err
+	}
+	audience, err := s.isAudience(ctx, o, hikerID)
+	if err != nil {
+		return nil, err
+	}
+	if !audience {
+		return nil, apperr.Forbidden("only outing members can view comments", "non-audience list rejected")
+	}
+	cvs, err := s.store.ListComments(ctx, outingID, hikerID)
+	if err != nil {
+		return nil, err
+	}
+	return cvs, nil
+}
+
 // helpers
 
 func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, outing *Outing, kind notification.Kind) {
