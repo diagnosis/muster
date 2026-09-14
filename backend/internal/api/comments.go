@@ -73,9 +73,7 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responder.JSON(w, http.StatusCreated, map[string]any{
-		"comment": c,
-	}, correlationID)
+	responder.JSON(w, http.StatusCreated, c, correlationID)
 
 }
 

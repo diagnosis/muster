@@ -139,6 +139,32 @@ export interface Event{
     read_at:  string|null
 }
 
+export interface Comment{
+    id: string
+    outing_id: string
+    hiker_id: string
+    parent_id: string|null
+    body: string
+    created_at: string
+    deleted_at: string|null
+}
+
+export interface CommentView{
+    id: string
+    outing_id: string
+    hiker_id: string
+    parent_id: string|null
+    body: string
+    created_at: string
+    deleted_at: string|null
+    author_name:string
+    like_count: number
+    liked_by_me:boolean
+}
+export interface ListCommentResponse{
+    comments:CommentView[]
+}
+
 
 export const CODE_EMAIL_NOT_VERIFIED = "email_not_verified"
 

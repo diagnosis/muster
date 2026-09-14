@@ -82,3 +82,15 @@ export const readNotification = (ctx: APIRequestContext, id: string) =>
 
 export const readAllNotifications = (ctx: APIRequestContext) =>
     ctx.post('/api/notifications/read-all')
+
+export const listComments = (ctx:APIRequestContext, outingID:string) =>
+    ctx.get(`/api/outings/${outingID}/comments`)
+export const addComment = (ctx: APIRequestContext, outingID:string, input:{body:string, parent_id:string|null}) =>
+    ctx.post(`/api/outings/${outingID}/comments`, {data:input})
+export const deleteComment = (ctx:APIRequestContext, outingID:string, commentID:string) => {
+    ctx.delete(`/api/outings/${outingID}/comments/${commentID}`)
+}
+export const likeComment = (ctx:APIRequestContext, outingID:string, commentID:string)=>
+    ctx.post(`/api/outings/${outingID}/comments/${commentID}/like`)
+export const unlikeComment = (ctx:APIRequestContext, outingID:string, commentID:string) =>
+    ctx.delete(`/api/outings/${outingID}/comments/${commentID}/like`)
