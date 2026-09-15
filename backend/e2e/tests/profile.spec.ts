@@ -21,7 +21,7 @@ test.describe("profile", ()=>{
     });
 
     test('anonymous hiker card serves id/name/experience, no email', async () => {
-        const { ctx: ctxHost } = await asUser(BASE);
+        const { ctx: ctxHost, user } = await asUser(BASE);
         const outing = await unwrap<OutingResponse>(createOuting(ctxHost), 201)
 
         const ctxAnon = await request.newContext({ baseURL: BASE });
@@ -29,7 +29,7 @@ test.describe("profile", ()=>{
         const card = await unwrap<MemberCard>(getHiker(ctxAnon, outing.host_id), 200)
 
         expect(card.id).toBe(outing.host_id);
-        expect(card.name).toBe('Test User');
+        expect(card.name).toBe(user.name);
         expect(card.experience).toBe('beginner');
         expect(card.email).toBeUndefined();       // the privacy assertion — the test's point
     });

@@ -32,6 +32,7 @@ type CommentLike struct {
 // like data and the author's display name, joined at read time.
 type CommentView struct {
 	Comment
+	Deleted    bool   `json:"deleted"`
 	AuthorName string `json:"author_name"`
 	LikeCount  int    `json:"like_count"`
 	LikedByMe  bool   `json:"liked_by_me"`

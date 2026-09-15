@@ -34,10 +34,12 @@ func (s *OutingStore) CreateComment(ctx context.Context, c *outing.Comment) erro
 // ListComments lists all comments for outing and displays like count along with if viewer likes them.
 func (s *OutingStore) ListComments(ctx context.Context, outingID, viewerID uuid.UUID) ([]*outing.CommentView, error) {
 	q := `
-		SELECT c.id, c.outing_id, c.hiker_id, c.parent_id, c.body, c.created_at, c.deleted_at,
-		       h.name AS author_name,
-		       (SELECT count(*) FROM comment_likes l WHERE l.comment_id = c.id) AS like_count,
-		       EXISTS(SELECT 1 FROM comment_likes l WHERE l.comment_id = c.id AND l.hiker_id = $2) AS liked_by_me   
+		SELECT c.id, c.outing_id, c.hiker_id, c.parent_id,
+       		CASE WHEN c.deleted_at IS NULL THEN c.body ELSE '' END AS body,
+       		c.created_at, c.deleted_at,
+       		h.name AS author_name,
+       		(SELECT count(*) FROM comment_likes l WHERE l.comment_id = c.id) AS like_count,
+       		EXISTS(SELECT 1 FROM comment_likes l WHERE l.comment_id = c.id AND l.hiker_id = $2) AS liked_by_me
 		FROM comments c
 		JOIN hikers h ON h.id = c.hiker_id
 		WHERE c.outing_id = $1
@@ -55,6 +57,7 @@ func (s *OutingStore) ListComments(ctx context.Context, outingID, viewerID uuid.
 			&cv.Body, &cv.CreatedAt, &cv.DeletedAt, &cv.AuthorName, &cv.LikeCount, &cv.LikedByMe); err != nil {
 			return nil, apperr.Database("failed to list comments", "scan comment failed", err)
 		}
+		cv.Deleted = cv.DeletedAt != nil
 		commentViews = append(commentViews, cv)
 	}
 
