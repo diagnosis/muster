@@ -10,6 +10,7 @@ import styles from "@/routes/outings.$id.module.css"
 import formStyles from "@/routes/form.module.css"
 import {Badges} from "@/components/Badges.tsx";
 import {Modal} from "@/components/Modal.tsx";
+import {Comments} from "@/components/Comments.tsx";
 
 
 export const Route = createFileRoute('/outings/$id')({
@@ -123,7 +124,12 @@ export function OutingDetailPage() {
 
     const effectiveCap = Math.min(detail.seat_capacity, detail.outing.max_size)
     const isFull = detail.people_count >= detail.outing.max_size
-
+    const canSeeComments = !!me && (
+        me.id === detail.outing.host_id ||
+            detail.my_request?.status === 'accepted' ||
+            detail.my_request?.status === 'requested'
+    )
+    const isReadOnly = detail.outing.status === 'cancelled' || new Date(detail.outing.starts_at) < new Date()
 
     return <>
         <div className={styles.container}>
@@ -174,7 +180,9 @@ export function OutingDetailPage() {
                 <h2 className={styles.subheading}>Notes</h2>
                 {detail.outing.notes && <p>{detail.outing.notes}</p>}
             </section>}
-
+            {canSeeComments&&(
+                <Comments outingId={id} hostId={detail.outing.host_id} readOnly={isReadOnly}/>
+            )}
         </div>
     </>
 }
