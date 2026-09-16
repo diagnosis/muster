@@ -1,10 +1,13 @@
 // src/components/Comments.tsx
 
-import {useAddComment, useLikeComment, useListComments, useUnlikeComment} from "@/queries/comment.ts";
+import {useAddComment, useDeleteComment, useLikeComment, useListComments, useUnlikeComment} from "@/queries/comment.ts";
 import {relativeTime} from "@/utils/date.ts";
 import type {CommentView} from "@/types.ts";
 import styles from '@/components/Comments.module.css'
 import {useState} from "react";
+import {useMeQuery} from "@/queries.ts";
+import {Modal} from "@/components/Modal.tsx";
+import {COMMENT_REMOVED} from "@/lib/copy.ts";
 
 interface CommentsProp{
     outingId: string
@@ -23,14 +26,16 @@ export function Comments({outingId, hostId, readOnly}:CommentsProp){
         <section className={styles.section}>
             <h2 className={"subheading"}>Discussion</h2>
             <div className={styles.thread}>
-            {topLevel.map(c => (
+                {topLevel.length===0&&
+                    <p className={styles.meta}>No comments yet - start the conversation.</p>}
+            {topLevel.length >0 && topLevel.map(c => (
                 <div key={c.id}>
-                    <CommentRow c={c} outingId={outingId} onReply={() => setReplyingTo(c.id)} />
+                    <CommentRow c={c} outingId={outingId} hostId={hostId} onReply={() => setReplyingTo(c.id)} />
                     {replyingTo === c.id && (
                         <CommentForm outingID={outingId} parentID={c.id} onDone={() => setReplyingTo(null)} />
                     )}
                     <div className={styles.replies}>
-                        {repliesOf(c.id).map(rc => <CommentRow key={rc.id} c={rc} outingId={outingId} />)}
+                        {repliesOf(c.id).map(rc => <CommentRow key={rc.id} c={rc} outingId={outingId} hostId={hostId}/>)}
                     </div>
                 </div>
             ))}
@@ -40,31 +45,50 @@ export function Comments({outingId, hostId, readOnly}:CommentsProp){
     )
 }
 
-function CommentRow({ c, outingId, onReply }: { c: CommentView; outingId: string, onReply?: ()=>void}) {
+function CommentRow({ c, outingId, hostId, onReply }: { c: CommentView; outingId: string, hostId:string, onReply?: ()=>void}) {
+    const [currentComment, setCurrentComment] = useState<CommentView|null>(null)
+    const {data:me} = useMeQuery()
     const like = useLikeComment(outingId)
     const unlike = useUnlikeComment(outingId)
     const toggle = () => c.liked_by_me ? unlike.mutate(c.id) : like.mutate(c.id)
     const busy = like.isPending || unlike.isPending
     const likeErr = like.error || unlike.error
     const isError = like.isError || unlike.isError
+
+    const del = useDeleteComment(outingId)
+
+    const canDelete = me?.id === c.hiker_id || me?.id === hostId
     return (
-        <div className={styles.row}>
+        <article className={styles.row}>
             <div className={styles.meta}>
                 <span className={styles.author}>{c.author_name}</span> · <time>{relativeTime(c.created_at)}</time>
             </div>
             <p className={c.deleted ? `${styles.body} ${styles.stub}` : styles.body}>
-                {c.deleted ? '[comment removed]' : c.body}
+                {c.deleted ? COMMENT_REMOVED : c.body}
             </p>
             {!c.deleted && (
                 <div className={styles.actions}>
-                    <button className={`${styles.actionBtn} ${c.liked_by_me ? styles.liked : ''}`} disabled={busy} onClick={toggle}>
+                    <button aria-label={"Like"}
+                        className={`${styles.actionBtn} ${c.liked_by_me ? styles.liked : ''}`} aria-pressed={c.liked_by_me} disabled={busy} onClick={toggle}>
                         ♥ {c.like_count}
                     </button>
                     {onReply && <button type="button" className={styles.actionBtn} onClick={onReply}>Reply</button>}
                     {isError && <span className={styles.meta}>{likeErr?.message}</span>}
+                    {canDelete&&<button className={styles.actionBtn} onClick={()=>{setCurrentComment(c)}}>Delete</button>}
                 </div>
             )}
-        </div>
+            {currentComment&&<Modal title={'Delete this comment? Replies will stay.'} onClose={()=>setCurrentComment(null)}>
+                <div>
+                    <div className={styles.actions}>
+                        <button className="btn btn-danger" disabled={del.isPending} onClick={() => del.mutate(currentComment.id, {
+                            onSuccess: () => setCurrentComment(null)
+                        })}>Yes</button>
+                        <button className={"btn btn-quite"} onClick={() => setCurrentComment(null)}>Never mind</button>
+                    </div>
+                    {del.isError&&<p className={"error"}>{del.error.message}</p>}
+                </div>
+            </Modal>}
+        </article>
     )
 }
 
@@ -84,7 +108,7 @@ function CommentForm({outingID,parentID, onDone}:{outingID:string, parentID:stri
             >
             </textarea>
             <div className={styles.formRow}>
-                <button className={"btn btn-primary"} type='submit' disabled={add.isPending||!body.trim()}>{`${parentID?'Reply':'Post'}`}</button>
+                <button className={"btn btn-primary"} type='submit' disabled={add.isPending||!body.trim()}>{`${parentID?'Post reply':'Post'}`}</button>
             </div>
             {add.isError && <p className={"error"}>{add.error.message}</p>}
         </form>

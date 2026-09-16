@@ -30,6 +30,10 @@ button:hover,
     border-color: var(--color-danger);
     color:var(--color-danger);
 }
+.btn-quite{
+    background: transparent;
+    color: var(--color-text);
+}
 
 /* Disabled sits on the page surface behind a dashed edge, so it reads as
    "waiting on you" rather than as a faded-out colour. Must stay below the

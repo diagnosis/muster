@@ -42,3 +42,5 @@ export const RESEND_RESPONSE = 'If email provided matches our record, you will r
 
 export const RESET_EMAIL_TEXT = 'If email provided matches our record, you will receive a password reset email shortly.'
 export const PASS_CHANGE_SUCCESS = 'Password was changed successfully!'
+
+export const COMMENT_REMOVED = '[comment removed]'
