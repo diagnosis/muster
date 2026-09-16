@@ -1,0 +1,50 @@
+.section {
+}
+
+.thread {
+    display: flex;
+    flex-direction: column; gap: var(--space-6);
+}
+
+.row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+/* author · time — quiet meta line */
+.meta {
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+.author { font-weight: 600; color: var(--color-text); }
+
+.body { margin: 0; line-height: 1.5; }
+.stub { color: var(--color-text-muted); font-style: italic; }   /* [comment removed] */
+
+/* replies: indent + hairline — the nesting made visible */
+.replies {
+    margin-left: var(--space-6);
+    padding-left: var(--space-3);
+    border-left: 2px solid var(--border-subtle);
+    display: flex; flex-direction: column; gap: var(--space-3);
+}
+
+/* actions in a row, quiet buttons */
+.actions { display: flex; align-items: center; gap: var(--space-3); }
+.actionBtn {
+    background: none; border: 0; padding: 2px 4px;
+    font-size: 13px; color: var(--color-text-muted); cursor: pointer;
+    border-radius: var(--radius-control);
+}
+.actionBtn:hover { background: var(--surface-sunken); color: var(--color-text); }
+.liked { color: var(--color-primary); }   /* the one accent — a liked heart goes teal */
+
+/* form */
+.form { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+.textarea {
+    width: 100%; min-height: 72px; padding: var(--space-3);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-control);
+    background: var(--surface-raised); font: inherit; resize: vertical;
+}
+.formRow { display: flex; justify-content: flex-end; gap: var(--space-2); }

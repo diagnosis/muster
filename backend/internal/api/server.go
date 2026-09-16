@@ -78,6 +78,13 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/notifications/{id}/read", requireAuth(http.HandlerFunc(s.handleReadNotification)))
 	mux.Handle("POST /api/notifications/read-all", requireAuth(http.HandlerFunc(s.handleReadAllNotifications)))
 
+	// protected comments routes
+	mux.Handle("GET /api/outings/{id}/comments", requireAuth(http.HandlerFunc(s.handleListCommentViews)))
+	mux.Handle("POST /api/outings/{id}/comments", requireAuth(http.HandlerFunc(s.handleAddComment)))
+	mux.Handle("DELETE /api/outings/{id}/comments/{cid}", requireAuth(http.HandlerFunc(s.handleSoftDeleteComment)))
+	mux.Handle("POST /api/outings/{id}/comments/{cid}/like", requireAuth(http.HandlerFunc(s.handleLikeComment)))
+	mux.Handle("DELETE /api/outings/{id}/comments/{cid}/like", requireAuth(http.HandlerFunc(s.handleUnlikeComment)))
+
 	// hikers public routes
 	mux.HandleFunc("GET /api/hikers/{id}", s.handleGetHiker)
 

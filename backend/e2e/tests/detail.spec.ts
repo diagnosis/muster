@@ -6,8 +6,8 @@ import {unwrap} from "../envelope";
 
 test.describe("detail", ()=>{
     test("anonymous full assembly", async () =>{
-        const {ctx: ctxHost} = await asUser(BASE)
-        const outing = await unwrap<OutingResponse>(createOuting(ctxHost), 201)
+        const {ctx: ctxHost, user:host} = await asUser(BASE)
+        const outing = await unwrap<OutingResponse>(createOuting(ctxHost, {host_seats:2}), 201)
         const {ctx: ctxRider} = await asUser(BASE)
         const joinRequest = await unwrap<JoinRequestResponse>(requestJoin(ctxRider, outing.id), 201)
 
@@ -19,7 +19,7 @@ test.describe("detail", ()=>{
 
 
         expect(detail.roster.length).toBe(1)
-        expect(detail.host.name).toBe('Test User')
+        expect(detail.host.name).toBe(host.name)
         expect(detail.seat_capacity).toBe(2)
         expect(detail.people_count).toBe(2)
         expect(detail.seats_short).toBe(0)

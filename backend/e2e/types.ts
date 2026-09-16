@@ -16,6 +16,20 @@ export interface ApiErrorBody{
     }
 }
 
+export type Difficulty = 'easy' | 'moderate' | 'hard'
+export type Pace = 'relaxed' | 'moderate' | 'fast'
+export interface CreateOutingInput{
+    title: string
+    destination: string
+    meet_label: string
+    starts_at: string
+    max_size: number
+    host_seats: number
+    cost_per_seat_cents: number
+    difficulty: Difficulty
+    pace: Pace
+    notes?: string
+}
 export interface OutingResponse {
     id: string
     host_id: string
@@ -137,6 +151,33 @@ export interface Event{
     payload: {outing_id:string,outing_title:string}
     created_at: string
     read_at:  string|null
+}
+
+export interface Comment{
+    id: string
+    outing_id: string
+    hiker_id: string
+    parent_id: string|null
+    body: string
+    created_at: string
+    deleted_at: string|null
+}
+
+export interface CommentView{
+    id: string
+    outing_id: string
+    hiker_id: string
+    parent_id: string|null
+    body: string
+    created_at: string
+    deleted_at: string|null
+    deleted: boolean|null
+    author_name:string
+    like_count: number
+    liked_by_me:boolean
+}
+export interface ListCommentResponse{
+    comments:CommentView[]
 }
 
 
