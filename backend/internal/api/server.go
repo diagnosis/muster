@@ -10,6 +10,7 @@ import (
 	"github.com/diagnosis/go-toolkit/v3/responder"
 	"github.com/diagnosis/go-toolkit/v3/secure"
 	"github.com/diagnosis/muster/internal/config"
+	"github.com/diagnosis/muster/internal/events"
 	"github.com/diagnosis/muster/internal/hiker"
 	"github.com/diagnosis/muster/internal/notification"
 	"github.com/diagnosis/muster/internal/outing"
@@ -23,16 +24,18 @@ type Server struct {
 	cfg           *config.Config
 	outings       *outing.Service
 	notifications notification.Storage
+	hub           *events.Hub
 }
 
 // NewServer returns a Server serving the given services.
-func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner, outings *outing.Service, notifications notification.Storage) *Server {
+func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner, outings *outing.Service, notifications notification.Storage, hub *events.Hub) *Server {
 	return &Server{
 		hikers:        hikers,
 		jwt:           jwt,
 		cfg:           cfg,
 		outings:       outings,
 		notifications: notifications,
+		hub:           hub,
 	}
 }
 
@@ -84,6 +87,9 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("DELETE /api/outings/{id}/comments/{cid}", requireAuth(http.HandlerFunc(s.handleSoftDeleteComment)))
 	mux.Handle("POST /api/outings/{id}/comments/{cid}/like", requireAuth(http.HandlerFunc(s.handleLikeComment)))
 	mux.Handle("DELETE /api/outings/{id}/comments/{cid}/like", requireAuth(http.HandlerFunc(s.handleUnlikeComment)))
+
+	// protected events
+	mux.Handle("GET /api/events", requireAuth(http.HandlerFunc(s.handleEvents)))
 
 	// hikers public routes
 	mux.HandleFunc("GET /api/hikers/{id}", s.handleGetHiker)

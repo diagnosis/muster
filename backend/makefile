@@ -17,7 +17,7 @@ build:
 
 # run all tests
 test:
-	go test ./...
+	go test ./... -race
 
 # the full pre-commit gate
 check: fmt lint build test
