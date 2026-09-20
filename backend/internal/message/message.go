@@ -43,3 +43,13 @@ type Conversation struct {
 	DmDeclinedBy *uuid.UUID `json:"dm_declined_by"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+type Message struct {
+	ID uuid.UUID `json:"id"`
+	ConversationID uuid.UUID `json:"conversation_id"`
+	HikerID uuid.UUID `json:"hiker_id"`
+	Seq int64 `json:"seq"`
+	Body string `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
+	DeletedAt *time.Time `json:"deleted_at"`
+}
