@@ -29,7 +29,7 @@ func Test_PostMessage_NonMember(t *testing.T) {
 	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, members...)
 	hikerID := uuid.New()
 	svc := NewService(f, fb)
-	err := svc.PostMessage(context.Background(), conv.ID, hikerID, "hello")
+	_, err := svc.PostMessage(context.Background(), conv.ID, hikerID, "hello")
 	wantStatus(t, err, apperr.CodeForbidden)
 }
 
@@ -37,7 +37,7 @@ func Test_GetConv_UnknownConversation(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
 	svc := NewService(f, fb)
-	err := svc.PostMessage(context.Background(), uuid.New(), uuid.New(), "hello")
+	_, err := svc.PostMessage(context.Background(), uuid.New(), uuid.New(), "hello")
 	wantStatus(t, err, apperr.CodeNotFound)
 }
 
@@ -50,7 +50,7 @@ func Test_PostMessage_Happy(t *testing.T) {
 	m1 := uuid.New()
 	m2 := uuid.New()
 	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1, m2)
-	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	_, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Errorf("expected no error got %v", err)
 	}
@@ -110,7 +110,7 @@ func Test_PostMessage_OutingCancelled(t *testing.T) {
 	m1 := uuid.New()
 	m2 := uuid.New()
 	conv := f.addOutingConversation(outingID, host, outing.StatusCancelled, m1, m2)
-	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	_, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	wantStatus(t, err, apperr.CodeForbidden)
 }
 
@@ -138,7 +138,7 @@ func Test_PostMessage_BadBody(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := svc.PostMessage(context.Background(), conv.ID, m1, tt.body)
+			_, err := svc.PostMessage(context.Background(), conv.ID, m1, tt.body)
 			if tt.wantErr {
 				wantStatus(t, err, tt.expected)
 			} else if err != nil {
@@ -163,15 +163,15 @@ func Test_PostMessage_Limit(t *testing.T) {
 	m1 := uuid.New()
 	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1)
 	for i := 0; i < 10; i++ {
-		err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+		_, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 		if err != nil {
 			t.Fatalf("expected no error got %v", err)
 		}
 	}
-	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	_, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	wantStatus(t, err, apperr.CodeTooManyRequests)
 	clock = clock.Add(61 * time.Second)
-	err = svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	_, err = svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
@@ -186,11 +186,11 @@ func Test_ListMessage_Happy(t *testing.T) {
 	m1 := uuid.New()
 	m2 := uuid.New()
 	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1, m2)
-	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	_, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-	err = svc.PostMessage(context.Background(), conv.ID, m2, "hi, m1")
+	_, err = svc.PostMessage(context.Background(), conv.ID, m2, "hi, m1")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
@@ -227,11 +227,11 @@ func Test_ListMessage_Stranger(t *testing.T) {
 	m1 := uuid.New()
 	stranger := uuid.New()
 	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1)
-	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	_, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-	err = svc.PostMessage(context.Background(), conv.ID, host, "hi, m1")
+	_, err = svc.PostMessage(context.Background(), conv.ID, host, "hi, m1")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
@@ -251,11 +251,11 @@ func Test_ListMessage_UnknownConversation(t *testing.T) {
 	m1 := uuid.New()
 	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1)
 	randomConv := uuid.New()
-	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	_, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-	err = svc.PostMessage(context.Background(), conv.ID, host, "hi, m1")
+	_, err = svc.PostMessage(context.Background(), conv.ID, host, "hi, m1")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
@@ -264,4 +264,181 @@ func Test_ListMessage_UnknownConversation(t *testing.T) {
 	}
 	_, err = svc.ListMessages(context.Background(), randomConv, m1)
 	wantStatus(t, err, apperr.CodeNotFound)
+}
+
+// delete message tests
+func newOutingConv(t *testing.T) (*fakeStore, *fakeBroadcaster, *Service, *Conversation, uuid.UUID, uuid.UUID, uuid.UUID) {
+	t.Helper()
+	f := newFakeStore()
+	fb := newFakeBroadcaster()
+	svc := NewService(f, fb)
+	outingID := uuid.New()
+	host := uuid.New()
+	m1 := uuid.New()
+	m2 := uuid.New()
+	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1, m2)
+	return f, fb, svc, conv, host, m1, m2
+}
+
+func Test_DeleteMessage_AuthorDeletes(t *testing.T) {
+	f, fb, svc, conv, host, m1, m2 := newOutingConv(t)
+	message1, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.PostMessage(context.Background(), conv.ID, m2, "hi, m1")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 2 {
+		t.Fatalf("expected 2 messages got %d", len(f.messages))
+	}
+	fb.sent = nil
+	err = svc.DeleteMessage(context.Background(), message1.ID, m1)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 1 {
+		t.Fatalf("expected 1 messages got %d", len(f.messages))
+	}
+	if _, ok := f.messages[message1.ID]; ok {
+		t.Fatal("expected message1 to be deleted")
+	}
+
+	for _, usr := range []uuid.UUID{host, m1, m2} {
+		got := fb.sentTo(usr)
+		if len(got) != 1 {
+			t.Fatalf("hiker %v: want 1 event, got %d", usr, len(got))
+		}
+		if got[0].Type != "message.deleted" {
+			t.Errorf("hiker %v: type = %q", usr, got[0].Type)
+		}
+		var p poke
+		if err := json.Unmarshal([]byte(got[0].Data), &p); err != nil {
+			t.Fatalf("hiker %v: bad poke json: %v", usr, err)
+		}
+		if p.ConversationID != conv.ID || p.Kind != ConversationKindOuting {
+			t.Errorf("hiker %v: poke = %+v", usr, p)
+		}
+	}
+
+}
+
+func Test_DeleteMessage_HostDeletes(t *testing.T) {
+	f, fb, svc, conv, host, m1, m2 := newOutingConv(t)
+	message1, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.PostMessage(context.Background(), conv.ID, m2, "hi, m1")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 2 {
+		t.Fatalf("expected 2 messages got %d", len(f.messages))
+	}
+	fb.sent = nil
+	err = svc.DeleteMessage(context.Background(), message1.ID, host)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 1 {
+		t.Fatalf("expected 1 messages got %d", len(f.messages))
+	}
+	if _, ok := f.messages[message1.ID]; ok {
+		t.Fatal("expected message1 to be deleted")
+	}
+
+	for _, usr := range []uuid.UUID{host, m1, m2} {
+		got := fb.sentTo(usr)
+		if len(got) != 1 {
+			t.Fatalf("hiker %v: want 1 event, got %d", usr, len(got))
+		}
+		if got[0].Type != "message.deleted" {
+			t.Errorf("hiker %v: type = %q", usr, got[0].Type)
+		}
+		var p poke
+		if err := json.Unmarshal([]byte(got[0].Data), &p); err != nil {
+			t.Fatalf("hiker %v: bad poke json: %v", usr, err)
+		}
+		if p.ConversationID != conv.ID || p.Kind != ConversationKindOuting {
+			t.Errorf("hiker %v: poke = %+v", usr, p)
+		}
+	}
+
+}
+
+func Test_DeleteMessage_OtherMemberDeletes(t *testing.T) {
+	f, fb, svc, conv, _, m1, m2 := newOutingConv(t)
+	message1, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.PostMessage(context.Background(), conv.ID, m2, "hi, m1")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 2 {
+		t.Fatalf("expected 2 messages got %d", len(f.messages))
+	}
+	fb.sent = nil
+	err = svc.DeleteMessage(context.Background(), message1.ID, m2)
+	wantStatus(t, err, apperr.CodeForbidden)
+	if len(f.messages) != 2 {
+		t.Errorf("expected 2 but got %d", len(f.messages))
+	}
+	if len(fb.sent) != 0 {
+		t.Errorf("expected 0 but got %d", len(fb.sent))
+	}
+
+}
+
+func Test_DeleteMessage_StrangerDeletes(t *testing.T) {
+	f, fb, svc, conv, _, m1, m2 := newOutingConv(t)
+	message1, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.PostMessage(context.Background(), conv.ID, m2, "hi, m1")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 2 {
+		t.Fatalf("expected 2 messages got %d", len(f.messages))
+	}
+	fb.sent = nil
+	err = svc.DeleteMessage(context.Background(), message1.ID, uuid.New())
+	wantStatus(t, err, apperr.CodeForbidden)
+	if len(f.messages) != 2 {
+		t.Errorf("expected 2 but got %d", len(f.messages))
+	}
+	if len(fb.sent) != 0 {
+		t.Errorf("expected 0 but got %d", len(fb.sent))
+	}
+
+}
+
+func Test_DeleteMessage_UnknownMessage(t *testing.T) {
+	f, fb, svc, conv, _, m1, m2 := newOutingConv(t)
+	_, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.PostMessage(context.Background(), conv.ID, m2, "hi, m1")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 2 {
+		t.Fatalf("expected 2 messages got %d", len(f.messages))
+	}
+	fb.sent = nil
+	err = svc.DeleteMessage(context.Background(), uuid.New(), m1)
+	wantStatus(t, err, apperr.CodeNotFound)
+	if len(f.messages) != 2 {
+		t.Errorf("expected 2 but got %d", len(f.messages))
+	}
+	if len(fb.sent) != 0 {
+		t.Errorf("expected 0 but got %d", len(fb.sent))
+	}
+
 }

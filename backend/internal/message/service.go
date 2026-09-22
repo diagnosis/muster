@@ -24,6 +24,9 @@ type Storage interface {
 	OutingStatus(ctx context.Context, outingID uuid.UUID) (outing.Status, error)
 	CountMessagesSince(ctx context.Context, conversationID, hikerID uuid.UUID, since time.Time) (int, error)
 	ListMessages(ctx context.Context, conversationID uuid.UUID) ([]*Message, error)
+	GetMessage(ctx context.Context, messageID uuid.UUID) (*Message, error)
+	DeleteMessage(ctx context.Context, messageID uuid.UUID) error
+	OutingHost(ctx context.Context, outingID uuid.UUID) (uuid.UUID, error)
 }
 
 const maxBodyRunes = 500
@@ -54,48 +57,48 @@ type poke struct {
 
 // PostMessage inserts a message from hikerID into conversationID after verifying
 // membership, then emits one message.created poke (no body) to every member.
-func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.UUID, body string) error {
+func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.UUID, body string) (*Message, error) {
 	body = strings.TrimSpace(body)
 	n := utf8.RuneCountInString(body)
 	if n < 1 || n > maxBodyRunes {
 		if n > maxBodyRunes {
-			return apperr.BadRequest("body cannot be longer than 500 characters", "500+ chars in body")
+			return nil, apperr.BadRequest("body cannot be longer than 500 characters", "500+ chars in body")
 		}
-		return apperr.BadRequest("body cannot be empty", "empty body")
+		return nil, apperr.BadRequest("body cannot be empty", "empty body")
 	}
 	conv, err := s.store.GetConversation(ctx, conversationID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	member, err := s.store.IsMember(ctx, conversationID, hikerID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !member {
-		return apperr.Forbidden("forbidden", "user not part of the roster", err)
+		return nil, apperr.Forbidden("forbidden", "user not part of the roster", err)
 	}
 	if conv.OutingID != nil {
 		var outingStatusErr error
 		status, outingStatusErr := s.store.OutingStatus(ctx, *conv.OutingID)
 		if outingStatusErr != nil {
-			return outingStatusErr
+			return nil, outingStatusErr
 		}
 		if !status.Valid() {
-			return apperr.Internal("internal error", "invalid outing status")
+			return nil, apperr.Internal("internal error", "invalid outing status")
 		}
 		if status != outing.StatusOpen {
 			msg := fmt.Sprintf("outing is %s", status)
-			return apperr.Forbidden(msg, msg)
+			return nil, apperr.Forbidden(msg, msg)
 		}
 	}
 
 	count, err := s.store.CountMessagesSince(ctx, conversationID, hikerID, s.now().Add(-time.Minute))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if count >= maxPerMinute {
-		return apperr.TooManyRequests("too many requests", "too many requests")
+		return nil, apperr.TooManyRequests("too many requests", "too many requests")
 	}
 
 	message := &Message{
@@ -105,31 +108,13 @@ func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.
 	}
 
 	if err = s.store.InsertMessage(ctx, message, s.now()); err != nil {
-		return err
+		return nil, err
 	}
-	memberIDs, err := s.store.MemberIDs(ctx, conversationID)
-	if err != nil {
-		return err
-	}
-	in := poke{
-		ConversationID: conversationID,
-		Kind:           conv.Kind,
-		OutingID:       conv.OutingID,
+	if err = s.broadcast(ctx, conv, "message.created"); err != nil {
+		return nil, err
 	}
 
-	data, err := json.Marshal(in)
-	if err != nil {
-		return apperr.Internal("internal error", "marshal poke", err)
-	}
-
-	for _, id := range memberIDs {
-		s.broadcaster.BroadcastToUser(id, events.Event{
-			Type: "message.created",
-			Data: string(data),
-		})
-	}
-
-	return nil
+	return message, nil
 }
 
 // ListMessages returns message history for members.
@@ -149,4 +134,61 @@ func (s *Service) ListMessages(ctx context.Context, convID, hikerID uuid.UUID) (
 		return nil, err
 	}
 	return messages, nil
+}
+
+// DeleteMessage removes selected messages. Host or author
+func (s *Service) DeleteMessage(ctx context.Context, messageID, hikerID uuid.UUID) error {
+	message, err := s.store.GetMessage(ctx, messageID)
+	if err != nil {
+		return err
+	}
+	conv, err := s.store.GetConversation(ctx, message.ConversationID)
+	if err != nil {
+		return err
+	}
+	allowed := message.HikerID == hikerID
+	if !allowed && conv.OutingID != nil {
+		hostID, convErr := s.store.OutingHost(ctx, *conv.OutingID)
+		if convErr != nil {
+			return convErr
+		}
+		allowed = hostID == hikerID
+	}
+	if !allowed {
+		return apperr.Forbidden("forbidden", "author or host can delete")
+	}
+
+	if err = s.store.DeleteMessage(ctx, messageID); err != nil {
+		return err
+	}
+	if err = s.broadcast(ctx, conv, "message.deleted"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) broadcast(ctx context.Context, conv *Conversation, eventType string) error {
+	memberIDs, err := s.store.MemberIDs(ctx, conv.ID)
+	if err != nil {
+		return err
+	}
+	in := poke{
+		ConversationID: conv.ID,
+		Kind:           conv.Kind,
+		OutingID:       conv.OutingID,
+	}
+
+	data, err := json.Marshal(in)
+	if err != nil {
+		return apperr.Internal("internal error", "marshal poke", err)
+	}
+
+	for _, id := range memberIDs {
+		s.broadcaster.BroadcastToUser(id, events.Event{
+			Type: eventType,
+			Data: string(data),
+		})
+	}
+	return nil
 }

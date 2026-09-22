@@ -16,6 +16,7 @@ type fakeStore struct {
 	messages       map[uuid.UUID]Message
 	seq            int64
 	outingStatuses map[uuid.UUID]outing.Status
+	hosts          map[uuid.UUID]uuid.UUID
 }
 
 func (f *fakeStore) InsertMessage(ctx context.Context, m *Message, now time.Time) error {
@@ -47,6 +48,7 @@ func newFakeStore() *fakeStore {
 		messages:       make(map[uuid.UUID]Message),
 		seq:            0,
 		outingStatuses: make(map[uuid.UUID]outing.Status),
+		hosts:          make(map[uuid.UUID]uuid.UUID),
 	}
 }
 
@@ -75,7 +77,7 @@ func (f *fakeStore) addOutingConversation(outingID, host uuid.UUID, outingStatus
 	}
 	f.converstations[conv.ID] = conv
 	f.outingStatuses[outingID] = outingStatus
-
+	f.hosts[outingID] = host
 	memberSet := make(map[uuid.UUID]struct{})
 	f.members[conv.ID] = memberSet
 
@@ -114,6 +116,26 @@ func (f *fakeStore) ListMessages(ctx context.Context, conversationID uuid.UUID) 
 		return mes[i].Seq < mes[j].Seq
 	})
 	return mes, nil
+}
+
+func (f *fakeStore) GetMessage(ctx context.Context, messageID uuid.UUID) (*Message, error) {
+	v, ok := f.messages[messageID]
+	if !ok {
+		return nil, apperr.NotFound("message not found", "message not found")
+	}
+	return &v, nil
+}
+
+func (f *fakeStore) DeleteMessage(ctx context.Context, messageID uuid.UUID) error {
+	delete(f.messages, messageID)
+	return nil
+}
+func (f *fakeStore) OutingHost(ctx context.Context, outingID uuid.UUID) (uuid.UUID, error) {
+	v, ok := f.hosts[outingID]
+	if !ok {
+		return uuid.Nil, apperr.NotFound("host not found", "host not found")
+	}
+	return v, nil
 }
 
 var _ Storage = (*fakeStore)(nil)
