@@ -3,9 +3,14 @@ package message
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+	"unicode/utf8"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/diagnosis/muster/internal/events"
+	"github.com/diagnosis/muster/internal/outing"
 	"github.com/google/uuid"
 )
 
@@ -14,10 +19,13 @@ import (
 type Storage interface {
 	GetConversation(ctx context.Context, id uuid.UUID) (*Conversation, error)
 	IsMember(ctx context.Context, conversationID, hikerID uuid.UUID) (bool, error)
-	InsertMessage(ctx context.Context, m *Message) error
+	InsertMessage(ctx context.Context, m *Message, now time.Time) error
 	MemberIDs(ctx context.Context, conversationID uuid.UUID) ([]uuid.UUID, error)
+	OutingStatus(ctx context.Context, outingID uuid.UUID)(outing.Status, error)
+	CountMessagesSince(ctx context.Context, conversationID, hikerID uuid.UUID, since time.Time)(int, error)
 }
-
+const maxBodyRunes = 500
+const maxPerMinute = 10
 // Broadcaster is the single hub method the service uses; *events.Hub satisfies it.
 type Broadcaster interface {
 	BroadcastToUser(hikerID uuid.UUID, e events.Event)
@@ -27,11 +35,12 @@ type Broadcaster interface {
 type Service struct {
 	store       Storage
 	broadcaster Broadcaster
+	now func()time.Time
 }
 
 // NewService returns a Service over the given store and broadcaster.
 func NewService(store Storage, broadcaster Broadcaster) *Service {
-	return &Service{store: store, broadcaster: broadcaster}
+	return &Service{store: store, broadcaster: broadcaster, now: time.Now}
 }
 
 type poke struct {
@@ -43,6 +52,14 @@ type poke struct {
 // PostMessage inserts a message from hikerID into conversationID after verifying
 // membership, then emits one message.created poke (no body) to every member.
 func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.UUID, body string) error {
+	body = strings.TrimSpace(body)
+	n := utf8.RuneCountInString(body)
+	if n < 1 || n> maxBodyRunes{
+		if n > maxBodyRunes {
+			return apperr.BadRequest("body cannot be longer than 500 characters", "500+ chars in body")
+		}
+		return apperr.BadRequest("body cannot be empty", "empty body")
+	}
 	conv, err := s.store.GetConversation(ctx, conversationID)
 	if err != nil {
 		return err
@@ -55,13 +72,35 @@ func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.
 	if !member {
 		return apperr.Forbidden("forbidden", "user not part of the roster", err)
 	}
+	if conv.OutingID != nil{
+		status, err := s.store.OutingStatus(ctx, *conv.OutingID)
+		if err != nil {
+			return err
+		}
+		if !status.Valid(){
+			return apperr.Internal("internal error", "invalid outing status")
+		}
+		if status != outing.StatusOpen {
+			msg := fmt.Sprintf("outing is %s", status)
+			return apperr.Forbidden(msg, msg)
+		}
+	}
+
+	count, err := s.store.CountMessagesSince(ctx, conversationID, hikerID, s.now().Add(-time.Minute))
+	if err != nil {
+		return err
+	}
+	if count >= maxPerMinute{
+		return apperr.TooManyRequests("too many requests", "too many requests")
+	}
+
 	message := &Message{
 		ConversationID: conversationID,
 		HikerID:        hikerID,
 		Body:           body,
 	}
 
-	if err = s.store.InsertMessage(ctx, message); err != nil {
+	if err = s.store.InsertMessage(ctx, message, s.now()); err != nil {
 		return err
 	}
 	memberIDs, err := s.store.MemberIDs(ctx, conversationID)

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
+	"github.com/diagnosis/muster/internal/outing"
 	"github.com/google/uuid"
 )
 
@@ -13,13 +14,14 @@ type fakeStore struct {
 	members        map[uuid.UUID]map[uuid.UUID]struct{}
 	messages       map[uuid.UUID]Message
 	seq            int64
+	outingStatuses map[uuid.UUID]outing.Status
 }
 
-func (f *fakeStore) InsertMessage(ctx context.Context, m *Message) error {
+func (f *fakeStore) InsertMessage(ctx context.Context, m *Message, now time.Time) error {
 	f.seq++
 	m.Seq = f.seq
 	m.ID = uuid.New()
-	m.CreatedAt = time.Now()
+	m.CreatedAt = now
 	f.messages[m.ID] = *m
 	return nil
 }
@@ -43,6 +45,7 @@ func newFakeStore() *fakeStore {
 		members:        make(map[uuid.UUID]map[uuid.UUID]struct{}),
 		messages:       make(map[uuid.UUID]Message),
 		seq:            0,
+		outingStatuses: make(map[uuid.UUID]outing.Status),
 	}
 }
 
@@ -63,13 +66,14 @@ func (f *fakeStore) IsMember(ctx context.Context, conversationID, hikerID uuid.U
 	return false, nil
 }
 
-func (f *fakeStore) addOutingConversation(outingID, host uuid.UUID, members ...uuid.UUID) *Conversation {
+func (f *fakeStore) addOutingConversation(outingID, host uuid.UUID, outingStatus outing.Status, members ...uuid.UUID) *Conversation {
 	conv := &Conversation{
 		ID:       uuid.New(),
 		Kind:     ConversationKindOuting,
 		OutingID: &outingID,
 	}
 	f.converstations[conv.ID] = conv
+	f.outingStatuses[outingID] = outingStatus
 
 	memberSet := make(map[uuid.UUID]struct{})
 	f.members[conv.ID] = memberSet
@@ -79,6 +83,23 @@ func (f *fakeStore) addOutingConversation(outingID, host uuid.UUID, members ...u
 		memberSet[m] = struct{}{}
 	}
 	return conv
+}
+
+func (f *fakeStore) OutingStatus(ctx context.Context, outingID uuid.UUID) (outing.Status, error) {
+	v, ok := f.outingStatuses[outingID]
+	if !ok {
+		return "", apperr.NotFound("outing not found", "outing not found")
+	}
+	return v, nil
+}
+func (f *fakeStore) CountMessagesSince(ctx context.Context, conversationID, hikerID uuid.UUID, since time.Time) (int, error) {
+	count := 0
+	for _, m := range f.messages{
+		if m.ConversationID == conversationID && m.HikerID == hikerID && m.CreatedAt.After(since){
+			count++
+		}
+	}
+	return count, nil
 }
 
 var _ Storage = (*fakeStore)(nil)
