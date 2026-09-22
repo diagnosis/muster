@@ -57,14 +57,14 @@ func Test_PostMessage_Happy(t *testing.T) {
 	}
 	var got Message
 
-	for _, m := range f.messages{
+	for _, m := range f.messages {
 		got = m
 	}
 
-	if got.Body != "hello"{
+	if got.Body != "hello" {
 		t.Errorf("expected body hello got %s", got.Body)
 	}
-	if got.ConversationID != conv.ID{
+	if got.ConversationID != conv.ID {
 		t.Errorf("expected %v got %v", got.ConversationID, conv.ID)
 	}
 	if got.Seq != 1 {
@@ -74,18 +74,22 @@ func Test_PostMessage_Happy(t *testing.T) {
 		t.Errorf("expected %v got %v", m1, got.HikerID)
 	}
 	for _, usr := range []uuid.UUID{host, m1, m2} {
-		if got := fb.sentTo(usr); len(got) != 1 || got[0].Type != "message.created" {
-			var p poke
-			if err := json.Unmarshal([]byte(got[0].Data), &p); err != nil {
-				t.Fatalf("hiker %v: bad poke json: %v", usr, err)
-			}
-			if p.ConversationID != conv.ID || p.Kind != ConversationKindOuting {
-				t.Errorf("hiker %v: poke = %+v", usr, p)
-			}
-			if strings.Contains(got[0].Data, "hello") {
-				t.Errorf("poke carries the body: %s", got[0].Data)
-			}
-			t.Errorf("hiker %v: want 1 message.created, got %v", usr, got)
+		got := fb.sentTo(usr)
+		if len(got) != 1 {
+			t.Fatalf("hiker %v: want 1 event, got %d", usr, len(got))
+		}
+		if got[0].Type != "message.created" {
+			t.Errorf("hiker %v: type = %q", usr, got[0].Type)
+		}
+		var p poke
+		if err := json.Unmarshal([]byte(got[0].Data), &p); err != nil {
+			t.Fatalf("hiker %v: bad poke json: %v", usr, err)
+		}
+		if p.ConversationID != conv.ID || p.Kind != ConversationKindOuting {
+			t.Errorf("hiker %v: poke = %+v", usr, p)
+		}
+		if strings.Contains(got[0].Data, "hello") {
+			t.Errorf("poke carries the body: %s", got[0].Data)
 		}
 
 	}

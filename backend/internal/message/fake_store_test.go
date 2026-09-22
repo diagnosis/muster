@@ -12,7 +12,7 @@ type fakeStore struct {
 	converstations map[uuid.UUID]*Conversation
 	members        map[uuid.UUID]map[uuid.UUID]struct{}
 	messages       map[uuid.UUID]Message
-	seq int64
+	seq            int64
 }
 
 func (f *fakeStore) InsertMessage(ctx context.Context, m *Message) error {
@@ -30,8 +30,8 @@ func (f *fakeStore) MemberIDs(ctx context.Context, conversationID uuid.UUID) ([]
 		return nil, err
 	}
 	set := f.members[conversationID]
-	members  := []uuid.UUID{}
-	for k:=  range set{
+	members := []uuid.UUID{}
+	for k := range set {
 		members = append(members, k)
 	}
 	return members, nil
@@ -41,8 +41,8 @@ func newFakeStore() *fakeStore {
 	return &fakeStore{
 		converstations: make(map[uuid.UUID]*Conversation),
 		members:        make(map[uuid.UUID]map[uuid.UUID]struct{}),
-		messages: make(map[uuid.UUID]Message),
-		seq: 0,
+		messages:       make(map[uuid.UUID]Message),
+		seq:            0,
 	}
 }
 

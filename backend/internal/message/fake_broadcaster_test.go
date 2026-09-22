@@ -25,7 +25,7 @@ func (f *fakeBroadcaster) BroadcastToUser(hikerID uuid.UUID, e events.Event) {
 func (f *fakeBroadcaster) sentTo(hikerID uuid.UUID) []events.Event {
 	me := []events.Event{}
 	for _, s := range f.sent {
-		if s.HikerID == hikerID{
+		if s.HikerID == hikerID {
 			me = append(me, s.Event)
 		}
 	}
