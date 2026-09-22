@@ -26,7 +26,7 @@ func Test_PostMessage_NonMember(t *testing.T) {
 	outingID := uuid.New()
 	host := uuid.New()
 	members := []uuid.UUID{uuid.New(), uuid.New()}
-	conv := f.addOutingConversation(outingID, host,outing.StatusOpen, members...)
+	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, members...)
 	hikerID := uuid.New()
 	svc := NewService(f, fb)
 	err := svc.PostMessage(context.Background(), conv.ID, hikerID, "hello")
@@ -49,7 +49,7 @@ func Test_PostMessage_Happy(t *testing.T) {
 	host := uuid.New()
 	m1 := uuid.New()
 	m2 := uuid.New()
-	conv := f.addOutingConversation(outingID, host,outing.StatusOpen, m1, m2)
+	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1, m2)
 	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Errorf("expected no error got %v", err)
@@ -101,7 +101,7 @@ func Test_PostMessage_Happy(t *testing.T) {
 
 }
 
-func Test_PostMessage_OutingCancelled(t *testing.T){
+func Test_PostMessage_OutingCancelled(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
 	svc := NewService(f, fb)
@@ -109,12 +109,12 @@ func Test_PostMessage_OutingCancelled(t *testing.T){
 	host := uuid.New()
 	m1 := uuid.New()
 	m2 := uuid.New()
-	conv := f.addOutingConversation(outingID, host,outing.StatusCancelled, m1, m2)
+	conv := f.addOutingConversation(outingID, host, outing.StatusCancelled, m1, m2)
 	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	wantStatus(t, err, apperr.CodeForbidden)
 }
 
-func Test_PostMessage_BadBody(t *testing.T){
+func Test_PostMessage_BadBody(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
 	svc := NewService(f, fb)
@@ -122,38 +122,36 @@ func Test_PostMessage_BadBody(t *testing.T){
 	host := uuid.New()
 	m1 := uuid.New()
 	m2 := uuid.New()
-	conv := f.addOutingConversation(outingID, host,outing.StatusOpen, m1, m2)
+	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1, m2)
 
-	tests := []struct{
-		name string
-		body  string
-		wantErr bool
+	tests := []struct {
+		name     string
+		body     string
+		wantErr  bool
 		expected apperr.Status
 	}{
-		{name:"empty", body: "",wantErr: true, expected: apperr.CodeBadRequest},
-		{name:"empty with space", body: "   ",wantErr: true,expected: apperr.CodeBadRequest},
-		{name:"501 chars", body: strings.Repeat("a", 501),wantErr: true,expected: apperr.CodeBadRequest},
-		{name:"500 chars", body: strings.Repeat("a", 500), wantErr: false},
-		{name:"500 chars non-english", body: strings.Repeat("ş", 500), wantErr: false},
+		{name: "empty", body: "", wantErr: true, expected: apperr.CodeBadRequest},
+		{name: "empty with space", body: "   ", wantErr: true, expected: apperr.CodeBadRequest},
+		{name: "501 chars", body: strings.Repeat("a", 501), wantErr: true, expected: apperr.CodeBadRequest},
+		{name: "500 chars", body: strings.Repeat("a", 500), wantErr: false},
+		{name: "500 chars non-english", body: strings.Repeat("ş", 500), wantErr: false},
 	}
-	for _, tt := range tests{
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := svc.PostMessage(context.Background(), conv.ID, m1, tt.body)
-			if tt.wantErr{
+			if tt.wantErr {
 				wantStatus(t, err, tt.expected)
-			}else {
-				if err != nil {
-					t.Fatalf("expected no err got %v", err)
-				}
+			} else if err != nil {
+				t.Fatalf("expected no err got %v", err)
 			}
+
 		})
 	}
 
-
 }
 
-func Test_PostMessage_Limit(t *testing.T){
-	clock := time.Date(2026,9,21,12,0,0,0, time.UTC)
+func Test_PostMessage_Limit(t *testing.T) {
+	clock := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
 	svc := NewService(f, fb)
@@ -164,7 +162,7 @@ func Test_PostMessage_Limit(t *testing.T){
 	host := uuid.New()
 	m1 := uuid.New()
 	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1)
-	for i := 0 ; i < 10; i ++ {
+	for i := 0; i < 10; i++ {
 		err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 		if err != nil {
 			t.Fatalf("expected no error got %v", err)
@@ -172,9 +170,98 @@ func Test_PostMessage_Limit(t *testing.T){
 	}
 	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	wantStatus(t, err, apperr.CodeTooManyRequests)
-	clock = clock.Add(61*time.Second)
+	clock = clock.Add(61 * time.Second)
 	err = svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
+}
+
+func Test_ListMessage_Happy(t *testing.T) {
+	f := newFakeStore()
+	fb := newFakeBroadcaster()
+	svc := NewService(f, fb)
+	outingID := uuid.New()
+	host := uuid.New()
+	m1 := uuid.New()
+	m2 := uuid.New()
+	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1, m2)
+	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	err = svc.PostMessage(context.Background(), conv.ID, m2, "hi, m1")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 2 {
+		t.Fatalf("expected 2 messages got %d", len(f.messages))
+	}
+	messages, err := svc.ListMessages(context.Background(), conv.ID, m1)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages got %d", len(f.messages))
+	}
+	if messages[0].Body != "hello" {
+		t.Errorf("expected body hello got %s", messages[0].Body)
+	}
+	if messages[1].Body != "hi, m1" {
+		t.Errorf("expected body hi, m1 got %s", messages[1].Body)
+	}
+	if messages[0].Seq != 1 {
+		t.Errorf("expected seq 1 got %d", messages[0].Seq)
+	}
+	if messages[1].Seq != 2 {
+		t.Errorf("expected seq 2 got %d", messages[1].Seq)
+	}
+}
+
+func Test_ListMessage_Stranger(t *testing.T) {
+	f := newFakeStore()
+	fb := newFakeBroadcaster()
+	svc := NewService(f, fb)
+	outingID := uuid.New()
+	host := uuid.New()
+	m1 := uuid.New()
+	stranger := uuid.New()
+	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1)
+	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	err = svc.PostMessage(context.Background(), conv.ID, host, "hi, m1")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 2 {
+		t.Fatalf("expected 2 messages got %d", len(f.messages))
+	}
+	_, err = svc.ListMessages(context.Background(), conv.ID, stranger)
+	wantStatus(t, err, apperr.CodeForbidden)
+}
+
+func Test_ListMessage_UnknownConversation(t *testing.T) {
+	f := newFakeStore()
+	fb := newFakeBroadcaster()
+	svc := NewService(f, fb)
+	outingID := uuid.New()
+	host := uuid.New()
+	m1 := uuid.New()
+	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1)
+	randomConv := uuid.New()
+	err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	err = svc.PostMessage(context.Background(), conv.ID, host, "hi, m1")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 2 {
+		t.Fatalf("expected 2 messages got %d", len(f.messages))
+	}
+	_, err = svc.ListMessages(context.Background(), randomConv, m1)
+	wantStatus(t, err, apperr.CodeNotFound)
 }

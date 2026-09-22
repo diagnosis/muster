@@ -2,6 +2,7 @@ package message
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
@@ -94,12 +95,25 @@ func (f *fakeStore) OutingStatus(ctx context.Context, outingID uuid.UUID) (outin
 }
 func (f *fakeStore) CountMessagesSince(ctx context.Context, conversationID, hikerID uuid.UUID, since time.Time) (int, error) {
 	count := 0
-	for _, m := range f.messages{
-		if m.ConversationID == conversationID && m.HikerID == hikerID && m.CreatedAt.After(since){
+	for _, m := range f.messages {
+		if m.ConversationID == conversationID && m.HikerID == hikerID && m.CreatedAt.After(since) {
 			count++
 		}
 	}
 	return count, nil
+}
+
+func (f *fakeStore) ListMessages(ctx context.Context, conversationID uuid.UUID) ([]*Message, error) {
+	mes := []*Message{}
+	for _, m := range f.messages {
+		if m.ConversationID == conversationID {
+			mes = append(mes, &m)
+		}
+	}
+	sort.Slice(mes, func(i, j int) bool {
+		return mes[i].Seq < mes[j].Seq
+	})
+	return mes, nil
 }
 
 var _ Storage = (*fakeStore)(nil)

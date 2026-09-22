@@ -21,11 +21,14 @@ type Storage interface {
 	IsMember(ctx context.Context, conversationID, hikerID uuid.UUID) (bool, error)
 	InsertMessage(ctx context.Context, m *Message, now time.Time) error
 	MemberIDs(ctx context.Context, conversationID uuid.UUID) ([]uuid.UUID, error)
-	OutingStatus(ctx context.Context, outingID uuid.UUID)(outing.Status, error)
-	CountMessagesSince(ctx context.Context, conversationID, hikerID uuid.UUID, since time.Time)(int, error)
+	OutingStatus(ctx context.Context, outingID uuid.UUID) (outing.Status, error)
+	CountMessagesSince(ctx context.Context, conversationID, hikerID uuid.UUID, since time.Time) (int, error)
+	ListMessages(ctx context.Context, conversationID uuid.UUID) ([]*Message, error)
 }
+
 const maxBodyRunes = 500
 const maxPerMinute = 10
+
 // Broadcaster is the single hub method the service uses; *events.Hub satisfies it.
 type Broadcaster interface {
 	BroadcastToUser(hikerID uuid.UUID, e events.Event)
@@ -35,7 +38,7 @@ type Broadcaster interface {
 type Service struct {
 	store       Storage
 	broadcaster Broadcaster
-	now func()time.Time
+	now         func() time.Time
 }
 
 // NewService returns a Service over the given store and broadcaster.
@@ -54,7 +57,7 @@ type poke struct {
 func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.UUID, body string) error {
 	body = strings.TrimSpace(body)
 	n := utf8.RuneCountInString(body)
-	if n < 1 || n> maxBodyRunes{
+	if n < 1 || n > maxBodyRunes {
 		if n > maxBodyRunes {
 			return apperr.BadRequest("body cannot be longer than 500 characters", "500+ chars in body")
 		}
@@ -72,12 +75,13 @@ func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.
 	if !member {
 		return apperr.Forbidden("forbidden", "user not part of the roster", err)
 	}
-	if conv.OutingID != nil{
-		status, err := s.store.OutingStatus(ctx, *conv.OutingID)
-		if err != nil {
-			return err
+	if conv.OutingID != nil {
+		var outingStatusErr error
+		status, outingStatusErr := s.store.OutingStatus(ctx, *conv.OutingID)
+		if outingStatusErr != nil {
+			return outingStatusErr
 		}
-		if !status.Valid(){
+		if !status.Valid() {
 			return apperr.Internal("internal error", "invalid outing status")
 		}
 		if status != outing.StatusOpen {
@@ -90,7 +94,7 @@ func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.
 	if err != nil {
 		return err
 	}
-	if count >= maxPerMinute{
+	if count >= maxPerMinute {
 		return apperr.TooManyRequests("too many requests", "too many requests")
 	}
 
@@ -126,4 +130,23 @@ func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.
 	}
 
 	return nil
+}
+
+// ListMessages returns message history for members.
+func (s *Service) ListMessages(ctx context.Context, convID, hikerID uuid.UUID) ([]*Message, error) {
+	if _, err := s.store.GetConversation(ctx, convID); err != nil {
+		return nil, err
+	}
+	ok, err := s.store.IsMember(ctx, convID, hikerID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, apperr.Forbidden("forbidden", "user not part of the roster", err)
+	}
+	messages, err := s.store.ListMessages(ctx, convID)
+	if err != nil {
+		return nil, err
+	}
+	return messages, nil
 }
