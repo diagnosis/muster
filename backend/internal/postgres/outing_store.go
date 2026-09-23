@@ -127,13 +127,19 @@ var _ outing.Storage = (*OutingStore)(nil)
 // CreateOuting inserts a new outing, scanning DB-generated timestamps
 // back into Outings
 func (s *OutingStore) CreateOuting(ctx context.Context, o *outing.Outing) error {
-	q := `
+	q := `	
+	WITH o AS (
 	INSERT INTO outings
 		(id, host_id, title, destination, meet_label, meet_lat,
 		 meet_lng, starts_at, max_size, host_seats, cost_per_seat_cents,
 		 difficulty, pace, notes, status)
 	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-	RETURNING created_at, updated_at`
+	RETURNING id, created_at, updated_at),
+	c AS (	
+	INSERT INTO conversations (kind, outing_id) SELECT 'outing', id FROM o
+	)
+	SELECT created_at, updated_at FROM o;
+`
 
 	err := s.pool.QueryRow(ctx, q,
 		o.ID, o.HostID, o.Title, o.Destination, o.MeetLabel,
@@ -176,11 +182,11 @@ func (s *OutingStore) UpdateJoinRequest(ctx context.Context, jr *outing.JoinRequ
 // GetOuting returns the outing with given id
 func (s *OutingStore) GetOuting(ctx context.Context, id uuid.UUID) (*outing.Outing, error) {
 	q := `
-		SELECT id, host_id, title, destination, meet_label, meet_lat, meet_lng,
-			starts_at, max_size, host_seats, cost_per_seat_cents, difficulty, pace, notes, status,
-			created_at, updated_at
-		FROM outings 
-		WHERE id = $1
+		SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
+			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
+			o.created_at, o.updated_at, c.id AS conversation_id
+		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
+		WHERE o.id = $1
 `
 	o, err := scanOuting(s.pool.QueryRow(ctx, q, id))
 	if err != nil {
@@ -244,10 +250,10 @@ func (s *OutingStore) UpdateOuting(ctx context.Context, o *outing.Outing) error 
 // ListUpcoming returns open outings starting after now, soonest first.
 func (s *OutingStore) ListUpcoming(ctx context.Context, now time.Time) ([]outing.Outing, error) {
 	q := `
-	SELECT id, host_id, title, destination, meet_label, meet_lat, meet_lng,
-			starts_at, max_size, host_seats, cost_per_seat_cents, difficulty, pace, notes, status,
-			created_at, updated_at
-		FROM outings
+	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
+			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
+			o.created_at, o.updated_at, c.id AS conversation_id
+		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 	WHERE status = 'open' AND starts_at > $1
 	ORDER BY starts_at
 `
@@ -475,18 +481,18 @@ func (s *OutingStore) SetOutingStatus(ctx context.Context, id uuid.UUID, status 
 // ListForHiker returns the outings the hiker hosts and the ones they've joined (accepted requests only), each soonest first.
 func (s *OutingStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*outing.MyOutings, error) {
 	hostingQuery := `
-	SELECT id, host_id, title, destination, meet_label, meet_lat, meet_lng,
-			starts_at, max_size, host_seats, cost_per_seat_cents, difficulty, pace, notes, status,
-			created_at, updated_at
-		FROM outings
+	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
+			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
+			o.created_at, o.updated_at, c.id AS conversation_id
+		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 		WHERE host_id = $1 
 		ORDER BY starts_at
 `
 	joinedQuery := `
-	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat,
-			o.meet_lng, o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents,
-			o.difficulty, o.pace, o.notes, o.status, o.created_at, o.updated_at
-		FROM outings o 
+	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
+			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
+			o.created_at, o.updated_at, c.id AS conversation_id
+		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 		JOIN join_requests jr ON jr.outing_id = o.id
 		WHERE jr.hiker_id = $1 AND jr.status = 'accepted'
 		ORDER BY o.starts_at
@@ -616,6 +622,7 @@ func scanOuting(row pgx.Row) (*outing.Outing, error) {
 		&o.Status,
 		&o.CreatedAt,
 		&o.UpdatedAt,
+		&o.ConversationID,
 	)
 	return o, err
 }
