@@ -12,6 +12,7 @@ import (
 	"github.com/diagnosis/muster/internal/config"
 	"github.com/diagnosis/muster/internal/events"
 	"github.com/diagnosis/muster/internal/hiker"
+	"github.com/diagnosis/muster/internal/message"
 	"github.com/diagnosis/muster/internal/notification"
 	"github.com/diagnosis/muster/internal/outing"
 	"golang.org/x/time/rate"
@@ -25,10 +26,11 @@ type Server struct {
 	outings       *outing.Service
 	notifications notification.Storage
 	hub           *events.Hub
+	messages      *message.Service
 }
 
 // NewServer returns a Server serving the given services.
-func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner, outings *outing.Service, notifications notification.Storage, hub *events.Hub) *Server {
+func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner, outings *outing.Service, notifications notification.Storage, hub *events.Hub, messages *message.Service) *Server {
 	return &Server{
 		hikers:        hikers,
 		jwt:           jwt,
@@ -36,6 +38,7 @@ func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner,
 		outings:       outings,
 		notifications: notifications,
 		hub:           hub,
+		messages:      messages,
 	}
 }
 
@@ -93,6 +96,13 @@ func (s *Server) Routes() http.Handler {
 
 	// hikers public routes
 	mux.HandleFunc("GET /api/hikers/{id}", s.handleGetHiker)
+
+	// messages
+	mux.Handle("POST /api/conversations/{id}/messages", requireAuth(http.HandlerFunc(s.handlePostMessage)))
+
+	// mux.Handle("DELETE /api/messages/{id}", requireAuth(http.HandlerFunc(s.handleDeleteMessage)))
+
+	// mux.Handle("GET /api/conversations/{id}/messages", requireAuth(http.HandlerFunc(s.handleListMessages)))
 
 	var h http.Handler = mux
 	h = middleware.RateLimit(rate.Limit(s.cfg.RateLimiter.RPS), int(s.cfg.RateLimiter.Burst), 5*time.Minute)(h)

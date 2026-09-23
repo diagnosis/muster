@@ -17,6 +17,7 @@ import (
 	"github.com/diagnosis/muster/internal/config"
 	"github.com/diagnosis/muster/internal/events"
 	"github.com/diagnosis/muster/internal/hiker"
+	"github.com/diagnosis/muster/internal/message"
 	"github.com/diagnosis/muster/internal/notification"
 	"github.com/diagnosis/muster/internal/outing"
 	"github.com/diagnosis/muster/internal/postgres"
@@ -57,6 +58,7 @@ func run() error {
 	tokenStore := postgres.NewAuthTokenStore(pool)
 	outingsStore := postgres.NewOutingStore(pool)
 	notificationStore := postgres.NewNotificationStore(pool)
+	messageStore := postgres.NewMessageStore(pool)
 	tokenService := authtoken.NewService(tokenStore)
 
 	signer, err := secure.NewJWTSigner(secure.JWTConfig{
@@ -90,7 +92,10 @@ func run() error {
 	outings := outing.NewService(outingsStore, notificationStore)
 	dispatcher := notification.NewDispatcher(notificationStore, m, cfg.App.DispatcherInterval, cfg.App.BaseURL)
 	hub := events.NewHub()
-	srv := api.NewServer(cfg, hikers, signer, outings, notificationStore, hub)
+
+	messages := message.NewService(messageStore, hub)
+
+	srv := api.NewServer(cfg, hikers, signer, outings, notificationStore, hub, messages)
 
 	go dispatcher.Run(ctx)
 	server := &http.Server{
