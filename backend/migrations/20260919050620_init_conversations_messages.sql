@@ -32,8 +32,7 @@ CREATE TABLE messages
     hiker_id UUID NOT NULL REFERENCES hikers(id) ON DELETE CASCADE,
     seq BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE ,
     body TEXT NOT NULL,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    deleted_at TIMESTAMPTZ NULL
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_messages_conversation_id_seq ON messages (conversation_id, seq);

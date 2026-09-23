@@ -61,11 +61,10 @@ type Conversation struct {
 // Message is one row of messages. Seq is the DB-assigned ordering (D6);
 // a non-nil DeletedAt marks a soft-deleted message.
 type Message struct {
-	ID             uuid.UUID  `json:"id"`
-	ConversationID uuid.UUID  `json:"conversation_id"`
-	HikerID        uuid.UUID  `json:"hiker_id"`
-	Seq            int64      `json:"seq"`
-	Body           string     `json:"body"`
-	CreatedAt      time.Time  `json:"created_at"`
-	DeletedAt      *time.Time `json:"deleted_at"`
+	ID             uuid.UUID `json:"id"`
+	ConversationID uuid.UUID `json:"conversation_id"`
+	HikerID        uuid.UUID `json:"hiker_id"`
+	Seq            int64     `json:"seq"`
+	Body           string    `json:"body"`
+	CreatedAt      time.Time `json:"created_at"`
 }

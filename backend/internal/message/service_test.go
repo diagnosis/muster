@@ -33,7 +33,7 @@ func Test_PostMessage_NonMember(t *testing.T) {
 	wantStatus(t, err, apperr.CodeForbidden)
 }
 
-func Test_GetConv_UnknownConversation(t *testing.T) {
+func Test_PostMessage_UnknownConversation(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
 	svc := NewService(f, fb)
