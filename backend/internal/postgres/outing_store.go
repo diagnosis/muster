@@ -137,15 +137,16 @@ func (s *OutingStore) CreateOuting(ctx context.Context, o *outing.Outing) error 
 	RETURNING id, created_at, updated_at),
 	c AS (	
 	INSERT INTO conversations (kind, outing_id) SELECT 'outing', id FROM o
+	RETURNING id
 	)
-	SELECT created_at, updated_at FROM o;
+	SELECT o.created_at, o.updated_at, c.id FROM o, c;
 `
 
 	err := s.pool.QueryRow(ctx, q,
 		o.ID, o.HostID, o.Title, o.Destination, o.MeetLabel,
 		o.MeetLat, o.MeetLng, o.StartsAt, o.MaxSize, o.HostSeats,
 		o.CostPerSeatCents, o.Difficulty, o.Pace, o.Notes, o.Status,
-	).Scan(&o.CreatedAt, &o.UpdatedAt)
+	).Scan(&o.CreatedAt, &o.UpdatedAt, &o.ConversationID)
 	if err != nil {
 		return apperr.Database("could not create outing", "insert outings failed", err)
 	}
