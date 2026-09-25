@@ -16,17 +16,17 @@ export function Chat({cid, outing}:ChatProps){
     return <>
         <div>
             <h1>{outing.title}</h1>
+            <div>
+                {messages.data?.messages.map(m => <p key={m.id}>
+                        {m.body}
+                    </p>
+                )}
+            </div>
             <form onSubmit={(e)=>{
                 e.preventDefault()
                 if (!body.trim()) return
-                postMessage.mutate({body})
+                postMessage.mutate({body}, {onSuccess: ()=> setBody("")})
             }}>
-                <div>
-                    {messages.data?.messages.map(m => <p key={m.id}>
-                        {m.body}
-                        </p>
-                    )}
-                </div>
                 <textarea
                     aria-label='chat-box'
                     value={body}
@@ -34,7 +34,7 @@ export function Chat({cid, outing}:ChatProps){
                     placeholder={"start typing..."}
                 >
                 </textarea>
-                <button name={'send'} type='submit'>send</button>
+                <button type='submit'>send</button>
             </form>
         </div>
     </>

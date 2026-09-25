@@ -18,6 +18,7 @@ import { Route as MeOutingsRouteImport } from './routes/me.outings'
 import { Route as MeProfileRouteImport } from './routes/me.profile'
 import { Route as OutingsIdRouteImport } from './routes/outings.$id'
 import { Route as OutingsNewRouteImport } from './routes/outings.new'
+import { Route as OutingsIdConversationRouteImport } from './routes/outings_.$id.conversation'
 import { Route as OutingsIdEditRouteImport } from './routes/outings_.$id.edit'
 
 const IndexRoute = IndexRouteImport.update({
@@ -65,6 +66,11 @@ const OutingsNewRoute = OutingsNewRouteImport.update({
   path: '/outings/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OutingsIdConversationRoute = OutingsIdConversationRouteImport.update({
+  id: '/outings_/$id/conversation',
+  path: '/outings/$id/conversation',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OutingsIdEditRoute = OutingsIdEditRouteImport.update({
   id: '/outings_/$id/edit',
   path: '/outings/$id/edit',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
   '/outings/new': typeof OutingsNewRoute
+  '/outings/$id/conversation': typeof OutingsIdConversationRoute
   '/outings/$id/edit': typeof OutingsIdEditRoute
 }
 export interface FileRoutesByTo {
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
   '/outings/new': typeof OutingsNewRoute
+  '/outings/$id/conversation': typeof OutingsIdConversationRoute
   '/outings/$id/edit': typeof OutingsIdEditRoute
 }
 export interface FileRoutesById {
@@ -106,6 +114,7 @@ export interface FileRoutesById {
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
   '/outings/new': typeof OutingsNewRoute
+  '/outings_/$id/conversation': typeof OutingsIdConversationRoute
   '/outings_/$id/edit': typeof OutingsIdEditRoute
 }
 export interface FileRouteTypes {
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/me/profile'
     | '/outings/$id'
     | '/outings/new'
+    | '/outings/$id/conversation'
     | '/outings/$id/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -132,6 +142,7 @@ export interface FileRouteTypes {
     | '/me/profile'
     | '/outings/$id'
     | '/outings/new'
+    | '/outings/$id/conversation'
     | '/outings/$id/edit'
   id:
     | '__root__'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/me/profile'
     | '/outings/$id'
     | '/outings/new'
+    | '/outings_/$id/conversation'
     | '/outings_/$id/edit'
   fileRoutesById: FileRoutesById
 }
@@ -157,6 +169,7 @@ export interface RootRouteChildren {
   MeProfileRoute: typeof MeProfileRoute
   OutingsIdRoute: typeof OutingsIdRoute
   OutingsNewRoute: typeof OutingsNewRoute
+  OutingsIdConversationRoute: typeof OutingsIdConversationRoute
   OutingsIdEditRoute: typeof OutingsIdEditRoute
 }
 
@@ -225,6 +238,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OutingsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/outings_/$id/conversation': {
+      id: '/outings_/$id/conversation'
+      path: '/outings/$id/conversation'
+      fullPath: '/outings/$id/conversation'
+      preLoaderRoute: typeof OutingsIdConversationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/outings_/$id/edit': {
       id: '/outings_/$id/edit'
       path: '/outings/$id/edit'
@@ -245,6 +265,7 @@ const rootRouteChildren: RootRouteChildren = {
   MeProfileRoute: MeProfileRoute,
   OutingsIdRoute: OutingsIdRoute,
   OutingsNewRoute: OutingsNewRoute,
+  OutingsIdConversationRoute: OutingsIdConversationRoute,
   OutingsIdEditRoute: OutingsIdEditRoute,
 }
 export const routeTree = rootRouteImport
