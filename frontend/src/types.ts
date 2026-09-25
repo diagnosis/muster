@@ -42,6 +42,7 @@ export interface Outing{
     status: OutingStatus
     created_at: string
     updated_at: string
+    conversation_id:string
 }
 
 export interface Detail{

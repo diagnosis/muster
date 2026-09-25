@@ -5,7 +5,7 @@ import type {ApiError, ApiResponse} from '../types'
 
 let refreshInFlight: Promise<boolean> | null = null
 
-const refreshSession = () => {
+export const refreshSession = () => {
     if (refreshInFlight) return refreshInFlight
     refreshInFlight = bareRequest('/api/auth/refresh', {
         method:'POST',

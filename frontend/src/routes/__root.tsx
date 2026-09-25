@@ -5,6 +5,8 @@ import type {QueryClient} from "@tanstack/react-query";
 import {Header} from "@/components/Header.tsx";
 import styles from "@/routes/Layout.module.css"
 import {NotFound} from "@/components/NotFound.tsx";
+import {EventsProvider} from "@/events/EventProvider.tsx";
+import {useMeQuery} from "@/queries.ts";
 
 export const Route =
     createRootRouteWithContext<{queryClient:QueryClient}>()({
@@ -13,11 +15,14 @@ export const Route =
     })
 
 export function RouteComponent(){
+    const { data: me } = useMeQuery()
     return <>
         <Header/>
-        <div className={styles.shell}>
-            <Outlet/>
-        </div>
+        <EventsProvider enabled={!!me}>
+            <div className={styles.shell}>
+                <Outlet/>
+            </div>
+        </EventsProvider>
     </>
 }
 

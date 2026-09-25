@@ -3,12 +3,14 @@
 import { useListMessages, usePostMessage} from "@/queries/message.ts";
 import type {Outing} from "@/types.ts";
 import {useState} from "react";
+import {useConversationEvents} from "@/events/useConversationEvents.ts";
 interface ChatProps {
     cid: string
     outing: Outing
 }
 
 export function Chat({cid, outing}:ChatProps){
+    useConversationEvents(cid)
     const [body, setBody] = useState("")
     const messages = useListMessages(cid)
     const postMessage = usePostMessage(cid)
