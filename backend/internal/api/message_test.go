@@ -298,15 +298,17 @@ func Test_HandleListMessages_Happy(t *testing.T) {
 		t.Errorf("expected 200 got %d", w.Code)
 	}
 	var resp struct {
-		Data []testMessage `json:"data"`
+		Data struct {
+			Messages []testMessage `json:"messages"`
+		} `json:"data"`
 	}
 	dec := json.NewDecoder(w.Body)
 	err := dec.Decode(&resp)
 	if err != nil {
 		t.Fatalf("got error n decoding %v", err)
 	}
-	if len(resp.Data) != 4 {
-		t.Errorf("expected list size 4 got %d", len(resp.Data))
+	if len(resp.Data.Messages) != 4 {
+		t.Errorf("expected list size 4 got %d", len(resp.Data.Messages))
 	}
 	if f.gotConvID != convID {
 		t.Errorf("expected %v got %v", convID, f.gotConvID)
@@ -314,7 +316,7 @@ func Test_HandleListMessages_Happy(t *testing.T) {
 	if f.gotHikerID != hikerID {
 		t.Errorf("expected %v got %v", hikerID, f.gotHikerID)
 	}
-	for i, b := range resp.Data {
+	for i, b := range resp.Data.Messages {
 		if b.Seq != i+1 {
 			t.Errorf("expected %d got %d", i+1, b.Seq)
 		}
@@ -335,7 +337,7 @@ func Test_HandleListMessages_EmptyList(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("expected 200 got %d", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), `"data":[]`) {
+	if !strings.Contains(w.Body.String(), `"messages":[]`) {
 		t.Errorf("expected empty array got %v", w.Body.String())
 	}
 }

@@ -186,3 +186,20 @@ export interface Comment{
     body: string
     created_at: string
 }
+
+export interface ListMessagesResponse{
+    messages: Message[]
+}
+export interface MessageInput{
+    body: string
+}
+
+export interface Message {
+    id: string
+    conversation_id: string
+    hiker_id: string
+    seq: number
+    body: string
+    created_at: string
+}
+

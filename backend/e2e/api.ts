@@ -142,3 +142,10 @@ export const likeComment = (ctx:APIRequestContext, outingID:string, commentID:st
     ctx.post(`/api/outings/${outingID}/comments/${commentID}/like`)
 export const unlikeComment = (ctx:APIRequestContext, outingID:string, commentID:string) =>
     ctx.delete(`/api/outings/${outingID}/comments/${commentID}/like`)
+
+export const listMessages = (ctx: APIRequestContext, cid:string)=>
+    ctx.get(`/api/conversations/${cid}/messages`)
+export const postMessage = (ctx: APIRequestContext, cid: string, input:{body:string}) =>
+    ctx.post(`/api/conversations/${cid}/messages`, {data:input})
+export const deleteMessage = (ctx: APIRequestContext, mid: string) =>
+    ctx.delete(`/api/messages/${mid}`)

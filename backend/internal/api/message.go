@@ -65,7 +65,9 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	if messages == nil {
 		messages = []*message.Message{}
 	}
-	responder.JSON(w, http.StatusOK, messages, correlationID)
+	responder.JSON(w, http.StatusOK, map[string]any{
+		"messages": messages,
+	}, correlationID)
 }
 
 func (s *Server) handleDeleteMessage(w http.ResponseWriter, r *http.Request) {
