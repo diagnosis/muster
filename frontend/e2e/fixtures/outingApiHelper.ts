@@ -1,7 +1,7 @@
 // e2e/fixtures/outingApiHelper.ts
 
 
-import type {CreateOutingInput, JoinRequest, JoinRequestInput, Outing} from "./types.ts";
+import type {CreateOutingInput, JoinRequest, JoinRequestInput, Message, Outing} from "./types.ts";
 import {type Actor} from "./actor.ts";
 import {tag} from "./mint.ts";
 import {unwrap} from "./api.ts";
@@ -92,4 +92,9 @@ export async function declineRequest(actor:Actor, requestId: string){
 export async function removeMember(actor:Actor, requestId: string){
     const res = await actor.api.delete(`/api/requests/${requestId}/member`)
     return unwrap<JoinRequest>(res, 'remove member')
+}
+
+export async function postMessage(actor:Actor,cid: string ,input:{body:string}){
+    const res = await actor.api.post(`/api/conversations/${cid}/messages`, {data: input})
+    return unwrap<Message>(res, 'post message')
 }
