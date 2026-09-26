@@ -130,6 +130,7 @@ export function OutingDetailPage() {
             detail.my_request?.status === 'requested'
     )
     const isReadOnly = detail.outing.status === 'cancelled' || new Date(detail.outing.starts_at) < new Date()
+    const canSeeChat = me && (me.id === detail.host.hiker_id || detail.roster.some(r => r.hiker_id === me.id))
 
     return <>
         <div className={styles.container}>
@@ -180,6 +181,9 @@ export function OutingDetailPage() {
                 <h2 className={styles.subheading}>Notes</h2>
                 {detail.outing.notes && <p>{detail.outing.notes}</p>}
             </section>}
+            {canSeeChat&&<div>
+                <Link className={'btn btn-primary'} to={'/outings/$id/conversation'} params={{id:id}}>Outing chat</Link>
+            </div>}
             {canSeeComments&&(
                 <Comments outingId={id} hostId={detail.outing.host_id} readOnly={isReadOnly}/>
             )}

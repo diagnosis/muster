@@ -14,6 +14,19 @@ export function EventsProvider({children, enabled}:{children: ReactNode, enabled
         if(!enabled) return
         let es: EventSource | null = null
         let stopped = false
+        let delay = 1000
+        let timer: ReturnType<typeof setTimeout> | null = null
+
+        const reconnect = async () => {
+            es?.close()
+            if (stopped) return
+            const status = await refreshSession()
+            if (stopped) return                       // cleanup ran while we awaited
+            if (status === 401) { stopped = true; return }
+            if (status === 200) { open(); return }
+            timer = setTimeout(reconnect, delay)      // server down: try again later
+            delay = Math.min(delay * 2, 30_000)
+        }
 
         const open = () => {
             es = new EventSource(`${API_BASE}/api/events`, {withCredentials: true})
@@ -22,15 +35,11 @@ export function EventsProvider({children, enabled}:{children: ReactNode, enabled
                     handlers.current.get(type)?.forEach(h=>h((e as MessageEvent).data))
                 })
             }
-            es.onerror = async () => {
-                es?.close()
-                if (stopped) return
-                const ok = await refreshSession()
-                if (ok) open(); else stopped = true
-            }
+            es.onopen = () => { delay = 1000 }
+            es.onerror = reconnect
         }
         open()
-        return () => {stopped= true; es?.close()}
+        return () => {stopped= true;if (timer) clearTimeout(timer); es?.close()}
     }, [enabled])
 
     const subscribe = useCallback((type: string, h: Handler) => {

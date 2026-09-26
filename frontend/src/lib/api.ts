@@ -3,15 +3,14 @@ const API_BASE = import.meta.env.VITE_API_URL ?? ''
 import type {ApiError, ApiResponse} from '../types'
 
 
-let refreshInFlight: Promise<boolean> | null = null
+let refreshInFlight: Promise<number> | null = null
 
-export const refreshSession = () => {
+export const refreshSession = (): Promise<number> => {
     if (refreshInFlight) return refreshInFlight
-    refreshInFlight = bareRequest('/api/auth/refresh', {
-        method:'POST',
-    })
-        .then(r => r.ok)
-        .finally(()=>{refreshInFlight = null})
+    refreshInFlight = bareRequest('/api/auth/refresh', { method: 'POST' })
+        .then(r => (r.ok ? 200 : r.httpStatus))
+        .catch(() => 0)                       // fetch threw: server unreachable
+        .finally(() => { refreshInFlight = null })
     return refreshInFlight
 }
 
@@ -24,7 +23,7 @@ const request = async <T>(endpoint:string, init?: RequestInit):Promise<ApiRespon
         return res
     }
     const refresh = await refreshSession()
-    if(refresh){
+    if(refresh === 200){
         return bareRequest<T>(endpoint, init)
     }
     return res
