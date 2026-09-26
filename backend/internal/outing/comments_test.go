@@ -11,7 +11,7 @@ import (
 )
 
 func Test_AddComment_MemberSucceeds(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, memberID := uuid.New(), uuid.New()
 	o := seedOuting(6, 4, StatusOpen, hostID, f)
 	_ = seedJoinRequest(o.ID, memberID, RequestStatusAccepted, RoleRider, f, 0)
@@ -30,7 +30,7 @@ func Test_AddComment_MemberSucceeds(t *testing.T) {
 }
 
 func Test_AddComment_NoMemberForbidden(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, strangerID := uuid.New(), uuid.New()
 	o := seedOuting(6, 4, StatusOpen, hostID, f)
 	_, err := svc.AddComment(context.Background(), strangerID, o.ID, "Halo!", nil)
@@ -39,7 +39,7 @@ func Test_AddComment_NoMemberForbidden(t *testing.T) {
 
 // riderID is a pending requester — this also proves the pending-audience door
 func Test_AddComment_ReplyToTopLevel(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, driverID, riderID := uuid.New(), uuid.New(), uuid.New()
 
 	o := seedOuting(6, 4, StatusOpen, hostID, f)
@@ -64,7 +64,7 @@ func Test_AddComment_ReplyToTopLevel(t *testing.T) {
 }
 
 func Test_AddComment_ReplyOnReplyReturnsConflict(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, salihAbi, recepI := uuid.New(), uuid.New(), uuid.New()
 
 	o := seedOuting(6, 4, StatusOpen, hostID, f)
@@ -87,7 +87,7 @@ func Test_AddComment_ReplyOnReplyReturnsConflict(t *testing.T) {
 }
 
 func Test_AddComment_ParentFromAnotherOutingReturnsBadRequest(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	host1ID, host2ID, hikerID := uuid.New(), uuid.New(), uuid.New()
 
 	o1 := seedOuting(6, 4, StatusOpen, host1ID, f)
@@ -107,7 +107,7 @@ _:
 }
 
 func Test_AddComment_CancelledAndPassedOutingReturnConflict(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	host1ID, host2ID, hikerID := uuid.New(), uuid.New(), uuid.New()
 	o1 := seedOutingWithStartTime(5, 3, StatusOpen, host1ID, f, time.Now().Add(-6*time.Hour))
 	o2 := seedOuting(7, 3, StatusCancelled, host2ID, f)
@@ -124,7 +124,7 @@ func Test_AddComment_CancelledAndPassedOutingReturnConflict(t *testing.T) {
 
 func Test_AddComment_BodyOver2000Chs(t *testing.T) {
 	body := strings.Repeat("abcdefgjkl", 201)
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, memberID := uuid.New(), uuid.New()
 	o := seedOuting(6, 4, StatusOpen, hostID, f)
 	_ = seedJoinRequest(o.ID, memberID, RequestStatusAccepted, RoleRider, f, 0)
@@ -135,7 +135,7 @@ func Test_AddComment_BodyOver2000Chs(t *testing.T) {
 }
 
 func Test_AddComment_PendingCanComment(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, memberID := uuid.New(), uuid.New()
 	o := seedOuting(6, 4, StatusOpen, hostID, f)
 	_ = seedJoinRequest(o.ID, memberID, RequestStatusRequested, RoleRider, f, 0)
@@ -153,7 +153,7 @@ func Test_AddComment_PendingCanComment(t *testing.T) {
 }
 
 func Test_AddComment_ReplyOnDeletedParentReturnsConflict(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, memberID := uuid.New(), uuid.New()
 	o := seedOuting(8, 4, StatusOpen, hostID, f)
 
@@ -171,7 +171,7 @@ func Test_AddComment_ReplyOnDeletedParentReturnsConflict(t *testing.T) {
 }
 
 func Test_DeleteComment_DeleteSuccess(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, hikerID := uuid.New(), uuid.New()
 	o := seedOuting(8, 4, StatusOpen, hostID, f)
 
@@ -199,7 +199,7 @@ func Test_DeleteComment_DeleteSuccess(t *testing.T) {
 }
 
 func Test_DeleteComment_HostDeletes(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, hikerID := uuid.New(), uuid.New()
 	o := seedOuting(8, 4, StatusOpen, hostID, f)
 
@@ -225,7 +225,7 @@ func Test_DeleteComment_HostDeletes(t *testing.T) {
 }
 
 func Test_DeleteComment_StrangerTriesToDelete(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, hikerID, stranger := uuid.New(), uuid.New(), uuid.New()
 	o := seedOuting(8, 4, StatusOpen, hostID, f)
 
@@ -247,7 +247,7 @@ func Test_DeleteComment_StrangerTriesToDelete(t *testing.T) {
 }
 
 func Test_DeleteComment_DeletingParentKeepsReplies(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, driverID, riderID := uuid.New(), uuid.New(), uuid.New()
 	o := seedOuting(10, 4, StatusOpen, hostID, f)
 	_ = seedJoinRequest(o.ID, driverID, RequestStatusRequested, "driver", f, 2)
@@ -276,7 +276,7 @@ func Test_DeleteComment_DeletingParentKeepsReplies(t *testing.T) {
 }
 
 func Test_LikeAndUnlikeComment_LikeSuccess(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, hikerID := uuid.New(), uuid.New()
 	o := seedOuting(8, 4, StatusOpen, hostID, f)
 
@@ -307,7 +307,7 @@ func Test_LikeAndUnlikeComment_LikeSuccess(t *testing.T) {
 
 }
 func Test_LikeAndUnlikeComment_UnLikeSuccess(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, hikerID := uuid.New(), uuid.New()
 	o := seedOuting(5, 4, StatusOpen, hostID, f)
 
@@ -338,7 +338,7 @@ func Test_LikeAndUnlikeComment_UnLikeSuccess(t *testing.T) {
 }
 
 func Test_LikeAndUnlikeComment_LikeADeletedCommentReturnsConflict(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, hikerID := uuid.New(), uuid.New()
 	o := seedOuting(8, 4, StatusOpen, hostID, f)
 
@@ -359,7 +359,7 @@ func Test_LikeAndUnlikeComment_LikeADeletedCommentReturnsConflict(t *testing.T) 
 }
 
 func Test_LikeAndUnlikeComment_LikeByAStrangerForbidden(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, hikerID, stranger := uuid.New(), uuid.New(), uuid.New()
 	o := seedOuting(8, 4, StatusOpen, hostID, f)
 
@@ -379,7 +379,7 @@ func Test_LikeAndUnlikeComment_LikeByAStrangerForbidden(t *testing.T) {
 }
 
 func Test_LikeAndUnlikeComment_DoubleLike(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, hikerID := uuid.New(), uuid.New()
 	o := seedOuting(8, 4, StatusOpen, hostID, f)
 
@@ -414,7 +414,7 @@ func Test_LikeAndUnlikeComment_DoubleLike(t *testing.T) {
 }
 
 func Test_Comment_ListComments_Success(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, hikerID := uuid.New(), uuid.New()
 	o := seedOuting(8, 4, StatusOpen, hostID, f)
 
@@ -462,7 +462,7 @@ func Test_Comment_ListComments_Success(t *testing.T) {
 }
 
 func Test_Comment_ListComments_Stranger(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID, hikerID, stranger := uuid.New(), uuid.New(), uuid.New()
 	o := seedOuting(8, 4, StatusOpen, hostID, f)
 

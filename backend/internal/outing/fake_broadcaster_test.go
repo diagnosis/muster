@@ -1,4 +1,4 @@
-package message
+package outing
 
 import (
 	"github.com/diagnosis/muster/internal/events"
@@ -21,7 +21,6 @@ func newFakeBroadcaster() *fakeBroadcaster {
 func (f *fakeBroadcaster) BroadcastToUser(hikerID uuid.UUID, e events.Event) {
 	f.sent = append(f.sent, sent{HikerID: hikerID, Event: e})
 }
-
 func (f *fakeBroadcaster) sentTo(hikerID uuid.UUID) []events.Event {
 	me := []events.Event{}
 	for _, s := range f.sent {

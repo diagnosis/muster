@@ -7,11 +7,20 @@ import {relativeTime} from "@/utils/date.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import {useNavigate} from "@tanstack/react-router";
+import {useEvents} from "@/events/EventProvider.tsx";
 export function NotificationBell( ){
+    const { subscribe } = useEvents()
     const queryClient = useQueryClient()
     const navigate = useNavigate()
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
+    useEffect( () => {
+       return subscribe('notification.created', ()=>{
+           queryClient.invalidateQueries({queryKey: ['notifications']})
+       })
+    }, [subscribe, queryClient])
+
+
     useEffect( () => {
         if (!open)return
         const onClick = (e: MouseEvent) => {

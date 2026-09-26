@@ -120,6 +120,5 @@ export function useNotifications() {
             if (res.ok) return res.data
             throw new ApiRequestError(res.error, res.httpStatus)
         },
-        refetchInterval: 30_000,   // the polling bridge — "eventually fresh"
     })
 }

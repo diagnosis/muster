@@ -17,8 +17,8 @@ export const Route =
 export function RouteComponent(){
     const { data: me } = useMeQuery()
     return <>
-        <Header/>
         <EventsProvider enabled={!!me}>
+            <Header/>
             <div className={styles.shell}>
                 <Outlet/>
             </div>

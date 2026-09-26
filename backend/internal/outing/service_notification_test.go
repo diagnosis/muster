@@ -9,15 +9,16 @@ import (
 	"github.com/google/uuid"
 )
 
-func newTestService(t *testing.T) (*Service, *fakeStore, *fakeNotificationStore) {
+func newTestService(t *testing.T) (*Service, *fakeStore, *fakeNotificationStore, *fakeBroadcaster) {
 	t.Helper()
 	f := newFakeStore()
 	fn := &fakeNotificationStore{}
-	return NewService(f, fn), f, fn
+	fb := newFakeBroadcaster()
+	return NewService(f, fn, fb), f, fn, fb
 }
 
 func Test_Decline_NotifiesRequester(t *testing.T) {
-	svc, f, fn := newTestService(t)
+	svc, f, fn, fb := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -38,11 +39,21 @@ func Test_Decline_NotifiesRequester(t *testing.T) {
 	if fn.events[0].Kind != notification.KindJoinRequestDeclined {
 		t.Errorf("expected event_kind: %s got %s", notification.KindJoinRequestDeclined, fn.events[0].Kind)
 	}
+	if len(fb.sentTo(hikerID)) != 1 {
+		t.Fatalf("expected 1 got, %d", len(fb.sentTo(hikerID)))
+	}
+	got := fb.sentTo(hikerID)
+	if got[0].Type != "notification.created" {
+		t.Errorf("expected notification.created got %s", got[0].Type)
+	}
+	if len(fb.sentTo(hostID)) != 0 {
+		t.Fatalf("expected 0 got %d", len(fb.sentTo(hostID)))
+	}
 
 }
 
 func Test_Accept_NotifiesRequester(t *testing.T) {
-	svc, f, fn := newTestService(t)
+	svc, f, fn, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -65,7 +76,7 @@ func Test_Accept_NotifiesRequester(t *testing.T) {
 	}
 }
 func Test_Request_NotifiesHost(t *testing.T) {
-	svc, f, fn := newTestService(t)
+	svc, f, fn, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -93,7 +104,7 @@ func Test_Request_NotifiesHost(t *testing.T) {
 }
 
 func Test_Withdrawn_BeforeAccepted_NotifiesHost(t *testing.T) {
-	svc, f, fn := newTestService(t)
+	svc, f, fn, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -118,7 +129,7 @@ func Test_Withdrawn_BeforeAccepted_NotifiesHost(t *testing.T) {
 }
 
 func Test_Withdrawn_AfterAccepted_NotifiesHost(t *testing.T) {
-	svc, f, fn := newTestService(t)
+	svc, f, fn, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -143,7 +154,7 @@ func Test_Withdrawn_AfterAccepted_NotifiesHost(t *testing.T) {
 }
 
 func Test_RemoveMember_NotifiesRemovedHiker(t *testing.T) {
-	svc, f, fn := newTestService(t)
+	svc, f, fn, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -167,7 +178,7 @@ func Test_RemoveMember_NotifiesRemovedHiker(t *testing.T) {
 }
 
 func Test_CancelOuting_NotifiesEachMember(t *testing.T) {
-	svc, f, fn := newTestService(t)
+	svc, f, fn, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hiker1ID := uuid.New()
@@ -206,7 +217,7 @@ func Test_CancelOuting_NotifiesEachMember(t *testing.T) {
 }
 
 func Test_UpdateOuting_NotifiesEachMember(t *testing.T) {
-	svc, f, fn := newTestService(t)
+	svc, f, fn, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hiker1ID := uuid.New()
@@ -255,7 +266,7 @@ func Test_UpdateOuting_NotifiesEachMember(t *testing.T) {
 }
 
 func Test_Rerequest_NotifiesHost(t *testing.T) {
-	svc, f, fn := newTestService(t)
+	svc, f, fn, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hiker1ID := uuid.New()

@@ -2,12 +2,14 @@ package outing
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/diagnosis/go-toolkit/v3/logger"
 	"github.com/diagnosis/go-toolkit/v3/validator"
+	"github.com/diagnosis/muster/internal/events"
 	"github.com/diagnosis/muster/internal/notification"
 	"github.com/google/uuid"
 )
@@ -50,11 +52,12 @@ type Storage interface {
 type Service struct {
 	store         Storage
 	notifications notification.Storage
+	broadcaster   events.Broadcaster
 }
 
 // NewService returns a Service backed by store.
-func NewService(store Storage, notifications notification.Storage) *Service {
-	return &Service{store: store, notifications: notifications}
+func NewService(store Storage, notifications notification.Storage, broadcaster events.Broadcaster) *Service {
+	return &Service{store: store, notifications: notifications, broadcaster: broadcaster}
 }
 
 // minLeadTime is how far in advance an outing must be scheduled —
@@ -699,6 +702,9 @@ func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, outing *Outing,
 		Payload: map[string]any{"outing_id": outing.ID, "outing_title": outing.Title},
 	}); err != nil {
 		logger.Warn(ctx, "failed to send notification", "err", err, "hikerID:", hikerID)
+	} else {
+		data, _ := json.Marshal(map[string]any{"kind": kind, "outing_id": outing.ID})
+		s.broadcaster.BroadcastToUser(hikerID, events.Event{Type: "notification.created", Data: string(data)})
 	}
 }
 func (s *Service) notifyOutingAudience(ctx context.Context, outing *Outing, kind notification.Kind) {
