@@ -42,6 +42,7 @@ export interface Outing{
     status: OutingStatus
     created_at: string
     updated_at: string
+    conversation_id:string
 }
 
 export interface Detail{
@@ -186,3 +187,20 @@ export interface Comment{
     body: string
     created_at: string
 }
+
+export interface ListMessagesResponse{
+    messages: Message[]
+}
+export interface MessageInput{
+    body: string
+}
+
+export interface Message {
+    id: string
+    conversation_id: string
+    hiker_id: string
+    seq: number
+    body: string
+    created_at: string
+}
+

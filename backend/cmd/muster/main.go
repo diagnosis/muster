@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/logger"
@@ -13,7 +15,9 @@ import (
 	"github.com/diagnosis/muster/internal/api"
 	"github.com/diagnosis/muster/internal/authtoken"
 	"github.com/diagnosis/muster/internal/config"
+	"github.com/diagnosis/muster/internal/events"
 	"github.com/diagnosis/muster/internal/hiker"
+	"github.com/diagnosis/muster/internal/message"
 	"github.com/diagnosis/muster/internal/notification"
 	"github.com/diagnosis/muster/internal/outing"
 	"github.com/diagnosis/muster/internal/postgres"
@@ -37,7 +41,8 @@ func run() error {
 	}
 	logger.Init(cfg.App.Env)
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 	pool, err := openPool(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("db pool: %w", err)
@@ -53,6 +58,7 @@ func run() error {
 	tokenStore := postgres.NewAuthTokenStore(pool)
 	outingsStore := postgres.NewOutingStore(pool)
 	notificationStore := postgres.NewNotificationStore(pool)
+	messageStore := postgres.NewMessageStore(pool)
 	tokenService := authtoken.NewService(tokenStore)
 
 	signer, err := secure.NewJWTSigner(secure.JWTConfig{
@@ -85,22 +91,48 @@ func run() error {
 	hikers := hiker.NewService(hikerServiceConfig)
 	outings := outing.NewService(outingsStore, notificationStore)
 	dispatcher := notification.NewDispatcher(notificationStore, m, cfg.App.DispatcherInterval, cfg.App.BaseURL)
-	srv := api.NewServer(cfg, hikers, signer, outings, notificationStore)
+	hub := events.NewHub()
 
-	ctxWithCancel, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go dispatcher.Run(ctxWithCancel)
+	messages := message.NewService(messageStore, hub)
 
-	logger.Info(ctx, "muster listening", "addr", cfg.App.Host+":"+cfg.App.Port)
-	return (&http.Server{
+	srv := api.NewServer(cfg, hikers, signer, outings, notificationStore, hub, messages)
+
+	go dispatcher.Run(ctx)
+	server := &http.Server{
 		Addr:              cfg.App.Host + ":" + cfg.App.Port,
 		Handler:           srv.Routes(),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      0,
 		IdleTimeout:       120 * time.Second,
-	}).ListenAndServe()
-}
+	}
 
+	serverErrors := make(chan error, 1)
+	go func() {
+		logger.Info(ctx, "muster listening", "addr", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErrors <- fmt.Errorf("http server: %w", err)
+		}
+	}()
+	select {
+	case err := <-serverErrors:
+		return err
+
+	case <-ctx.Done():
+		logger.Info(context.Background(), "muster shutting down gracefully...")
+
+		shutDownCtx, cancelShutdown := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancelShutdown()
+		hub.CloseAll()
+		if err := server.Shutdown(shutDownCtx); err != nil {
+			_ = server.Close()
+			return fmt.Errorf("graceful shutdown failed: %w", err)
+		}
+	}
+
+	logger.Info(context.Background(), "muster stopped cleanly")
+	return nil
+
+}
 func openPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	dbConfig := cfg.Database
 	pgxConfig, err := pgxpool.ParseConfig(dbConfig.DSN)

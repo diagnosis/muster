@@ -2,6 +2,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -10,9 +11,12 @@ import (
 	"github.com/diagnosis/go-toolkit/v3/responder"
 	"github.com/diagnosis/go-toolkit/v3/secure"
 	"github.com/diagnosis/muster/internal/config"
+	"github.com/diagnosis/muster/internal/events"
 	"github.com/diagnosis/muster/internal/hiker"
+	"github.com/diagnosis/muster/internal/message"
 	"github.com/diagnosis/muster/internal/notification"
 	"github.com/diagnosis/muster/internal/outing"
+	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 )
 
@@ -23,17 +27,27 @@ type Server struct {
 	cfg           *config.Config
 	outings       *outing.Service
 	notifications notification.Storage
+	hub           *events.Hub
+	messages      messageService
 }
 
 // NewServer returns a Server serving the given services.
-func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner, outings *outing.Service, notifications notification.Storage) *Server {
+func NewServer(cfg *config.Config, hikers *hiker.Service, jwt *secure.JWTSigner, outings *outing.Service, notifications notification.Storage, hub *events.Hub, messages messageService) *Server {
 	return &Server{
 		hikers:        hikers,
 		jwt:           jwt,
 		cfg:           cfg,
 		outings:       outings,
 		notifications: notifications,
+		hub:           hub,
+		messages:      messages,
 	}
+}
+
+type messageService interface {
+	PostMessage(ctx context.Context, convID, hikerID uuid.UUID, body string) (*message.Message, error)
+	ListMessages(ctx context.Context, convID, hikerID uuid.UUID) ([]*message.Message, error)
+	DeleteMessage(ctx context.Context, msgID, hikerID uuid.UUID) error
 }
 
 // Routes returns the fully wired HTTP handler.
@@ -85,8 +99,16 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/outings/{id}/comments/{cid}/like", requireAuth(http.HandlerFunc(s.handleLikeComment)))
 	mux.Handle("DELETE /api/outings/{id}/comments/{cid}/like", requireAuth(http.HandlerFunc(s.handleUnlikeComment)))
 
+	// protected events
+	mux.Handle("GET /api/events", requireAuth(http.HandlerFunc(s.handleEvents)))
+
 	// hikers public routes
 	mux.HandleFunc("GET /api/hikers/{id}", s.handleGetHiker)
+
+	// messages
+	mux.Handle("POST /api/conversations/{id}/messages", requireAuth(http.HandlerFunc(s.handlePostMessage)))
+	mux.Handle("DELETE /api/messages/{id}", requireAuth(http.HandlerFunc(s.handleDeleteMessage)))
+	mux.Handle("GET /api/conversations/{id}/messages", requireAuth(http.HandlerFunc(s.handleListMessages)))
 
 	var h http.Handler = mux
 	h = middleware.RateLimit(rate.Limit(s.cfg.RateLimiter.RPS), int(s.cfg.RateLimiter.Burst), 5*time.Minute)(h)
@@ -118,3 +140,5 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"status": "ok",
 	}, correlationID)
 }
+
+var _ messageService = (*message.Service)(nil)

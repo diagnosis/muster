@@ -42,6 +42,7 @@ export interface OutingResponse {
     cost_per_seat_cents: number
     difficulty: 'hard'|'easy'|'moderate'
     pace: 'relaxed' | 'fast' | 'moderate'
+    conversation_id: string
 }
 
 export interface JoinRequestResponse {
@@ -178,6 +179,18 @@ export interface CommentView{
 }
 export interface ListCommentResponse{
     comments:CommentView[]
+}
+
+export interface Message {
+    id: string
+    conversation_id: string
+    hiker_id: string
+    seq: number
+    body: string
+    created_at: string
+}
+export interface ListMessages{
+    messages: Message[]
 }
 
 
