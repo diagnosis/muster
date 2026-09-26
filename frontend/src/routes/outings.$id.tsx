@@ -3,7 +3,7 @@ import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import type {Detail, Member} from "@/types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useMeQuery, useOuting} from "@/queries.ts";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {JoinForm} from "@/components/JoinForm.tsx";
 import {HostControls} from "@/components/HostControls.tsx";
 import styles from "@/routes/outings.$id.module.css"
@@ -11,6 +11,7 @@ import formStyles from "@/routes/form.module.css"
 import {Badges} from "@/components/Badges.tsx";
 import {Modal} from "@/components/Modal.tsx";
 import {Comments} from "@/components/Comments.tsx";
+import {useEvents} from "@/events/EventProvider.tsx";
 
 
 export const Route = createFileRoute('/outings/$id')({
@@ -24,6 +25,18 @@ export function OutingDetailPage() {
     const {data: me} = useMeQuery()
     const {data:detail, isPending, error} = useOuting(id)
     const [memberToRemove, setMemberToRemove] = useState<Member|null>(null)
+    const { subscribe } = useEvents()
+    useEffect(()=> {
+        return subscribe('notification.created', (data)=>{
+            const poke = JSON.parse(data)
+            if(poke.outing_id === id){
+                qc.invalidateQueries({ queryKey: ['outings'] })
+                qc.invalidateQueries({ queryKey: ['outing', id] })
+                qc.invalidateQueries({ queryKey: ['my-outings'] })
+                qc.invalidateQueries({ queryKey: ['outing-join-requests', id] })
+            }
+        })
+    }, [subscribe, qc, id])
 
     const withdrawMutation = useMutation({
         mutationFn: async () => {

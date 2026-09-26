@@ -68,7 +68,7 @@ func seedJoinRequestWithCreatedAt(outingID, hikerID uuid.UUID, status RequestSta
 // --- RequestJoin ---
 
 func TestRequestJoin_FirstRequestCreated(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	o := seedOuting(6, 4, StatusOpen, hostID, f)
@@ -86,7 +86,7 @@ func TestRequestJoin_FirstRequestCreated(t *testing.T) {
 }
 
 func TestRequestJoin_HostCannotSelfJoin(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	o := seedOuting(6, 4, StatusOpen, hostID, f)
@@ -98,7 +98,7 @@ func TestRequestJoin_HostCannotSelfJoin(t *testing.T) {
 }
 
 func TestRequestJoin_RiderWithSeats(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -111,7 +111,7 @@ func TestRequestJoin_RiderWithSeats(t *testing.T) {
 }
 
 func TestRequestJoin_DriverZeroSeats(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -122,7 +122,7 @@ func TestRequestJoin_DriverZeroSeats(t *testing.T) {
 }
 
 func TestRequestJoin_TooManyGuests(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -135,7 +135,7 @@ func TestRequestJoin_TooManyGuests(t *testing.T) {
 }
 
 func TestRequestJoin_CancelledOuting(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -148,7 +148,7 @@ func TestRequestJoin_CancelledOuting(t *testing.T) {
 }
 
 func TestRequestJoin_DeclinedIsTerminal(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -166,7 +166,7 @@ func TestRequestJoin_DeclinedIsTerminal(t *testing.T) {
 }
 
 func TestRequestJoin_DuplicateActive(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -183,7 +183,7 @@ func TestRequestJoin_DuplicateActive(t *testing.T) {
 }
 
 func TestRequestJoin_WithdrawnMyRequest(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -302,7 +302,7 @@ func TestAccept_Capacity(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			svc, f, _ := newTestService(t)
+			svc, f, _, _ := newTestService(t)
 			hostID := uuid.New()
 
 			o := &Outing{ID: uuid.New(), HostID: hostID, StartsAt: time.Now().Add(48 * time.Hour),
@@ -335,7 +335,7 @@ func TestAccept_Capacity(t *testing.T) {
 }
 
 func TestAccept_NonHostForbidden(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	random := uuid.New()
@@ -352,7 +352,7 @@ func TestAccept_NonHostForbidden(t *testing.T) {
 }
 
 func Test_Withdraw_AcceptedMayWithdraw(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -372,7 +372,7 @@ func Test_Withdraw_AcceptedMayWithdraw(t *testing.T) {
 }
 
 func Test_Withdraw_RequestedOK(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -391,7 +391,7 @@ func Test_Withdraw_RequestedOK(t *testing.T) {
 	}
 }
 func Test_Withdraw_DeclinedConflicts(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -406,7 +406,7 @@ func Test_Withdraw_DeclinedConflicts(t *testing.T) {
 }
 
 func Test_Decline_PendingWorks(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -424,7 +424,7 @@ func Test_Decline_PendingWorks(t *testing.T) {
 }
 
 func Test_Decline_AcceptedConflicts(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -437,7 +437,7 @@ func Test_Decline_AcceptedConflicts(t *testing.T) {
 }
 
 func Test_Accept_AlreadyAcceptedConflicts(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -450,7 +450,7 @@ func Test_Accept_AlreadyAcceptedConflicts(t *testing.T) {
 }
 
 func Test_RemoveMember_AcceptedWorks(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -469,7 +469,7 @@ func Test_RemoveMember_AcceptedWorks(t *testing.T) {
 }
 
 func Test_RemoveMember_PendingConflicts(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -482,7 +482,7 @@ func Test_RemoveMember_PendingConflicts(t *testing.T) {
 
 }
 func TestService_RemoveMember_TryToJoinBack(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 
 	hostID := uuid.New()
 	hikerID := uuid.New()
@@ -507,7 +507,7 @@ func TestService_RemoveMember_TryToJoinBack(t *testing.T) {
 }
 
 func Test_Cancel_HostCancelsOpen(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 	o := seedOuting(6, 2, StatusOpen, hostID, f)
 
@@ -520,7 +520,7 @@ func Test_Cancel_HostCancelsOpen(t *testing.T) {
 }
 
 func Test_Cancel_HostCancelsCancelled(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 	o := seedOuting(6, 2, StatusCancelled, hostID, f)
 
@@ -529,7 +529,7 @@ func Test_Cancel_HostCancelsCancelled(t *testing.T) {
 }
 
 func Test_Cancel_HostCancelsPastEvent(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 	o := &Outing{ID: uuid.New(), HostID: hostID, StartsAt: time.Now().Add(-2 * time.Hour), MaxSize: 6, HostSeats: 2, Status: StatusOpen}
 	f.outings[o.ID] = o
@@ -539,7 +539,7 @@ func Test_Cancel_HostCancelsPastEvent(t *testing.T) {
 }
 
 func Test_Cancel_RandomCancelsEvent(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 	randomID := uuid.New()
 	o := seedOuting(6, 2, StatusOpen, hostID, f)
@@ -549,7 +549,7 @@ func Test_Cancel_RandomCancelsEvent(t *testing.T) {
 }
 
 func Test_ListUpcoming_SortedOpenFuture(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	host := uuid.New()
 
 	late := seedOuting(6, 2, StatusOpen, host, f)
@@ -576,7 +576,7 @@ func Test_ListUpcoming_SortedOpenFuture(t *testing.T) {
 }
 
 func Test_PendingRequests_QueueOrder(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 
 	o := seedOuting(7, 2, StatusOpen, hostID, f)
@@ -601,7 +601,7 @@ func Test_PendingRequests_QueueOrder(t *testing.T) {
 }
 
 func Test_PendingRequests_Leaked(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 
 	o := seedOuting(7, 2, StatusOpen, hostID, f)
@@ -623,7 +623,7 @@ func Test_PendingRequests_Leaked(t *testing.T) {
 }
 
 func Test_PendingRequests_Forbidden(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 
 	o := seedOuting(7, 2, StatusOpen, hostID, f)
@@ -636,7 +636,7 @@ func Test_PendingRequests_Forbidden(t *testing.T) {
 
 }
 func Test_PendingRequests_EmptyNotNil(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 	o := seedOuting(7, 2, StatusOpen, hostID, f)
 
@@ -653,7 +653,7 @@ func Test_PendingRequests_EmptyNotNil(t *testing.T) {
 }
 
 func Test_MyOutings_Buckets(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hikerID := uuid.New()
 	_ = seedOuting(6, 2, StatusOpen, hikerID, f)
 	_ = seedOuting(4, 2, StatusCancelled, hikerID, f)
@@ -681,7 +681,7 @@ func Test_MyOutings_Buckets(t *testing.T) {
 	}
 }
 func Test_MyOutings_Sorted(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hikerID := uuid.New()
 	earlySelf := seedOutingWithStartTime(6, 4, StatusOpen, hikerID, f, time.Now().Add(24*time.Hour))
 	lateSelf := seedOutingWithStartTime(6, 4, StatusOpen, hikerID, f, time.Now().Add(7*24*time.Hour))
@@ -711,7 +711,7 @@ func Test_MyOutings_Sorted(t *testing.T) {
 }
 
 func Test_MyOutings_EmptyNotNil(t *testing.T) {
-	svc, _, _ := newTestService(t)
+	svc, _, _, _ := newTestService(t)
 	hikerID := uuid.New()
 
 	myOutings, err := svc.MyOutings(context.Background(), hikerID)
@@ -737,7 +737,7 @@ func Test_MyOutings_EmptyNotNil(t *testing.T) {
 }
 
 func Test_Detail_FullAssembly(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 	driverHiker := uuid.New()
 	riderHiker := uuid.New()
@@ -785,7 +785,7 @@ func Test_Detail_FullAssembly(t *testing.T) {
 }
 
 func Test_Detail_SeatsShortage(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 	o := seedOuting(10, 2, StatusOpen, hostID, f)
 	_ = seedMember(hostID, "hostman", "experienced", f)
@@ -807,7 +807,7 @@ func Test_Detail_SeatsShortage(t *testing.T) {
 }
 
 func Test_Detail_MyRequest(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 	o := seedOuting(10, 2, StatusOpen, hostID, f)
 	_ = seedMember(hostID, "hostest", "experienced", f)
@@ -838,7 +838,7 @@ func Test_Detail_MyRequest(t *testing.T) {
 }
 
 func Test_Detail_RosterExcludesNonAccepted(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	hostID := uuid.New()
 	o := seedOuting(10, 2, StatusOpen, hostID, f)
 	seedMember(hostID, "combu", "experienced", f)
@@ -869,7 +869,7 @@ func Test_Detail_RosterExcludesNonAccepted(t *testing.T) {
 }
 
 func Test_Update_HappyPatch(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	host := uuid.New()
 	o := seedOuting(6, 3, StatusOpen, host, f)
 	updatedTitle := "updated title"
@@ -888,7 +888,7 @@ func Test_Update_HappyPatch(t *testing.T) {
 }
 
 func Test_Update_NonHostForbidden(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	host := uuid.New()
 	o := seedOuting(6, 3, StatusOpen, host, f)
 	updatedTitle := "updated title"
@@ -898,7 +898,7 @@ func Test_Update_NonHostForbidden(t *testing.T) {
 }
 
 func Test_Update_CancelledConflicts(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	host := uuid.New()
 	o := seedOuting(6, 3, StatusCancelled, host, f)
 	updatedTitle := "updated title"
@@ -908,7 +908,7 @@ func Test_Update_CancelledConflicts(t *testing.T) {
 }
 
 func Test_Update_PastBadRequest(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	host := uuid.New()
 	o := seedOutingWithStartTime(6, 3, StatusOpen, host, f, time.Now().Add(-2*time.Hour))
 	updatedTitle := "won't matter"
@@ -917,7 +917,7 @@ func Test_Update_PastBadRequest(t *testing.T) {
 }
 
 func Test_Update_SeatShrinkAllowed(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	host := uuid.New()
 	o := seedOuting(6, 3, StatusOpen, host, f)
 	updatedHostSeats := 0
@@ -934,7 +934,7 @@ func Test_Update_SeatShrinkAllowed(t *testing.T) {
 }
 
 func Test_Update_InvalidPatchRejected(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	host := uuid.New()
 	o := seedOuting(6, 3, StatusOpen, host, f)
 	updateStart := time.Now().Add(1 * time.Hour)
@@ -943,7 +943,7 @@ func Test_Update_InvalidPatchRejected(t *testing.T) {
 }
 
 func Test_Update_SizeShrinkNotAllowedLessThenPeopleCount(t *testing.T) {
-	svc, f, _ := newTestService(t)
+	svc, f, _, _ := newTestService(t)
 	host := uuid.New()
 	o := seedOuting(8, 4, StatusOpen, host, f)
 	_ = seedJoinRequest(o.ID, uuid.New(), RequestStatusAccepted, RoleRider, f, 1)

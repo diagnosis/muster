@@ -21,6 +21,11 @@ type Client struct {
 	Send    chan Event
 }
 
+// Broadcaster is the single hub method the service uses; *events.Hub satisfies it.
+type Broadcaster interface {
+	BroadcastToUser(hikerID uuid.UUID, e Event)
+}
+
 // Hub is the registry of open connections keyed by hiker. It holds no roster
 // and no policy; callers decide who receives what. Safe for concurrent use.
 type Hub struct {
@@ -99,3 +104,5 @@ func (h *Hub) Count(hikerID uuid.UUID) int {
 	defer h.mu.RUnlock()
 	return len(h.clients[hikerID])
 }
+
+var _ Broadcaster = (*Hub)(nil)

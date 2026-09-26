@@ -89,12 +89,12 @@ func run() error {
 		VerifyTTL: 24 * time.Hour,
 	}
 	hikers := hiker.NewService(hikerServiceConfig)
-	outings := outing.NewService(outingsStore, notificationStore)
+
 	dispatcher := notification.NewDispatcher(notificationStore, m, cfg.App.DispatcherInterval, cfg.App.BaseURL)
 	hub := events.NewHub()
 
 	messages := message.NewService(messageStore, hub)
-
+	outings := outing.NewService(outingsStore, notificationStore, hub)
 	srv := api.NewServer(cfg, hikers, signer, outings, notificationStore, hub, messages)
 
 	go dispatcher.Run(ctx)

@@ -32,20 +32,15 @@ type Storage interface {
 const maxBodyRunes = 500
 const maxPerMinute = 10
 
-// Broadcaster is the single hub method the service uses; *events.Hub satisfies it.
-type Broadcaster interface {
-	BroadcastToUser(hikerID uuid.UUID, e events.Event)
-}
-
 // Service legislates messaging rules; stores execute them.
 type Service struct {
 	store       Storage
-	broadcaster Broadcaster
+	broadcaster events.Broadcaster
 	now         func() time.Time
 }
 
 // NewService returns a Service over the given store and broadcaster.
-func NewService(store Storage, broadcaster Broadcaster) *Service {
+func NewService(store Storage, broadcaster events.Broadcaster) *Service {
 	return &Service{store: store, broadcaster: broadcaster, now: time.Now}
 }
 

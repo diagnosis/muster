@@ -73,6 +73,21 @@ test.describe("chat message", ()=> {
         await expect(hostPage.getByText("why did you delete my message?")).not.toBeVisible()
         await expect(hikerPage.getByRole("button", { name: `delete message ${hostMessage.id}` })).not.toBeVisible()
 
+    });
+    test("host sees new join request without reload", async ({ browser }) => {
+        const host = await createActor()
+        const hiker = await createActor()
+        const hostCtx = await browser.newContext()
+        await actorInBrowser(host, hostCtx)
+        const outing = await createOuting(host)
 
+        const hostPage = await hostCtx.newPage()
+        await hostPage.goto(`/outings/${outing.id}`)
+        await expect(hostPage.getByText("Requests (0)")).toBeVisible()
+
+        await joinRequest(hiker, outing.id)                       // API, no browser for the hiker
+
+        await expect(hostPage.getByText("Requests (1)")).toBeVisible()   // no reload
+        await expect(hostPage.getByRole("button", { name: "Notifications" })).toContainText("1")
     })
 })
