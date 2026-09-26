@@ -4,6 +4,7 @@ const API_BASE = import.meta.env.VITE_API_URL ?? ''
 type Handler = (data:string) => void
 
 
+
 const Ctx = createContext<{subscribe: (type: string, h:Handler) => () => void} | null >(null)
 
 export function EventsProvider({children, enabled}:{children: ReactNode, enabled:boolean}){
@@ -30,7 +31,7 @@ export function EventsProvider({children, enabled}:{children: ReactNode, enabled
 
         const open = () => {
             es = new EventSource(`${API_BASE}/api/events`, {withCredentials: true})
-            for (const type of ["message.created", "message.deleted"]){
+            for (const type of EVENT_TYPES){
                 es.addEventListener(type, (e)=> {
                     handlers.current.get(type)?.forEach(h=>h((e as MessageEvent).data))
                 })
@@ -54,3 +55,5 @@ export function useEvents() {
     if (!v) throw new Error("useEvents outside EventsProvider")
     return v
 }
+
+export const EVENT_TYPES =["message.created", "message.deleted", "notification.created"]
