@@ -11,13 +11,14 @@ import (
 )
 
 type fakeStore struct {
-	converstations map[uuid.UUID]*Conversation
-	members        map[uuid.UUID]map[uuid.UUID]struct{}
-	messages       map[uuid.UUID]Message
-	seq            int64
-	outingStatuses map[uuid.UUID]outing.Status
-	hosts          map[uuid.UUID]uuid.UUID
-	dms            map[[2]uuid.UUID]*Conversation
+	converstations  map[uuid.UUID]*Conversation
+	members         map[uuid.UUID]map[uuid.UUID]struct{}
+	messages        map[uuid.UUID]Message
+	seq             int64
+	outingStatuses  map[uuid.UUID]outing.Status
+	hosts           map[uuid.UUID]uuid.UUID
+	dms             map[[2]uuid.UUID]*Conversation
+	pendingRequests map[uuid.UUID]map[uuid.UUID]struct{}
 }
 
 func (f *fakeStore) InsertMessage(ctx context.Context, m *Message, now time.Time) error {
@@ -44,13 +45,14 @@ func (f *fakeStore) MemberIDs(ctx context.Context, conversationID uuid.UUID) ([]
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
-		converstations: make(map[uuid.UUID]*Conversation),
-		members:        make(map[uuid.UUID]map[uuid.UUID]struct{}),
-		messages:       make(map[uuid.UUID]Message),
-		seq:            0,
-		outingStatuses: make(map[uuid.UUID]outing.Status),
-		hosts:          make(map[uuid.UUID]uuid.UUID),
-		dms:            make(map[[2]uuid.UUID]*Conversation),
+		converstations:  make(map[uuid.UUID]*Conversation),
+		members:         make(map[uuid.UUID]map[uuid.UUID]struct{}),
+		messages:        make(map[uuid.UUID]Message),
+		seq:             0,
+		outingStatuses:  make(map[uuid.UUID]outing.Status),
+		hosts:           make(map[uuid.UUID]uuid.UUID),
+		dms:             make(map[[2]uuid.UUID]*Conversation),
+		pendingRequests: make(map[uuid.UUID]map[uuid.UUID]struct{}),
 	}
 }
 
@@ -88,6 +90,14 @@ func (f *fakeStore) addOutingConversation(outingID, host uuid.UUID, outingStatus
 		memberSet[m] = struct{}{}
 	}
 	return conv
+}
+func (f *fakeStore) addPendingRequest(outingID, hiker uuid.UUID) {
+	if f.pendingRequests[outingID] == nil {
+		f.pendingRequests[outingID] = make(map[uuid.UUID]struct{})
+	}
+
+	set := f.pendingRequests[outingID]
+	set[hiker] = struct{}{}
 }
 
 func (f *fakeStore) OutingStatus(ctx context.Context, outingID uuid.UUID) (outing.Status, error) {
@@ -146,13 +156,13 @@ func (f *fakeStore) GetOrCreateDM(ctx context.Context, lo, hi, a uuid.UUID) (*Co
 	}
 	status := DMStatusPending
 	c := &Conversation{
-		ID:           uuid.New(),
-		Kind:         ConversationKindDM,
-		DmA:          &lo,
-		DmB:          &hi,
-		DmInitiator:  &a,
-		DmStatus:  &status,
-		CreatedAt:    time.Now(),
+		ID:          uuid.New(),
+		Kind:        ConversationKindDM,
+		DmA:         &lo,
+		DmB:         &hi,
+		DmInitiator: &a,
+		DmStatus:    &status,
+		CreatedAt:   time.Now(),
 	}
 	f.dms[[2]uuid.UUID{lo, hi}] = c
 	f.converstations[c.ID] = c
@@ -160,6 +170,18 @@ func (f *fakeStore) GetOrCreateDM(ctx context.Context, lo, hi, a uuid.UUID) (*Co
 	f.members[c.ID][lo] = struct{}{}
 	f.members[c.ID][hi] = struct{}{}
 	return c, nil
+}
+func (f *fakeStore) CanDM(ctx context.Context, h1, h2 uuid.UUID) (bool, error) {
+	for _, c := range f.converstations {
+		if c.Kind != ConversationKindOuting { continue }
+		set := f.members[c.ID]
+		_, aIn := set[h1]; _, bIn := set[h2]
+		if aIn && bIn { return true, nil }
+		if f.hosts[*c.OutingID] == h1 {
+			if _, pend := f.pendingRequests[*c.OutingID][h2]; pend { return true, nil }
+		}
+	}
+	return false, nil
 }
 
 var _ Storage = (*fakeStore)(nil)

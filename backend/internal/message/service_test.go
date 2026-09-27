@@ -464,9 +464,9 @@ func Test_StartDM_CreatesPending(t *testing.T) {
 	}
 
 }
-func  Test_StartDM_ReversedPair_SameConversation(t *testing.T){
+func Test_StartDM_ReversedPair_SameConversation(t *testing.T) {
 	f, _, svc, _, _, m1, m2 := newOutingConv(t)
-	dm1 ,err := svc.StartDM(context.Background(), m1, m2)
+	dm1, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
@@ -480,7 +480,7 @@ func  Test_StartDM_ReversedPair_SameConversation(t *testing.T){
 	if len(f.dms) != 1 {
 		t.Fatalf("expected 1 got %d", len(f.dms))
 	}
-	if dm2.ID != dm1.ID{
+	if dm2.ID != dm1.ID {
 		t.Fatalf("expected id unchanged got dm1: %v dm2: %v", dm1.ID, dm2.ID)
 	}
 	if *dm2.DmInitiator != m1 {
@@ -488,9 +488,39 @@ func  Test_StartDM_ReversedPair_SameConversation(t *testing.T){
 	}
 
 }
-func Test_StartDM_Self(t *testing.T){
+func Test_StartDM_Self(t *testing.T) {
 	_, _, svc, _, _, m1, _ := newOutingConv(t)
-	_ ,err := svc.StartDM(context.Background(), m1, m1)
+	_, err := svc.StartDM(context.Background(), m1, m1)
 	wantStatus(t, err, apperr.CodeBadRequest)
 
+}
+func Test_StartDM_HostDmsRequester(t *testing.T) {
+	f, _, svc, conv, host, _, _ := newOutingConv(t)
+	hikerSelim := uuid.New()
+	f.addPendingRequest(*conv.OutingID, hikerSelim)
+	dm, err := svc.StartDM(context.Background(), host, hikerSelim)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.DmInitiator == nil || *dm.DmInitiator != host {
+		t.Errorf("expected host: %v initiated got %v", host, *dm.DmInitiator)
+	}
+}
+func Test_StartDM_MemberDMsPending(t *testing.T) {
+	f, _, svc, conv, _, m1, _ := newOutingConv(t)
+	hikerSelim := uuid.New()
+	f.addPendingRequest(*conv.OutingID, hikerSelim)
+	_, err := svc.StartDM(context.Background(), m1, hikerSelim)
+	wantStatus(t, err, apperr.CodeForbidden)
+}
+
+func Test_StartDM_Strangers(t *testing.T) {
+	f, _, svc, _, _, _, _ := newOutingConv(t)
+	hikerCafer := uuid.New()
+	hikerSero := uuid.New()
+	_, err := svc.StartDM(context.Background(), hikerCafer, hikerSero)
+	wantStatus(t, err, apperr.CodeForbidden)
+	if len(f.dms) != 0 {
+		t.Errorf("expected 0 dm got %v", len(f.dms))
+	}
 }

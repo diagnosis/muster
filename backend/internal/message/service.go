@@ -27,8 +27,9 @@ type Storage interface {
 	GetMessage(ctx context.Context, messageID uuid.UUID) (*Message, error)
 	DeleteMessage(ctx context.Context, messageID uuid.UUID) error
 	OutingHost(ctx context.Context, outingID uuid.UUID) (uuid.UUID, error)
+	CanDM(ctx context.Context, hiker1, hiker uuid.UUID) (bool, error)
 
-	GetOrCreateDM(context context.Context, lo, hi, initiator uuid.UUID)(*Conversation, error)
+	GetOrCreateDM(context context.Context, lo, hi, initiator uuid.UUID) (*Conversation, error)
 }
 
 const maxBodyRunes = 500
@@ -190,19 +191,25 @@ func (s *Service) broadcast(ctx context.Context, conv *Conversation, eventType s
 	return nil
 }
 
-func (s *Service) StartDM(ctx context.Context, h1, h2 uuid.UUID)(*Conversation,error){
+func (s *Service) StartDM(ctx context.Context, h1, h2 uuid.UUID) (*Conversation, error) {
 	if h1 == h2 {
 		return nil, apperr.BadRequest("cannot dm yourself", "user cannot dm themselves")
 	}
 	lo, hi := h1, h2
-	if h2.String() < h1.String(){
+	if h2.String() < h1.String() {
 		lo, hi = h2, h1
+	}
+	ok, err := s.store.CanDM(ctx, h1, h2)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, apperr.Forbidden("dm is not allowed", "dm is not allowed")
 	}
 	conv, err := s.store.GetOrCreateDM(ctx, lo, hi, h1)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 	return conv, nil
 
 }
-
