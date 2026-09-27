@@ -27,6 +27,8 @@ type Storage interface {
 	GetMessage(ctx context.Context, messageID uuid.UUID) (*Message, error)
 	DeleteMessage(ctx context.Context, messageID uuid.UUID) error
 	OutingHost(ctx context.Context, outingID uuid.UUID) (uuid.UUID, error)
+
+	GetOrCreateDM(context context.Context, lo, hi, initiator uuid.UUID)(*Conversation, error)
 }
 
 const maxBodyRunes = 500
@@ -187,3 +189,20 @@ func (s *Service) broadcast(ctx context.Context, conv *Conversation, eventType s
 	}
 	return nil
 }
+
+func (s *Service) StartDM(ctx context.Context, h1, h2 uuid.UUID)(*Conversation,error){
+	if h1 == h2 {
+		return nil, apperr.BadRequest("cannot dm yourself", "user cannot dm themselves")
+	}
+	lo, hi := h1, h2
+	if h2.String() < h1.String(){
+		lo, hi = h2, h1
+	}
+	conv, err := s.store.GetOrCreateDM(ctx, lo, hi, h1)
+	if err != nil {
+		return nil,err
+	}
+	return conv, nil
+
+}
+

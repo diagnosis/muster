@@ -17,6 +17,7 @@ type fakeStore struct {
 	seq            int64
 	outingStatuses map[uuid.UUID]outing.Status
 	hosts          map[uuid.UUID]uuid.UUID
+	dms            map[[2]uuid.UUID]*Conversation
 }
 
 func (f *fakeStore) InsertMessage(ctx context.Context, m *Message, now time.Time) error {
@@ -49,6 +50,7 @@ func newFakeStore() *fakeStore {
 		seq:            0,
 		outingStatuses: make(map[uuid.UUID]outing.Status),
 		hosts:          make(map[uuid.UUID]uuid.UUID),
+		dms:            make(map[[2]uuid.UUID]*Conversation),
 	}
 }
 
@@ -136,6 +138,28 @@ func (f *fakeStore) OutingHost(ctx context.Context, outingID uuid.UUID) (uuid.UU
 		return uuid.Nil, apperr.NotFound("host not found", "host not found")
 	}
 	return v, nil
+}
+func (f *fakeStore) GetOrCreateDM(ctx context.Context, lo, hi, a uuid.UUID) (*Conversation, error) {
+	v, ok := f.dms[[2]uuid.UUID{lo, hi}]
+	if ok {
+		return v, nil
+	}
+	status := DMStatusPending
+	c := &Conversation{
+		ID:           uuid.New(),
+		Kind:         ConversationKindDM,
+		DmA:          &lo,
+		DmB:          &hi,
+		DmInitiator:  &a,
+		DmStatus:  &status,
+		CreatedAt:    time.Now(),
+	}
+	f.dms[[2]uuid.UUID{lo, hi}] = c
+	f.converstations[c.ID] = c
+	f.members[c.ID] = map[uuid.UUID]struct{}{lo: {}, hi: {}}
+	f.members[c.ID][lo] = struct{}{}
+	f.members[c.ID][hi] = struct{}{}
+	return c, nil
 }
 
 var _ Storage = (*fakeStore)(nil)

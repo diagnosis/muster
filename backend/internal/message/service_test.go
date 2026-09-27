@@ -442,3 +442,55 @@ func Test_DeleteMessage_UnknownMessage(t *testing.T) {
 	}
 
 }
+
+func Test_StartDM_CreatesPending(t *testing.T) {
+	_, _, svc, _, _, m1, m2 := newOutingConv(t)
+
+	dm, err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
+		t.Errorf("expected status pending got %v", dm.DmStatus)
+	}
+	if dm.Kind != ConversationKindDM {
+		t.Errorf("expected kind got %s", dm.Kind)
+	}
+	if dm.DmInitiator == nil || *dm.DmInitiator != m1 {
+		t.Errorf("expected dminitiator %v got %v", m1, dm.DmInitiator)
+	}
+	if dm.DmA == nil || dm.DmB == nil || dm.DmA.String() > dm.DmB.String() {
+		t.Errorf("expected dma smaller then dmb got %t", dm.DmA.String() < dm.DmB.String())
+	}
+
+}
+func  Test_StartDM_ReversedPair_SameConversation(t *testing.T){
+	f, _, svc, _, _, m1, m2 := newOutingConv(t)
+	dm1 ,err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm1.DmStatus == nil || *dm1.DmStatus != DMStatusPending {
+		t.Errorf("expected status pending got %v", dm1.DmStatus)
+	}
+	dm2, err := svc.StartDM(context.Background(), m2, m1)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.dms) != 1 {
+		t.Fatalf("expected 1 got %d", len(f.dms))
+	}
+	if dm2.ID != dm1.ID{
+		t.Fatalf("expected id unchanged got dm1: %v dm2: %v", dm1.ID, dm2.ID)
+	}
+	if *dm2.DmInitiator != m1 {
+		t.Errorf("expected %v is initiator got %v", m1, *dm2.DmInitiator)
+	}
+
+}
+func Test_StartDM_Self(t *testing.T){
+	_, _, svc, _, _, m1, _ := newOutingConv(t)
+	_ ,err := svc.StartDM(context.Background(), m1, m1)
+	wantStatus(t, err, apperr.CodeBadRequest)
+
+}
