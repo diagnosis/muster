@@ -184,4 +184,10 @@ func (f *fakeStore) CanDM(ctx context.Context, h1, h2 uuid.UUID) (bool, error) {
 	return false, nil
 }
 
+func (f *fakeStore) setDMStatus(id uuid.UUID, status DMStatus, declinedBy *uuid.UUID) {
+	c := f.converstations[id]
+	c.DmStatus = &status
+	c.DmDeclinedBy = declinedBy
+}
+
 var _ Storage = (*fakeStore)(nil)

@@ -27,7 +27,7 @@ type Storage interface {
 	GetMessage(ctx context.Context, messageID uuid.UUID) (*Message, error)
 	DeleteMessage(ctx context.Context, messageID uuid.UUID) error
 	OutingHost(ctx context.Context, outingID uuid.UUID) (uuid.UUID, error)
-	CanDM(ctx context.Context, hiker1, hiker uuid.UUID) (bool, error)
+	CanDM(ctx context.Context, hiker1, hiker2 uuid.UUID) (bool, error)
 
 	GetOrCreateDM(context context.Context, lo, hi, initiator uuid.UUID) (*Conversation, error)
 }
@@ -90,6 +90,25 @@ func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.
 			return nil, apperr.Forbidden(msg, msg)
 		}
 	}
+
+	if conv.Kind == ConversationKindDM {
+		switch *conv.DmStatus {
+		case DMStatusAccepted:
+			// fall through to rate limit
+		case DMStatusDeclined:
+			return nil, apperr.Forbidden("conversation is closed", "dm declined")
+		case DMStatusPending:
+			if conv.DmInitiator == nil || hikerID != *conv.DmInitiator {
+				return nil, apperr.Forbidden("waiting for the other hiker to accept", "dm pending, non-initiator")
+			}
+			n1, verr := s.store.CountMessagesSince(ctx, conversationID, hikerID, time.Time{})
+			if verr != nil { return nil, verr }
+			if n1 > 0 {
+				return nil, apperr.Forbidden("one message until they accept", "dm pending, opening message already sent")
+			}
+		}
+	}
+
 
 	count, err := s.store.CountMessagesSince(ctx, conversationID, hikerID, s.now().Add(-time.Minute))
 	if err != nil {

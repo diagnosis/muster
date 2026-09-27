@@ -524,3 +524,78 @@ func Test_StartDM_Strangers(t *testing.T) {
 		t.Errorf("expected 0 dm got %v", len(f.dms))
 	}
 }
+
+func Test_PostDM_Accepted(t *testing.T) {
+	f, _, svc, _, _, m1, m2 := newOutingConv(t)
+	dm, err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
+		t.Errorf("expected status pending got %v", dm.DmStatus)
+	}
+	f.setDMStatus(dm.ID, DMStatusAccepted, nil)
+	_, err = svc.PostMessage(context.Background(), dm.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.PostMessage(context.Background(), dm.ID, m2, "hi")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 2 {
+		t.Errorf("expected 2 messages got %d", len(f.messages))
+	}
+
+}
+func Test_PostDM_Declined(t *testing.T) {
+	f, _, svc, _, _, m1, m2 := newOutingConv(t)
+	dm, err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
+		t.Errorf("expected status pending got %v", dm.DmStatus)
+	}
+	f.setDMStatus(dm.ID, DMStatusDeclined, nil)
+	_, err = svc.PostMessage(context.Background(), dm.ID, m2, "hello")
+	wantStatus(t, err, apperr.CodeForbidden)
+	if len(f.messages) != 0 {
+		t.Errorf("expected 0 messages got %d", len(f.messages))
+	}
+	_, err = svc.PostMessage(context.Background(), dm.ID, m1, "hi")
+	wantStatus(t, err, apperr.CodeForbidden)
+	if len(f.messages) != 0 {
+		t.Errorf("expected 0 messages got %d", len(f.messages))
+	}
+
+}
+func Test_PostDM_Pending(t *testing.T) {
+	f, _, svc, _, _, m1, m2 := newOutingConv(t)
+	dm, err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
+		t.Errorf("expected status pending got %v", dm.DmStatus)
+	}
+	_, err = svc.PostMessage(context.Background(), dm.ID, m1, "hello, have ice axe?")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 1 {
+		t.Errorf("expected 1 messages got %d", len(f.messages))
+	}
+	_, err = svc.PostMessage(context.Background(), dm.ID, m1, "hello, have micro spike?")
+	wantStatus(t, err, apperr.CodeForbidden)
+	if len(f.messages) != 1 {
+		t.Errorf("expected 1 messages got %d", len(f.messages))
+	}
+	_, err = svc.PostMessage(context.Background(), dm.ID, m2, "hi")
+	wantStatus(t, err, apperr.CodeForbidden)
+	if len(f.messages) != 1 {
+		t.Errorf("expected 1 messages got %d", len(f.messages))
+	}
+
+}
+
