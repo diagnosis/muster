@@ -471,7 +471,7 @@ func Test_StartDM_ReversedPair_SameConversation(t *testing.T) {
 		t.Fatalf("expected no error got %v", err)
 	}
 	got := fb.sentTo(m2)
-	if len(got) !=1{
+	if len(got) != 1 {
 		t.Fatalf("expected poke one got %v", len(got))
 	}
 	if dm1.DmStatus == nil || *dm1.DmStatus != DMStatusPending {
@@ -482,7 +482,7 @@ func Test_StartDM_ReversedPair_SameConversation(t *testing.T) {
 		t.Fatalf("expected no error got %v", err)
 	}
 	got = fb.sentTo(m2)
-	if len(got) !=1{
+	if len(got) != 1 {
 		t.Fatalf("expected poke one got %v", len(got))
 	}
 
@@ -666,6 +666,212 @@ func Test_AcceptDM(t *testing.T) {
 	}
 	if message.Body != "hello m1" {
 		t.Errorf("expected message: hello m1 got: %s", message.Body)
+	}
+
+}
+
+func Test_AcceptDM_Rejections(t *testing.T) {
+	f, fb, svc, c, _, m1, m2 := newOutingConv(t)
+	fb.sent = nil
+	dm, err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
+		t.Errorf("expected status pending got %v", dm.DmStatus)
+	}
+	got := fb.sentTo(m2)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 got %v", len(got))
+	}
+	if got[0].Type != "dm.requested" {
+		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+	}
+	cases := []struct {
+		name      string
+		convID    uuid.UUID
+		input     uuid.UUID
+		setStatus bool
+		dmStatus  DMStatus
+		expected  apperr.Status
+	}{
+		{name: "initiator accepts", input: m1, expected: apperr.CodeForbidden, convID: dm.ID},
+		{name: "stranger accepts", input: uuid.New(), expected: apperr.CodeForbidden, convID: dm.ID},
+		{name: "outing conv", convID: c.ID, input: m2, expected: apperr.CodeBadRequest},
+		{name: "already accepted", setStatus: true, dmStatus: DMStatusAccepted, input: m2, expected: apperr.CodeConflict, convID: dm.ID},
+		{name: "unknow conv", convID: uuid.New(), input: m1, expected: apperr.CodeNotFound},
+		{name: "declined", setStatus: true, dmStatus: DMStatusDeclined, input: m2, expected: apperr.CodeConflict, convID: dm.ID},
+	}
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			if cc.setStatus {
+				f.setDMStatus(cc.convID, cc.dmStatus, nil)
+			}
+			fb.sent = nil
+			err = svc.AcceptDM(context.Background(), cc.convID, cc.input)
+			wantStatus(t, err, cc.expected)
+			if cc.expected == apperr.CodeForbidden {
+				if *f.converstations[dm.ID].DmStatus != DMStatusPending {
+					t.Errorf("status changed to %s on a forbidden accept", *f.converstations[dm.ID].DmStatus)
+				}
+				if len(fb.sent) != 0 {
+					t.Errorf("poke sent on a forbidden accept: %v", fb.sent)
+				}
+			}
+		})
+	}
+}
+
+func Test_Decline_DM(t *testing.T) {
+	f, fb, svc, _, _, m1, m2 := newOutingConv(t)
+	fb.sent = nil
+	dm, err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
+		t.Errorf("expected status pending got %v", dm.DmStatus)
+	}
+	got := fb.sentTo(m2)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 got %v", len(got))
+	}
+	if got[0].Type != "dm.requested" {
+		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+	}
+	fb.sent = nil
+	err = svc.DeclineDM(context.Background(), dm.ID, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	got = fb.sentTo(m1)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 got %v", len(got))
+	}
+	if got[0].Type != "dm.declined" {
+		t.Fatalf("expected type: dm.declined got: %v", got[0].Type)
+	}
+
+	if *f.converstations[dm.ID].DmStatus != DMStatusDeclined {
+		t.Fatalf("expected %s got %s", DMStatusDeclined, *f.converstations[dm.ID].DmStatus)
+	}
+
+	_, err = svc.PostMessage(context.Background(), dm.ID, m1, "lolo yapma dayi")
+	wantStatus(t, err, apperr.CodeForbidden)
+
+	if *f.converstations[dm.ID].DmDeclinedBy != m2{
+		t.Errorf("expected declined by %v got %v", m2, *f.converstations[dm.ID].DmDeclinedBy)
+	}
+
+}
+
+func Test_Decline_DM_Rejections(t *testing.T){
+	f, fb, svc, c, _, m1, m2 := newOutingConv(t)
+	fb.sent = nil
+	dm, err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
+		t.Errorf("expected status pending got %v", dm.DmStatus)
+	}
+	got := fb.sentTo(m2)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 got %v", len(got))
+	}
+	if got[0].Type != "dm.requested" {
+		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+	}
+	fb.sent = nil
+	cases := []struct{
+		name string
+		setStatus bool
+		status DMStatus
+		useOutingConv bool
+		unknown bool
+		hikerID uuid.UUID
+		expected apperr.Status
+	}{
+		{name: "stranger", hikerID: uuid.New(), expected: apperr.CodeForbidden},
+		{name:  "outing conv id", hikerID: m1, useOutingConv: true, expected: apperr.CodeBadRequest},
+		{name: "unknown conv id", hikerID: m1, expected: apperr.CodeNotFound, unknown: true},
+		{name: "already declined", setStatus: true,status: DMStatusDeclined, hikerID: m1, expected: apperr.CodeConflict},
+	}
+	for _, cc := range cases {
+
+		t.Run(cc.name, func(t *testing.T) {
+			convID := dm.ID
+			if cc.useOutingConv {
+				convID = c.ID
+			}
+			if cc.unknown{
+				convID = uuid.New()
+			}
+			if cc.setStatus{
+				f.setDMStatus(dm.ID, DMStatusDeclined, &m2)
+			}
+			err = svc.DeclineDM(context.Background(), convID, cc.hikerID)
+			wantStatus(t, err, cc.expected)
+
+		})
+	}
+
+}
+
+func Test_Decline_AcceptedDM(t *testing.T) {
+	f, fb, svc, _, _, m1, m2 := newOutingConv(t)
+	fb.sent = nil
+	dm, err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
+		t.Errorf("expected status pending got %v", dm.DmStatus)
+	}
+	got := fb.sentTo(m2)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 got %v", len(got))
+	}
+	if got[0].Type != "dm.requested" {
+		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+	}
+
+	fb.sent = nil
+	err = svc.AcceptDM(context.Background(), dm.ID, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	got = fb.sentTo(m1)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 got %v", len(got))
+	}
+	if got[0].Type != "dm.accepted" {
+		t.Fatalf("expected type: dm.accepted got: %v", got[0].Type)
+	}
+
+
+	fb.sent = nil
+	err = svc.DeclineDM(context.Background(), dm.ID, m1)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	got = fb.sentTo(m2)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 got %v", len(got))
+	}
+	if got[0].Type != "dm.declined" {
+		t.Fatalf("expected type: dm.declined got: %v", got[0].Type)
+	}
+
+	if *f.converstations[dm.ID].DmStatus != DMStatusDeclined {
+		t.Fatalf("expected %s got %s", DMStatusDeclined, *f.converstations[dm.ID].DmStatus)
+	}
+
+	_, err = svc.PostMessage(context.Background(), dm.ID, m2, "lolo yapma dayi")
+	wantStatus(t, err, apperr.CodeForbidden)
+
+	if *f.converstations[dm.ID].DmDeclinedBy != m1{
+		t.Errorf("expected declined by %v got %v", m1, *f.converstations[dm.ID].DmDeclinedBy)
 	}
 
 }

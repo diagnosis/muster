@@ -30,7 +30,7 @@ type Storage interface {
 	CanDM(ctx context.Context, hiker1, hiker2 uuid.UUID) (bool, error)
 
 	GetOrCreateDM(context context.Context, lo, hi, initiator uuid.UUID) (*Conversation, bool, error)
-	UpdateDMStatus(ctx context.Context, convID uuid.UUID, status DMStatus, declinedBy *uuid.UUID)error
+	UpdateDMStatus(ctx context.Context, convID uuid.UUID, status DMStatus, declinedBy *uuid.UUID) error
 }
 
 const maxBodyRunes = 500
@@ -103,13 +103,14 @@ func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.
 				return nil, apperr.Forbidden("waiting for the other hiker to accept", "dm pending, non-initiator")
 			}
 			n1, verr := s.store.CountMessagesSince(ctx, conversationID, hikerID, time.Time{})
-			if verr != nil { return nil, verr }
+			if verr != nil {
+				return nil, verr
+			}
 			if n1 > 0 {
 				return nil, apperr.Forbidden("one message until they accept", "dm pending, opening message already sent")
 			}
 		}
 	}
-
 
 	count, err := s.store.CountMessagesSince(ctx, conversationID, hikerID, s.now().Add(-time.Minute))
 	if err != nil {
@@ -239,16 +240,51 @@ func (s *Service) StartDM(ctx context.Context, h1, h2 uuid.UUID) (*Conversation,
 
 }
 
-func (s *Service) AcceptDM(ctx context.Context, convID, actor uuid.UUID)error{
+func (s *Service) AcceptDM(ctx context.Context, convID, actor uuid.UUID) error {
 	conv, err := s.store.GetConversation(ctx, convID)
 	if err != nil {
 		return err
 	}
+	if conv.Kind != ConversationKindDM {
+		return apperr.BadRequest("this conversation isn't a direct message", "accept on non-dm conversation")
+	}
+	if actor != *conv.DmA && actor != *conv.DmB {
+		return apperr.Forbidden("you're not part of this conversation", "accept by non-party")
+	}
+	if actor == *conv.DmInitiator {
+		return apperr.Forbidden("only the other hiker can accept", "accept by initiator")
+	}
+	if *conv.DmStatus != DMStatusPending {
+		return apperr.Conflict("this conversation isn't waiting for acceptance", fmt.Sprintf("accept on status %s", *conv.DmStatus))
+	}
 	if err = s.store.UpdateDMStatus(ctx, convID, DMStatusAccepted, nil); err != nil {
 		return err
 	}
-	if err = s.broadcast(ctx, conv, "dm.accepted"); err != nil {
+	return s.broadcast(ctx, conv, "dm.accepted")
+}
+
+func (s *Service) DeclineDM(ctx context.Context, convID, actor uuid.UUID) error {
+	conv, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
 		return err
 	}
-	return nil
+	if conv.Kind != ConversationKindDM {
+		return apperr.BadRequest("this conversation isn't a direct message", "accept on non-dm conversation")
+	}
+	if actor != *conv.DmA && actor != *conv.DmB {
+		return apperr.Forbidden("you're not part of this conversation", "decline by non-party")
+	}
+	if *conv.DmStatus == DMStatusDeclined{
+		return apperr.Conflict("this conversation isn't waiting for decline", fmt.Sprintf("decline on status %s", *conv.DmStatus))
+	}
+	err = s.store.UpdateDMStatus(ctx, convID, DMStatusDeclined, &actor)
+	if err != nil {
+		return err
+	}
+	return s.broadcast(ctx, conv, "dm.declined")
+
+}
+
+func (s *Service) ReopenDM(ctx context.Context, convID, actor uuid.UUID)error{
+	return apperr.Internal("not implemented", "not implemented")
 }
