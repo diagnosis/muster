@@ -571,7 +571,11 @@ func Test_PostDM_Declined(t *testing.T) {
 
 }
 func Test_PostDM_Pending(t *testing.T) {
+	clock := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
 	f, _, svc, _, _, m1, m2 := newOutingConv(t)
+	svc.now = func() time.Time {
+		return clock
+	}
 	dm, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
@@ -592,6 +596,12 @@ func Test_PostDM_Pending(t *testing.T) {
 		t.Errorf("expected 1 messages got %d", len(f.messages))
 	}
 	_, err = svc.PostMessage(context.Background(), dm.ID, m2, "hi")
+	wantStatus(t, err, apperr.CodeForbidden)
+	if len(f.messages) != 1 {
+		t.Errorf("expected 1 messages got %d", len(f.messages))
+	}
+	clock = clock.Add(2* time.Minute)
+	_, err = svc.PostMessage(context.Background(), dm.ID, m1, "hello, got it?")
 	wantStatus(t, err, apperr.CodeForbidden)
 	if len(f.messages) != 1 {
 		t.Errorf("expected 1 messages got %d", len(f.messages))
