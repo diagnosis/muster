@@ -465,10 +465,14 @@ func Test_StartDM_CreatesPending(t *testing.T) {
 
 }
 func Test_StartDM_ReversedPair_SameConversation(t *testing.T) {
-	f, _, svc, _, _, m1, m2 := newOutingConv(t)
+	f, fb, svc, _, _, m1, m2 := newOutingConv(t)
 	dm1, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
+	}
+	got := fb.sentTo(m2)
+	if len(got) !=1{
+		t.Fatalf("expected poke one got %v", len(got))
 	}
 	if dm1.DmStatus == nil || *dm1.DmStatus != DMStatusPending {
 		t.Errorf("expected status pending got %v", dm1.DmStatus)
@@ -477,6 +481,11 @@ func Test_StartDM_ReversedPair_SameConversation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
+	got = fb.sentTo(m2)
+	if len(got) !=1{
+		t.Fatalf("expected poke one got %v", len(got))
+	}
+
 	if len(f.dms) != 1 {
 		t.Fatalf("expected 1 got %d", len(f.dms))
 	}
@@ -600,7 +609,7 @@ func Test_PostDM_Pending(t *testing.T) {
 	if len(f.messages) != 1 {
 		t.Errorf("expected 1 messages got %d", len(f.messages))
 	}
-	clock = clock.Add(2* time.Minute)
+	clock = clock.Add(2 * time.Minute)
 	_, err = svc.PostMessage(context.Background(), dm.ID, m1, "hello, got it?")
 	wantStatus(t, err, apperr.CodeForbidden)
 	if len(f.messages) != 1 {
@@ -608,4 +617,55 @@ func Test_PostDM_Pending(t *testing.T) {
 	}
 
 }
+func Test_AcceptDM(t *testing.T) {
+	f, fb, svc, _, _, m1, m2 := newOutingConv(t)
+	fb.sent = nil
+	dm, err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
+		t.Errorf("expected status pending got %v", dm.DmStatus)
+	}
+	got := fb.sentTo(m2)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 got %v", len(got))
+	}
+	if got[0].Type != "dm.requested" {
+		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+	}
+	fb.sent = nil
+	err = svc.AcceptDM(context.Background(), dm.ID, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	got = fb.sentTo(m1)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 got %v", len(got))
+	}
+	if got[0].Type != "dm.accepted" {
+		t.Fatalf("expected type: dm.accepted got: %v", got[0].Type)
+	}
 
+	if *f.converstations[dm.ID].DmStatus != DMStatusAccepted {
+		t.Fatalf("expected %s got %s", DMStatusAccepted, *f.converstations[dm.ID].DmStatus)
+	}
+
+	message, err := svc.PostMessage(context.Background(), dm.ID, m2, "hello m1")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(f.messages) != 1 {
+		t.Fatalf("expected 1 message got %v", len(f.messages))
+	}
+	if message.ConversationID != dm.ID {
+		t.Errorf("expected conv id: %v got: %v", dm.ID, message.ID)
+	}
+	if message.HikerID != m2 {
+		t.Errorf("expected hiker id: %v got: %v", m2, message.HikerID)
+	}
+	if message.Body != "hello m1" {
+		t.Errorf("expected message: hello m1 got: %s", message.Body)
+	}
+
+}

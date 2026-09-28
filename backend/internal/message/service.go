@@ -29,7 +29,8 @@ type Storage interface {
 	OutingHost(ctx context.Context, outingID uuid.UUID) (uuid.UUID, error)
 	CanDM(ctx context.Context, hiker1, hiker2 uuid.UUID) (bool, error)
 
-	GetOrCreateDM(context context.Context, lo, hi, initiator uuid.UUID) (*Conversation, error)
+	GetOrCreateDM(context context.Context, lo, hi, initiator uuid.UUID) (*Conversation, bool, error)
+	UpdateDMStatus(ctx context.Context, convID uuid.UUID, status DMStatus, declinedBy *uuid.UUID)error
 }
 
 const maxBodyRunes = 500
@@ -225,10 +226,29 @@ func (s *Service) StartDM(ctx context.Context, h1, h2 uuid.UUID) (*Conversation,
 	if !ok {
 		return nil, apperr.Forbidden("dm is not allowed", "dm is not allowed")
 	}
-	conv, err := s.store.GetOrCreateDM(ctx, lo, hi, h1)
+	conv, created, err := s.store.GetOrCreateDM(ctx, lo, hi, h1)
 	if err != nil {
 		return nil, err
 	}
+	if created {
+		if err = s.broadcast(ctx, conv, "dm.requested"); err != nil {
+			return nil, err
+		}
+	}
 	return conv, nil
 
+}
+
+func (s *Service) AcceptDM(ctx context.Context, convID, actor uuid.UUID)error{
+	conv, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return err
+	}
+	if err = s.store.UpdateDMStatus(ctx, convID, DMStatusAccepted, nil); err != nil {
+		return err
+	}
+	if err = s.broadcast(ctx, conv, "dm.accepted"); err != nil {
+		return err
+	}
+	return nil
 }

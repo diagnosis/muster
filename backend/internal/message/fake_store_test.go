@@ -149,10 +149,10 @@ func (f *fakeStore) OutingHost(ctx context.Context, outingID uuid.UUID) (uuid.UU
 	}
 	return v, nil
 }
-func (f *fakeStore) GetOrCreateDM(ctx context.Context, lo, hi, a uuid.UUID) (*Conversation, error) {
+func (f *fakeStore) GetOrCreateDM(ctx context.Context, lo, hi, a uuid.UUID) (*Conversation, bool, error) {
 	v, ok := f.dms[[2]uuid.UUID{lo, hi}]
 	if ok {
-		return v, nil
+		return v, false, nil
 	}
 	status := DMStatusPending
 	c := &Conversation{
@@ -169,7 +169,7 @@ func (f *fakeStore) GetOrCreateDM(ctx context.Context, lo, hi, a uuid.UUID) (*Co
 	f.members[c.ID] = map[uuid.UUID]struct{}{lo: {}, hi: {}}
 	f.members[c.ID][lo] = struct{}{}
 	f.members[c.ID][hi] = struct{}{}
-	return c, nil
+	return c, true, nil
 }
 func (f *fakeStore) CanDM(ctx context.Context, h1, h2 uuid.UUID) (bool, error) {
 	for _, c := range f.converstations {
@@ -188,6 +188,13 @@ func (f *fakeStore) setDMStatus(id uuid.UUID, status DMStatus, declinedBy *uuid.
 	c := f.converstations[id]
 	c.DmStatus = &status
 	c.DmDeclinedBy = declinedBy
+}
+func (f *fakeStore) UpdateDMStatus(ctx context.Context, convID uuid.UUID, status DMStatus, declinedBy *uuid.UUID)error{
+	if _, ok := f.converstations[convID]; !ok {
+		return apperr.NotFound("not found", "not found")
+	}
+	f.setDMStatus(convID, status, declinedBy)
+	return nil
 }
 
 var _ Storage = (*fakeStore)(nil)
