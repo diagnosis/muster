@@ -173,12 +173,19 @@ func (f *fakeStore) GetOrCreateDM(ctx context.Context, lo, hi, a uuid.UUID) (*Co
 }
 func (f *fakeStore) CanDM(ctx context.Context, h1, h2 uuid.UUID) (bool, error) {
 	for _, c := range f.converstations {
-		if c.Kind != ConversationKindOuting { continue }
+		if c.Kind != ConversationKindOuting {
+			continue
+		}
 		set := f.members[c.ID]
-		_, aIn := set[h1]; _, bIn := set[h2]
-		if aIn && bIn { return true, nil }
+		_, aIn := set[h1]
+		_, bIn := set[h2]
+		if aIn && bIn {
+			return true, nil
+		}
 		if f.hosts[*c.OutingID] == h1 {
-			if _, pend := f.pendingRequests[*c.OutingID][h2]; pend { return true, nil }
+			if _, pend := f.pendingRequests[*c.OutingID][h2]; pend {
+				return true, nil
+			}
 		}
 	}
 	return false, nil
@@ -189,7 +196,7 @@ func (f *fakeStore) setDMStatus(id uuid.UUID, status DMStatus, declinedBy *uuid.
 	c.DmStatus = &status
 	c.DmDeclinedBy = declinedBy
 }
-func (f *fakeStore) UpdateDMStatus(ctx context.Context, convID uuid.UUID, status DMStatus, declinedBy *uuid.UUID)error{
+func (f *fakeStore) UpdateDMStatus(ctx context.Context, convID uuid.UUID, status DMStatus, declinedBy *uuid.UUID) error {
 	if _, ok := f.converstations[convID]; !ok {
 		return apperr.NotFound("not found", "not found")
 	}

@@ -269,12 +269,12 @@ func (s *Service) DeclineDM(ctx context.Context, convID, actor uuid.UUID) error 
 		return err
 	}
 	if conv.Kind != ConversationKindDM {
-		return apperr.BadRequest("this conversation isn't a direct message", "accept on non-dm conversation")
+		return apperr.BadRequest("this conversation isn't a direct message", "decline on non-dm conversation")
 	}
 	if actor != *conv.DmA && actor != *conv.DmB {
 		return apperr.Forbidden("you're not part of this conversation", "decline by non-party")
 	}
-	if *conv.DmStatus == DMStatusDeclined{
+	if *conv.DmStatus == DMStatusDeclined {
 		return apperr.Conflict("this conversation isn't waiting for decline", fmt.Sprintf("decline on status %s", *conv.DmStatus))
 	}
 	err = s.store.UpdateDMStatus(ctx, convID, DMStatusDeclined, &actor)
@@ -285,6 +285,27 @@ func (s *Service) DeclineDM(ctx context.Context, convID, actor uuid.UUID) error 
 
 }
 
-func (s *Service) ReopenDM(ctx context.Context, convID, actor uuid.UUID)error{
-	return apperr.Internal("not implemented", "not implemented")
+func (s *Service) ReopenDM(ctx context.Context, convID, actor uuid.UUID) error {
+	conv, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return err
+	}
+	if conv.Kind != ConversationKindDM {
+		return apperr.BadRequest("this conversation isn't a direct message", "reopen on non-dm conversation")
+	}
+	if actor != *conv.DmA && actor != *conv.DmB {
+		return apperr.Forbidden("you're not part of this conversation", "reopen by non-party")
+	}
+	if *conv.DmStatus != DMStatusDeclined {
+		return apperr.Conflict("conversation is not declined", "reopen non-declined conv")
+	}
+	if conv.DmDeclinedBy == nil || *conv.DmDeclinedBy != actor {
+		return apperr.Forbidden("you're not the one declined this conversation", "reopen by non-decliner")
+	}
+
+	if err = s.store.UpdateDMStatus(ctx, convID, DMStatusAccepted, nil); err != nil {
+		return err
+	}
+
+	return s.broadcast(ctx, conv, "dm.reopened")
 }
