@@ -27,9 +27,9 @@ type Storage interface {
 	GetMessage(ctx context.Context, messageID uuid.UUID) (*Message, error)
 	DeleteMessage(ctx context.Context, messageID uuid.UUID) error
 	OutingHost(ctx context.Context, outingID uuid.UUID) (uuid.UUID, error)
-	CanDM(ctx context.Context, hiker1, hiker2 uuid.UUID) (bool, error)
+	CanDM(ctx context.Context, initiator, other uuid.UUID) (bool, error)
 
-	GetOrCreateDM(context context.Context, lo, hi, initiator uuid.UUID) (*Conversation, bool, error)
+	GetOrCreateDM(ctx context.Context, lo, hi, initiator uuid.UUID) (*Conversation, bool, error)
 	UpdateDMStatus(ctx context.Context, convID uuid.UUID, status DMStatus, declinedBy *uuid.UUID) error
 }
 
@@ -212,6 +212,9 @@ func (s *Service) broadcast(ctx context.Context, conv *Conversation, eventType s
 	return nil
 }
 
+// StartDM opens (or returns) the DM between initiator and other. Requires a shared
+// outing, or initiator hosting an outing other has requested. New DMs start pending
+// and poke both parties with dm.requested; an existing DM is returned silently.
 func (s *Service) StartDM(ctx context.Context, h1, h2 uuid.UUID) (*Conversation, error) {
 	if h1 == h2 {
 		return nil, apperr.BadRequest("cannot dm yourself", "user cannot dm themselves")
@@ -240,6 +243,7 @@ func (s *Service) StartDM(ctx context.Context, h1, h2 uuid.UUID) (*Conversation,
 
 }
 
+// AcceptDM moves a pending DM to accepted. Only the non-initiating party may accept.
 func (s *Service) AcceptDM(ctx context.Context, convID, actor uuid.UUID) error {
 	conv, err := s.store.GetConversation(ctx, convID)
 	if err != nil {
@@ -263,6 +267,8 @@ func (s *Service) AcceptDM(ctx context.Context, convID, actor uuid.UUID) error {
 	return s.broadcast(ctx, conv, "dm.accepted")
 }
 
+// DeclineDM moves a pending or accepted DM to declined and records the actor as
+// dm_declined_by; either party may decline (this is also "close").
 func (s *Service) DeclineDM(ctx context.Context, convID, actor uuid.UUID) error {
 	conv, err := s.store.GetConversation(ctx, convID)
 	if err != nil {
@@ -285,6 +291,8 @@ func (s *Service) DeclineDM(ctx context.Context, convID, actor uuid.UUID) error 
 
 }
 
+// ReopenDM moves a declined DM back to accepted. Only dm_declined_by may reopen;
+// the column is cleared on success.
 func (s *Service) ReopenDM(ctx context.Context, convID, actor uuid.UUID) error {
 	conv, err := s.store.GetConversation(ctx, convID)
 	if err != nil {

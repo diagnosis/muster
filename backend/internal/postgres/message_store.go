@@ -208,6 +208,26 @@ func (s *MessageStore) OutingHost(ctx context.Context, outingID uuid.UUID) (uuid
 	return hostID, nil
 }
 
+// CanDM reports whether initiator may open a DM with other: both are host or
+// accepted members of a common outing, or initiator hosts an outing other has a
+// pending request on. The pending door is one-way.
+func (s *MessageStore) CanDM(ctx context.Context, initiator, other uuid.UUID) (bool, error) {
+	return false, apperr.Internal("not implemented", "not implemented")
+}
+
+// GetOrCreateDM inserts the DM for the sorted pair (lo < hi) as pending with the
+// given initiator, or returns the existing one. The bool reports whether this call
+// created it; the UNIQUE (dm_a, dm_b) constraint serializes concurrent creates.
+func (s *MessageStore) GetOrCreateDM(ctx context.Context, lo, hi, initiator uuid.UUID) (*message.Conversation, bool, error) {
+	return nil, false, apperr.Internal("not implemented", "not implemented")
+}
+
+// UpdateDMStatus sets dm_status and dm_declined_by on a DM conversation;
+// NotFound when no such conversation exists.
+func (s *MessageStore) UpdateDMStatus(ctx context.Context, convID uuid.UUID, status message.DMStatus, declinedBy *uuid.UUID) error {
+	return apperr.Internal("not implemented", "not implemented")
+}
+
 var _ message.Storage = (*MessageStore)(nil)
 
 // helper
