@@ -392,3 +392,130 @@ func Test_HandleDeleteMessage(t *testing.T) {
 		})
 	}
 }
+
+func Test_HandleStartDM(t *testing.T) {
+	me := uuid.New()
+	other := uuid.New()
+	cases := []struct {
+		name     string
+		user     *uuid.UUID
+		body     map[string]string
+		err      error
+		wantCode int
+		wantCall bool
+	}{
+		{"unauthorized", nil, map[string]string{"hiker_id": other.String()}, nil, 401, false},
+		{"bad json", &me, nil, nil, 400, false},
+		{"bad hiker id", &me, map[string]string{"hiker_id": "1233456"}, nil, 400, false},
+		{"forbidden", &me, map[string]string{"hiker_id": other.String()}, apperr.Forbidden("x", "x"), 403, true},
+		{"created", &me, map[string]string{"hiker_id": other.String()}, nil, 201, true},
+	}
+	target := "/api/dms"
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			body, _ := json.Marshal(cc.body)
+			if cc.body == nil {
+				body = []byte("bad json")
+			}
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodPost, target, bytes.NewReader(body))
+			if cc.user != nil {
+				r = r.WithContext(middleware.SetUserID(r.Context(), cc.user.String()))
+			}
+
+			f := newFakeMessageService()
+			if cc.err != nil {
+				f.err = cc.err
+			}
+			if cc.wantCode == 201 {
+				f.conversation = &message.Conversation{ID: uuid.New(), Kind: message.ConversationKindDM}
+			}
+
+			s := &Server{messages: f}
+			s.handleStartDM(w, r)
+			if w.Code != cc.wantCode {
+				t.Errorf("expected %d got %d", cc.wantCode, w.Code)
+			}
+			if w.Code == 201 {
+				var resp struct {
+					Data struct {
+						Kind string `json:"kind"`
+					} `json:"data"`
+				}
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatalf("decode: %v", err)
+				}
+				if resp.Data.Kind != "dm" {
+					t.Errorf("kind = %q", resp.Data.Kind)
+				}
+			}
+
+			if cc.wantCall {
+				if f.gotHikerID != me || f.gotOtherID != other {
+					t.Errorf("service got %v %v", f.gotHikerID, f.gotOtherID)
+				}
+			} else if f.gotOtherID != uuid.Nil {
+				t.Error("service should not have been called")
+			}
+
+		})
+	}
+}
+
+func Test_HandleDMTransitions(t *testing.T) {
+	me := uuid.New()
+	convID := uuid.New()
+	handlers := []struct {
+		name string
+		call func(s *Server, w http.ResponseWriter, r *http.Request)
+	}{
+		{"accept", func(s *Server, w http.ResponseWriter, r *http.Request) { s.handleAcceptDM(w, r) }},
+		{"decline", func(s *Server, w http.ResponseWriter, r *http.Request) { s.handleDeclineDM(w, r) }},
+		{"reopen", func(s *Server, w http.ResponseWriter, r *http.Request) { s.handleReopenDM(w, r) }},
+	}
+	rows := []struct {
+		name     string
+		user     *uuid.UUID
+		path     string
+		err      error
+		wantCode int
+		wantCall bool
+	}{
+		{"unauthorized", nil, convID.String(), nil, 401, false},
+		{"bad uuid", &me, "nope", nil, 400, false},
+		{"forbidden", &me, convID.String(), apperr.Forbidden("x", "x"), 403, true},
+		{"conflict", &me, convID.String(), apperr.Conflict("x", "x"), 409, true},
+		{"ok", &me, convID.String(), nil, 204, true},
+	}
+	for _, h := range handlers {
+		for _, cc := range rows {
+			target := fmt.Sprintf("/api/conversations/%s/%s", cc.path, h.name)
+			t.Run(h.name+"/"+cc.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				r := httptest.NewRequest(http.MethodPost, target, nil)
+				r.SetPathValue("id", cc.path)
+				if cc.user != nil {
+					r = r.WithContext(middleware.SetUserID(r.Context(), cc.user.String()))
+				}
+
+				f := newFakeMessageService()
+				if cc.err != nil {
+					f.err = cc.err
+				}
+				s := &Server{messages: f}
+				h.call(s, w, r)
+				if w.Code != cc.wantCode {
+					t.Errorf("expected %d got %d", cc.wantCode, w.Code)
+				}
+				if cc.wantCall{
+					if convID != f.gotConvID || me != f.gotHikerID {
+						t.Errorf("service got %v %v", f.gotConvID, f.gotHikerID)
+					}
+				}else if f.gotConvID != uuid.Nil{
+					t.Error("service should not called")
+				}
+			})
+		}
+	}
+}

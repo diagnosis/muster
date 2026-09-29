@@ -58,6 +58,20 @@ type Conversation struct {
 	CreatedAt    time.Time        `json:"created_at"`
 }
 
+// ConversationSummary is one inbox row: what a hiker sees before opening a
+// conversation. Title is the outing's title for kind=outing and the other
+// hiker's name for kind=dm. LastMessageAt is nil when nothing has been posted.
+type ConversationSummary struct {
+	ID            uuid.UUID `json:"id"`
+	Kind          ConversationKind `json:"kind"`
+	Title         string `json:"title"`
+	DmStatus      *DMStatus `json:"dm_status"`
+	DmInitiator *uuid.UUID `json:"dm_initiator"`
+	DmDeclinedBy *uuid.UUID `json:"dm_declined_by"`
+	LastMessageAt *time.Time `json:"last_message_at"`
+	LastPreview   string `json:"last_preview"`
+}
+
 // Message is one row of messages. Seq is the DB-assigned ordering (D6);
 // a non-nil DeletedAt marks a soft-deleted message.
 type Message struct {
