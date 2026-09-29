@@ -18,6 +18,7 @@ type MessageStore struct {
 	pool *pgxpool.Pool
 }
 
+// ListConversations loads all conversations for a hiker
 func (s *MessageStore) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*message.ConversationSummary, error) {
 	q := `
 	SELECT c.id, c.kind, o.title, c.dm_status, c.dm_initiator, c.dm_declined_by,

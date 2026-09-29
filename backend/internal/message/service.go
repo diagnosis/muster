@@ -31,7 +31,7 @@ type Storage interface {
 
 	GetOrCreateDM(ctx context.Context, lo, hi, initiator uuid.UUID) (*Conversation, bool, error)
 	UpdateDMStatus(ctx context.Context, convID uuid.UUID, status DMStatus, declinedBy *uuid.UUID) error
-	ListConversations(ctx context.Context, hikerID uuid.UUID)([]*ConversationSummary, error)
+	ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*ConversationSummary, error)
 }
 
 const maxBodyRunes = 500
@@ -322,6 +322,6 @@ func (s *Service) ReopenDM(ctx context.Context, convID, actor uuid.UUID) error {
 // ListConversations returns the hiker's inbox: every outing chat they belong to
 // and every DM they're a party of, newest activity first. Scoping is done by the
 // store; there is no policy here.
-func (s *Service) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*ConversationSummary, error){
+func (s *Service) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*ConversationSummary, error) {
 	return s.store.ListConversations(ctx, hikerID)
 }

@@ -100,7 +100,7 @@ type dmInput struct {
 	HikerID string `json:"hiker_id"`
 }
 
-func (s *Server) handleStartDM(w http.ResponseWriter, r *http.Request){
+func (s *Server) handleStartDM(w http.ResponseWriter, r *http.Request) {
 	correlationID, _ := logger.GetCorrelationID(r.Context())
 	me, err := getAuthenticatedUserID(r)
 	if err != nil {
@@ -132,7 +132,7 @@ func (s *Server) handleStartDM(w http.ResponseWriter, r *http.Request){
 
 }
 
-func (s *Server) handleAcceptDM(w http.ResponseWriter, r *http.Request){
+func (s *Server) handleAcceptDM(w http.ResponseWriter, r *http.Request) {
 	s.dmTransition(w, r, s.messages.AcceptDM, "accept DM")
 }
 
@@ -140,11 +140,11 @@ func (s *Server) handleDeclineDM(w http.ResponseWriter, r *http.Request) {
 	s.dmTransition(w, r, s.messages.DeclineDM, "decline DM")
 }
 
-func (s *Server) handleReopenDM(w http.ResponseWriter, r *http.Request){
+func (s *Server) handleReopenDM(w http.ResponseWriter, r *http.Request) {
 	s.dmTransition(w, r, s.messages.ReopenDM, "reopen DM")
 }
 
-func (s *Server) dmTransition(w http.ResponseWriter, r *http.Request, fn func(ctx context.Context, convID, actor uuid.UUID)error, label string){
+func (s *Server) dmTransition(w http.ResponseWriter, r *http.Request, fn func(ctx context.Context, convID, actor uuid.UUID) error, label string) {
 	correlationID, _ := logger.GetCorrelationID(r.Context())
 	me, err := getAuthenticatedUserID(r)
 	if err != nil {
@@ -158,11 +158,34 @@ func (s *Server) dmTransition(w http.ResponseWriter, r *http.Request, fn func(ct
 		responder.Error(w, err, correlationID)
 		return
 	}
-	 err = fn(r.Context(), convID, me)
-	 if err != nil {
-		 logger.Warn(r.Context(), label + ":failed", "err", err)
-		 responder.Error(w, err, correlationID)
-		 return
-	 }
+	err = fn(r.Context(), convID, me)
+	if err != nil {
+		logger.Warn(r.Context(), label+":failed", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleListConversations(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	me, err := getAuthenticatedUserID(r)
+	if err != nil {
+		logger.Warn(r.Context(), "conv: auth failed", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	convs, err := s.messages.ListConversations(r.Context(), me)
+	if err != nil {
+		logger.Warn(r.Context(), "failed to get conversations", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	if convs == nil {
+		convs = []*message.ConversationSummary{}
+	}
+
+	responder.JSON(w, http.StatusOK, map[string]any{
+		"conversations": convs,
+	}, correlationID)
 }

@@ -8,18 +8,17 @@ import (
 )
 
 type fakeMessageService struct {
-	message    *message.Message
-	messages   []*message.Message
-	conversation *message.Conversation
+	message               *message.Message
+	messages              []*message.Message
+	conversation          *message.Conversation
 	conversationSummaries []*message.ConversationSummary
-	gotConvID  uuid.UUID
-	gotHikerID uuid.UUID
-	gotOtherID uuid.UUID
-	gotMsgID   uuid.UUID
-	gotBody    string
-	err        error
+	gotConvID             uuid.UUID
+	gotHikerID            uuid.UUID
+	gotOtherID            uuid.UUID
+	gotMsgID              uuid.UUID
+	gotBody               string
+	err                   error
 }
-
 
 func (f *fakeMessageService) PostMessage(ctx context.Context, convID, hikerID uuid.UUID, body string) (*message.Message, error) {
 	f.gotConvID, f.gotHikerID, f.gotBody = convID, hikerID, body
@@ -35,7 +34,6 @@ func (f *fakeMessageService) DeleteMessage(ctx context.Context, msgID, hikerID u
 	f.gotMsgID, f.gotHikerID = msgID, hikerID
 	return f.err
 }
-
 
 func (f *fakeMessageService) StartDM(ctx context.Context, h1, h2 uuid.UUID) (*message.Conversation, error) {
 	f.gotHikerID, f.gotOtherID = h1, h2
@@ -60,8 +58,6 @@ func (f *fakeMessageService) ListConversations(ctx context.Context, hikerID uuid
 	f.gotHikerID = hikerID
 	return f.conversationSummaries, f.err
 }
-
-
 
 func newFakeMessageService() *fakeMessageService {
 	return &fakeMessageService{}

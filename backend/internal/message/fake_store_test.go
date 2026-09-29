@@ -21,7 +21,6 @@ type fakeStore struct {
 	pendingRequests map[uuid.UUID]map[uuid.UUID]struct{}
 }
 
-
 func (f *fakeStore) InsertMessage(ctx context.Context, m *Message, now time.Time) error {
 	f.seq++
 	m.Seq = f.seq
@@ -206,8 +205,7 @@ func (f *fakeStore) UpdateDMStatus(ctx context.Context, convID uuid.UUID, status
 }
 func (f *fakeStore) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*ConversationSummary, error) {
 
-	return nil , apperr.Internal("not implemented", "not implemented")
+	return nil, apperr.Internal("not implemented", "not implemented")
 }
-
 
 var _ Storage = (*fakeStore)(nil)

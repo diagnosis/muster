@@ -508,14 +508,74 @@ func Test_HandleDMTransitions(t *testing.T) {
 				if w.Code != cc.wantCode {
 					t.Errorf("expected %d got %d", cc.wantCode, w.Code)
 				}
-				if cc.wantCall{
+				if cc.wantCall {
 					if convID != f.gotConvID || me != f.gotHikerID {
 						t.Errorf("service got %v %v", f.gotConvID, f.gotHikerID)
 					}
-				}else if f.gotConvID != uuid.Nil{
+				} else if f.gotConvID != uuid.Nil {
 					t.Error("service should not called")
 				}
 			})
 		}
+	}
+}
+
+func Test_HandleListConversations(t *testing.T) {
+	me := uuid.New()
+	two := []*message.ConversationSummary{
+		{ID: uuid.New(), Kind: message.ConversationKindOuting, Title: "Ingalls"},
+		{ID: uuid.New(), Kind: message.ConversationKindDM, Title: "Amber"},
+	}
+	cases := []struct {
+		name      string
+		user      *uuid.UUID
+		summaries []*message.ConversationSummary
+		wantCode  int
+		wantLen   int
+	}{
+		{"unauthorized", nil, nil, 401, 0},
+		{"empty is [] not null", &me, nil, 200, 0},
+		{"two rows", &me, two, 200, 2},
+	}
+
+	for _, cc := range cases {
+		target := "/api/conversations"
+		t.Run(cc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, target, nil)
+			if cc.user != nil {
+				r = r.WithContext(middleware.SetUserID(r.Context(), cc.user.String()))
+			}
+
+			f := newFakeMessageService()
+			if cc.wantCode == 200 {
+				f.conversationSummaries = cc.summaries
+			}
+			s := &Server{messages: f}
+
+			s.handleListConversations(w, r)
+
+			if w.Code != cc.wantCode {
+				t.Errorf("expected %d got %d", cc.wantCode, w.Code)
+			}
+			if w.Code == 200 {
+				if !strings.Contains(w.Body.String(), `"conversations":[`) {
+					t.Error("expected contains summaries")
+				}
+				var resp struct {
+					Data struct {
+						Conversations []*message.ConversationSummary `json:"conversations"`
+					} `json:"data"`
+				}
+				err := json.NewDecoder(w.Body).Decode(&resp)
+				if err != nil {
+					t.Fatalf("expected no error got %v", err)
+				}
+				if len(resp.Data.Conversations) != cc.wantLen {
+					t.Error("len not equal")
+				}
+			}
+
+		})
 	}
 }
