@@ -149,3 +149,14 @@ export const postMessage = (ctx: APIRequestContext, cid: string, input:{body:str
     ctx.post(`/api/conversations/${cid}/messages`, {data:input})
 export const deleteMessage = (ctx: APIRequestContext, mid: string) =>
     ctx.delete(`/api/messages/${mid}`)
+
+export const startDM = (ctx: APIRequestContext, input:{hiker_id:string})=>
+    ctx.post('/api/dms', {data:input})
+export const acceptDM = (ctx: APIRequestContext, cid:string) =>
+    ctx.post(`/api/conversations/${cid}/accept`)
+export const declineDM = (ctx:APIRequestContext, cid:string)=>
+    ctx.post(`/api/conversations/${cid}/decline`)
+export const reopenDM = (ctx:APIRequestContext, cid:string) =>
+    ctx.post(`/api/conversations/${cid}/reopen`)
+export const listConversations = (ctx: APIRequestContext) =>
+    ctx.get('/api/conversations')

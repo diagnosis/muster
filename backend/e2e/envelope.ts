@@ -11,6 +11,15 @@ export async function unwrap<T>(
     }
     return ((await res.json()) as ApiEnvelope<T>).data
 }
+export async function unwrapExpectNoContent(
+    input: Promise<APIResponse> | APIResponse,
+    expectedStatus: number
+){
+ const res = await input
+    if (res.status() !== expectedStatus){
+        throw new Error(`expected ${expectedStatus}, got ${res.status()}: ${await res.text()}`)
+    }
+}
 
 export async function unwrapError(res: APIResponse): Promise<ApiErrorBody['error']>{
     return ((await res.json()) as ApiErrorBody).error

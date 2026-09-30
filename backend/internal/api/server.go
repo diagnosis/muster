@@ -120,7 +120,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/conversations/{id}/accept", requireAuth(http.HandlerFunc(s.handleAcceptDM)))
 	mux.Handle("POST /api/conversations/{id}/decline", requireAuth(http.HandlerFunc(s.handleDeclineDM)))
 	mux.Handle("POST /api/conversations/{id}/reopen", requireAuth(http.HandlerFunc(s.handleReopenDM)))
-	mux.Handle("GET /api/conversation", requireAuth(http.HandlerFunc(s.handleListConversations)))
+	mux.Handle("GET /api/conversations", requireAuth(http.HandlerFunc(s.handleListConversations)))
 
 	var h http.Handler = mux
 	h = middleware.RateLimit(rate.Limit(s.cfg.RateLimiter.RPS), int(s.cfg.RateLimiter.Burst), 5*time.Minute)(h)
