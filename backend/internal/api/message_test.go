@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/diagnosis/go-toolkit/v3/middleware"
@@ -576,6 +577,78 @@ func Test_HandleListConversations(t *testing.T) {
 				}
 			}
 
+		})
+	}
+}
+
+func Test_HandleGetConversation(t *testing.T) {
+	stranger := uuid.New()
+	hikerA, hikerB := uuid.New(), uuid.New()
+	dmStatus := message.DMStatusAccepted
+	c := &message.Conversation{
+		ID:           uuid.New(),
+		Kind:         message.ConversationKindDM,
+		DmA:          &hikerA,
+		DmB:          &hikerB,
+		DmInitiator:  &hikerA,
+		DmStatus:     &dmStatus,
+		DmDeclinedBy: nil,
+		CreatedAt:    time.Now(),
+	}
+	cases := []struct {
+		name     string
+		user     *uuid.UUID
+		path     string
+		wantCode int
+	}{
+		{name: "unauthorized", user: nil, wantCode: 401, path: c.ID.String()},
+		{name: "forbidden", user: &stranger, wantCode: 403, path: c.ID.String()},
+		{name: "baduuid", user: &hikerA, path: "bad-uuid", wantCode: 400},
+		{name: "not found", user: &hikerA, path: uuid.New().String(), wantCode: 404},
+		{name: "success", user: &hikerB, wantCode: 200, path: c.ID.String()},
+	}
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "/api/conversations", nil)
+			r.SetPathValue("id", cc.path)
+			if cc.user != nil {
+				r = r.WithContext(middleware.SetUserID(r.Context(), cc.user.String()))
+			}
+
+			f := newFakeMessageService()
+			if cc.wantCode == 403 {
+				f.err = apperr.Forbidden("forbidden", "forbidden")
+			}
+			if cc.wantCode == 404 {
+				f.err = apperr.NotFound("not found", "not found")
+			}
+			f.conversation = c
+			s := &Server{messages: f}
+
+			s.handleGetConversation(w, r)
+			if cc.wantCode != w.Code {
+				t.Fatalf("expected %d gor %d", cc.wantCode, w.Code)
+			}
+			if cc.wantCode == 200 {
+
+				if f.gotConvID != c.ID {
+					t.Errorf("expected convID: %v got %v", c.ID, f.gotConvID)
+				}
+				if f.gotHikerID != *c.DmB && f.gotHikerID != *c.DmA {
+					t.Error("no member got in conversation")
+				}
+				resp := struct {
+					Data *message.Conversation `json:"data"`
+				}{}
+				dec := json.NewDecoder(w.Body)
+				if err := dec.Decode(&resp); err != nil {
+					t.Fatalf("expected no error got %v", err)
+				}
+				if resp.Data.ID != c.ID {
+					t.Errorf("expected convID: %v got %v", c.ID, resp.Data.ID)
+				}
+			}
 		})
 	}
 }

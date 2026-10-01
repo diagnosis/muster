@@ -58,6 +58,10 @@ func (f *fakeMessageService) ListConversations(ctx context.Context, hikerID uuid
 	f.gotHikerID = hikerID
 	return f.conversationSummaries, f.err
 }
+func (f *fakeMessageService) GetConversation(ctx context.Context, convID, hikerID uuid.UUID) (*message.Conversation, error) {
+	f.gotConvID, f.gotHikerID = convID, hikerID
+	return f.conversation, f.err
+}
 
 func newFakeMessageService() *fakeMessageService {
 	return &fakeMessageService{}

@@ -204,3 +204,31 @@ export interface Message {
     created_at: string
 }
 
+export interface Conversation{
+    id: string
+    kind: ConversationKind
+    outing_id: string | null
+    dm_a: string | null
+    dm_b: string | null
+    dm_initiator: string | null
+    dm_status: DMStatus | null
+    dm_declined_by: string | null
+    created_at: string
+}
+
+export interface ListConversationsResponse{
+    conversations: ConversationSummary[]
+}
+export type ConversationKind = "outing" | "dm"
+export type DMStatus = "pending" | "accepted" | "declined"
+export interface ConversationSummary{
+    id: string
+    kind: ConversationKind
+    title: string,
+    dm_status: DMStatus | null
+    dm_initiator: string | null
+    dm_declined_by: string | null
+    last_message_at: string | null
+    last_preview: string
+}
+

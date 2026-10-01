@@ -154,7 +154,7 @@ func (s *Server) dmTransition(w http.ResponseWriter, r *http.Request, fn func(ct
 	}
 	convID, err := pathUUID(r, "id")
 	if err != nil {
-		logger.Warn(r.Context(), "failed to reopen dm", "err", err)
+		logger.Warn(r.Context(), "failed to parse uuid for conversation", "err", err)
 		responder.Error(w, err, correlationID)
 		return
 	}
@@ -188,4 +188,27 @@ func (s *Server) handleListConversations(w http.ResponseWriter, r *http.Request)
 	responder.JSON(w, http.StatusOK, map[string]any{
 		"conversations": convs,
 	}, correlationID)
+}
+
+func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	me, err := getAuthenticatedUserID(r)
+	if err != nil {
+		logger.Warn(r.Context(), "dm: auth failed", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	convID, err := pathUUID(r, "id")
+	if err != nil {
+		logger.Warn(r.Context(), "failed to parse uuid", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	conv, err := s.messages.GetConversation(r.Context(), convID, me)
+	if err != nil {
+		logger.Warn(r.Context(), "failed to get conversation", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	responder.JSON(w, http.StatusOK, conv, correlationID)
 }

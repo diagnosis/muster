@@ -336,6 +336,24 @@ func (s *Service) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*
 	return s.store.ListConversations(ctx, hikerID)
 }
 
+// GetConversation returns one conversation the hiker belongs to: an outing chat
+// they're on the roster of, or a DM they're a party of. Forbidden for anyone else,
+// NotFound when the conversation doesn't exist.
+func (s *Service) GetConversation(ctx context.Context, convID, hikerID uuid.UUID) (*Conversation, error) {
+	conv, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return nil, err
+	}
+	ok, err := s.store.IsMember(ctx, convID, hikerID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, apperr.Forbidden("you're not part of this conversation", "get by non-member")
+	}
+	return conv, nil
+}
+
 func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, conv *Conversation, kind notification.Kind) {
 	e := &notification.Event{
 		HikerID: hikerID,

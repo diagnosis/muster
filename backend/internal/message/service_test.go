@@ -1026,3 +1026,50 @@ func Test_Reopen_Rejections(t *testing.T) {
 	}
 
 }
+
+func Test_GetConv(t *testing.T) {
+	_, _, _, svc, c, host, m1, m2 := newOutingConv(t)
+	dm, err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if err = svc.AcceptDM(context.Background(), dm.ID, m2); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	conv, err := svc.GetConversation(context.Background(), dm.ID, m1)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.ID != conv.ID {
+		t.Errorf("expected convid: %v got %v", dm.ID, conv.ID)
+	}
+	if m1 != *conv.DmInitiator {
+		t.Errorf("expected initiator id: %v got %v", m1, *conv.DmInitiator)
+	}
+	if ConversationKindDM != conv.Kind {
+		t.Errorf("expected kind %s got %s", ConversationKindDM, conv.Kind)
+	}
+	if DMStatusAccepted != *conv.DmStatus {
+		t.Errorf("expected dm status: %s got %s", DMStatusAccepted, *conv.DmStatus)
+	}
+	_, err = svc.GetConversation(context.Background(), dm.ID, host)
+	wantStatus(t, err, apperr.CodeForbidden)
+
+	_, err = svc.GetConversation(context.Background(), uuid.New(), host)
+	wantStatus(t, err, apperr.CodeNotFound)
+
+	_, err = svc.GetConversation(context.Background(), dm.ID, uuid.New())
+	wantStatus(t, err, apperr.CodeForbidden)
+
+	outingConv, err := svc.GetConversation(context.Background(), c.ID, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if outingConv.DmInitiator != nil {
+		t.Errorf("expected nil got %v", *outingConv.DmInitiator)
+	}
+	if outingConv.Kind != ConversationKindOuting {
+		t.Errorf("expected kind: %s got %s", ConversationKindOuting, outingConv.Kind)
+	}
+
+}
