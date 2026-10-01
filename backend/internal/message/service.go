@@ -9,7 +9,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
+	"github.com/diagnosis/go-toolkit/v3/logger"
 	"github.com/diagnosis/muster/internal/events"
+	"github.com/diagnosis/muster/internal/notification"
 	"github.com/diagnosis/muster/internal/outing"
 	"github.com/google/uuid"
 )
@@ -39,20 +41,21 @@ const maxPerMinute = 10
 
 // Service legislates messaging rules; stores execute them.
 type Service struct {
-	store       Storage
-	broadcaster events.Broadcaster
-	now         func() time.Time
+	store         Storage
+	broadcaster   events.Broadcaster
+	now           func() time.Time
+	notifications notification.Storage
 }
 
 // NewService returns a Service over the given store and broadcaster.
-func NewService(store Storage, broadcaster events.Broadcaster) *Service {
-	return &Service{store: store, broadcaster: broadcaster, now: time.Now}
+func NewService(store Storage, broadcaster events.Broadcaster, notifications notification.Storage) *Service {
+	return &Service{store: store, broadcaster: broadcaster, now: time.Now, notifications: notifications}
 }
 
 type poke struct {
-	ConversationID uuid.UUID        `json:"conversation_id"`
-	Kind           ConversationKind `json:"kind"`
-	OutingID       *uuid.UUID       `json:"outing_id,omitempty"`
+	ConversationID   uuid.UUID        `json:"conversation_id"`
+	ConversationKind ConversationKind `json:"conversation_kind"`
+	OutingID         *uuid.UUID       `json:"outing_id,omitempty"`
 }
 
 // PostMessage inserts a message from hikerID into conversationID after verifying
@@ -194,9 +197,9 @@ func (s *Service) broadcast(ctx context.Context, conv *Conversation, eventType s
 		return err
 	}
 	in := poke{
-		ConversationID: conv.ID,
-		Kind:           conv.Kind,
-		OutingID:       conv.OutingID,
+		ConversationID:   conv.ID,
+		ConversationKind: conv.Kind,
+		OutingID:         conv.OutingID,
 	}
 
 	data, err := json.Marshal(in)
@@ -239,6 +242,7 @@ func (s *Service) StartDM(ctx context.Context, h1, h2 uuid.UUID) (*Conversation,
 		if err = s.broadcast(ctx, conv, "dm.requested"); err != nil {
 			return nil, err
 		}
+		s.notify(ctx, h2, conv, notification.KindDMRequested)
 	}
 	return conv, nil
 
@@ -265,6 +269,7 @@ func (s *Service) AcceptDM(ctx context.Context, convID, actor uuid.UUID) error {
 	if err = s.store.UpdateDMStatus(ctx, convID, DMStatusAccepted, nil); err != nil {
 		return err
 	}
+	s.notify(ctx, *conv.DmInitiator, conv, notification.KindDMAccepted)
 	return s.broadcast(ctx, conv, "dm.accepted")
 }
 
@@ -315,6 +320,11 @@ func (s *Service) ReopenDM(ctx context.Context, convID, actor uuid.UUID) error {
 	if err = s.store.UpdateDMStatus(ctx, convID, DMStatusAccepted, nil); err != nil {
 		return err
 	}
+	if actor != *conv.DmA {
+		s.notify(ctx, *conv.DmA, conv, notification.KindDMReopened)
+	} else {
+		s.notify(ctx, *conv.DmB, conv, notification.KindDMReopened)
+	}
 
 	return s.broadcast(ctx, conv, "dm.reopened")
 }
@@ -324,4 +334,18 @@ func (s *Service) ReopenDM(ctx context.Context, convID, actor uuid.UUID) error {
 // store; there is no policy here.
 func (s *Service) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*ConversationSummary, error) {
 	return s.store.ListConversations(ctx, hikerID)
+}
+
+func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, conv *Conversation, kind notification.Kind) {
+	e := &notification.Event{
+		HikerID: hikerID,
+		Kind:    kind,
+		Payload: map[string]any{"conversation_id": conv.ID.String()},
+	}
+	if err := s.notifications.Insert(ctx, e); err != nil {
+		logger.Warn(ctx, "failed to send notification", "err", err)
+	} else {
+		data, _ := json.Marshal(map[string]any{"kind": kind, "conversation_id": conv.ID})
+		s.broadcaster.BroadcastToUser(hikerID, events.Event{Type: "notification.created", Data: string(data)})
+	}
 }

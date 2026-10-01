@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
+	"github.com/diagnosis/muster/internal/events"
+	"github.com/diagnosis/muster/internal/notification"
 	"github.com/diagnosis/muster/internal/outing"
 	"github.com/google/uuid"
 )
@@ -23,12 +25,13 @@ func wantStatus(t *testing.T, err error, want apperr.Status) {
 func Test_PostMessage_NonMember(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
+	fn := &fakeNotificationStore{}
 	outingID := uuid.New()
 	host := uuid.New()
 	members := []uuid.UUID{uuid.New(), uuid.New()}
 	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, members...)
 	hikerID := uuid.New()
-	svc := NewService(f, fb)
+	svc := NewService(f, fb, fn)
 	_, err := svc.PostMessage(context.Background(), conv.ID, hikerID, "hello")
 	wantStatus(t, err, apperr.CodeForbidden)
 }
@@ -36,7 +39,8 @@ func Test_PostMessage_NonMember(t *testing.T) {
 func Test_PostMessage_UnknownConversation(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
-	svc := NewService(f, fb)
+	fn := &fakeNotificationStore{}
+	svc := NewService(f, fb, fn)
 	_, err := svc.PostMessage(context.Background(), uuid.New(), uuid.New(), "hello")
 	wantStatus(t, err, apperr.CodeNotFound)
 }
@@ -44,7 +48,8 @@ func Test_PostMessage_UnknownConversation(t *testing.T) {
 func Test_PostMessage_Happy(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
-	svc := NewService(f, fb)
+	fn := &fakeNotificationStore{}
+	svc := NewService(f, fb, fn)
 	outingID := uuid.New()
 	host := uuid.New()
 	m1 := uuid.New()
@@ -87,7 +92,7 @@ func Test_PostMessage_Happy(t *testing.T) {
 		if err := json.Unmarshal([]byte(got[0].Data), &p); err != nil {
 			t.Fatalf("hiker %v: bad poke json: %v", usr, err)
 		}
-		if p.ConversationID != conv.ID || p.Kind != ConversationKindOuting {
+		if p.ConversationID != conv.ID || p.ConversationKind != ConversationKindOuting {
 			t.Errorf("hiker %v: poke = %+v", usr, p)
 		}
 		if strings.Contains(got[0].Data, "hello") {
@@ -104,7 +109,8 @@ func Test_PostMessage_Happy(t *testing.T) {
 func Test_PostMessage_OutingCancelled(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
-	svc := NewService(f, fb)
+	fn := &fakeNotificationStore{}
+	svc := NewService(f, fb, fn)
 	outingID := uuid.New()
 	host := uuid.New()
 	m1 := uuid.New()
@@ -117,7 +123,8 @@ func Test_PostMessage_OutingCancelled(t *testing.T) {
 func Test_PostMessage_BadBody(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
-	svc := NewService(f, fb)
+	fn := &fakeNotificationStore{}
+	svc := NewService(f, fb, fn)
 	outingID := uuid.New()
 	host := uuid.New()
 	m1 := uuid.New()
@@ -154,7 +161,8 @@ func Test_PostMessage_Limit(t *testing.T) {
 	clock := time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC)
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
-	svc := NewService(f, fb)
+	fn := &fakeNotificationStore{}
+	svc := NewService(f, fb, fn)
 	svc.now = func() time.Time {
 		return clock
 	}
@@ -180,7 +188,8 @@ func Test_PostMessage_Limit(t *testing.T) {
 func Test_ListMessage_Happy(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
-	svc := NewService(f, fb)
+	fn := &fakeNotificationStore{}
+	svc := NewService(f, fb, fn)
 	outingID := uuid.New()
 	host := uuid.New()
 	m1 := uuid.New()
@@ -221,7 +230,8 @@ func Test_ListMessage_Happy(t *testing.T) {
 func Test_ListMessage_Stranger(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
-	svc := NewService(f, fb)
+	fn := &fakeNotificationStore{}
+	svc := NewService(f, fb, fn)
 	outingID := uuid.New()
 	host := uuid.New()
 	m1 := uuid.New()
@@ -245,7 +255,8 @@ func Test_ListMessage_Stranger(t *testing.T) {
 func Test_ListMessage_UnknownConversation(t *testing.T) {
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
-	svc := NewService(f, fb)
+	fn := &fakeNotificationStore{}
+	svc := NewService(f, fb, fn)
 	outingID := uuid.New()
 	host := uuid.New()
 	m1 := uuid.New()
@@ -267,21 +278,22 @@ func Test_ListMessage_UnknownConversation(t *testing.T) {
 }
 
 // delete message tests
-func newOutingConv(t *testing.T) (*fakeStore, *fakeBroadcaster, *Service, *Conversation, uuid.UUID, uuid.UUID, uuid.UUID) {
+func newOutingConv(t *testing.T) (*fakeStore, *fakeBroadcaster, *fakeNotificationStore, *Service, *Conversation, uuid.UUID, uuid.UUID, uuid.UUID) {
 	t.Helper()
 	f := newFakeStore()
 	fb := newFakeBroadcaster()
-	svc := NewService(f, fb)
+	fn := &fakeNotificationStore{}
+	svc := NewService(f, fb, fn)
 	outingID := uuid.New()
 	host := uuid.New()
 	m1 := uuid.New()
 	m2 := uuid.New()
 	conv := f.addOutingConversation(outingID, host, outing.StatusOpen, m1, m2)
-	return f, fb, svc, conv, host, m1, m2
+	return f, fb, fn, svc, conv, host, m1, m2
 }
 
 func Test_DeleteMessage_AuthorDeletes(t *testing.T) {
-	f, fb, svc, conv, host, m1, m2 := newOutingConv(t)
+	f, fb, _, svc, conv, host, m1, m2 := newOutingConv(t)
 	message1, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
@@ -317,7 +329,7 @@ func Test_DeleteMessage_AuthorDeletes(t *testing.T) {
 		if err := json.Unmarshal([]byte(got[0].Data), &p); err != nil {
 			t.Fatalf("hiker %v: bad poke json: %v", usr, err)
 		}
-		if p.ConversationID != conv.ID || p.Kind != ConversationKindOuting {
+		if p.ConversationID != conv.ID || p.ConversationKind != ConversationKindOuting {
 			t.Errorf("hiker %v: poke = %+v", usr, p)
 		}
 	}
@@ -325,7 +337,7 @@ func Test_DeleteMessage_AuthorDeletes(t *testing.T) {
 }
 
 func Test_DeleteMessage_HostDeletes(t *testing.T) {
-	f, fb, svc, conv, host, m1, m2 := newOutingConv(t)
+	f, fb, _, svc, conv, host, m1, m2 := newOutingConv(t)
 	message1, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
@@ -361,7 +373,7 @@ func Test_DeleteMessage_HostDeletes(t *testing.T) {
 		if err := json.Unmarshal([]byte(got[0].Data), &p); err != nil {
 			t.Fatalf("hiker %v: bad poke json: %v", usr, err)
 		}
-		if p.ConversationID != conv.ID || p.Kind != ConversationKindOuting {
+		if p.ConversationID != conv.ID || p.ConversationKind != ConversationKindOuting {
 			t.Errorf("hiker %v: poke = %+v", usr, p)
 		}
 	}
@@ -369,7 +381,7 @@ func Test_DeleteMessage_HostDeletes(t *testing.T) {
 }
 
 func Test_DeleteMessage_OtherMemberDeletes(t *testing.T) {
-	f, fb, svc, conv, _, m1, m2 := newOutingConv(t)
+	f, fb, _, svc, conv, _, m1, m2 := newOutingConv(t)
 	message1, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
@@ -394,7 +406,7 @@ func Test_DeleteMessage_OtherMemberDeletes(t *testing.T) {
 }
 
 func Test_DeleteMessage_StrangerDeletes(t *testing.T) {
-	f, fb, svc, conv, _, m1, m2 := newOutingConv(t)
+	f, fb, _, svc, conv, _, m1, m2 := newOutingConv(t)
 	message1, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
@@ -419,7 +431,7 @@ func Test_DeleteMessage_StrangerDeletes(t *testing.T) {
 }
 
 func Test_DeleteMessage_UnknownMessage(t *testing.T) {
-	f, fb, svc, conv, _, m1, m2 := newOutingConv(t)
+	f, fb, _, svc, conv, _, m1, m2 := newOutingConv(t)
 	_, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
@@ -444,11 +456,23 @@ func Test_DeleteMessage_UnknownMessage(t *testing.T) {
 }
 
 func Test_StartDM_CreatesPending(t *testing.T) {
-	_, _, svc, _, _, m1, m2 := newOutingConv(t)
+	_, _, fn, svc, _, _, m1, m2 := newOutingConv(t)
 
 	dm, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fn.events) != 1 {
+		t.Fatalf("expected 1 notification, got %d", len(fn.events))
+	}
+	if fn.events[0].HikerID != m2 {
+		t.Errorf("expected hikerID: %v got %v", m2, fn.events[0].HikerID)
+	}
+	if fn.events[0].Kind != notification.KindDMRequested {
+		t.Errorf("expected event_kind: %s got %s", notification.KindDMRequested, fn.events[0].Kind)
+	}
+	if fn.events[0].Payload["conversation_id"] != dm.ID.String() {
+		t.Errorf("payload conversation_id = %v", fn.events[0].Payload["conversation_id"])
 	}
 	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
 		t.Errorf("expected status pending got %v", dm.DmStatus)
@@ -465,14 +489,14 @@ func Test_StartDM_CreatesPending(t *testing.T) {
 
 }
 func Test_StartDM_ReversedPair_SameConversation(t *testing.T) {
-	f, fb, svc, _, _, m1, m2 := newOutingConv(t)
+	f, fb, _, svc, _, _, m1, m2 := newOutingConv(t)
 	dm1, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
 	got := fb.sentTo(m2)
-	if len(got) != 1 {
-		t.Fatalf("expected poke one got %v", len(got))
+	if countType(got, "dm.requested") != 1 {
+		t.Fatalf("expected 1 got %v", countType(got, "dm.requested"))
 	}
 	if dm1.DmStatus == nil || *dm1.DmStatus != DMStatusPending {
 		t.Errorf("expected status pending got %v", dm1.DmStatus)
@@ -482,8 +506,8 @@ func Test_StartDM_ReversedPair_SameConversation(t *testing.T) {
 		t.Fatalf("expected no error got %v", err)
 	}
 	got = fb.sentTo(m2)
-	if len(got) != 1 {
-		t.Fatalf("expected poke one got %v", len(got))
+	if countType(got, "dm.requested") != 1 {
+		t.Fatalf("expected 1 got %v", countType(got, "dm.requested"))
 	}
 
 	if len(f.dms) != 1 {
@@ -498,13 +522,13 @@ func Test_StartDM_ReversedPair_SameConversation(t *testing.T) {
 
 }
 func Test_StartDM_Self(t *testing.T) {
-	_, _, svc, _, _, m1, _ := newOutingConv(t)
+	_, _, _, svc, _, _, m1, _ := newOutingConv(t)
 	_, err := svc.StartDM(context.Background(), m1, m1)
 	wantStatus(t, err, apperr.CodeBadRequest)
 
 }
 func Test_StartDM_HostDmsRequester(t *testing.T) {
-	f, _, svc, conv, host, _, _ := newOutingConv(t)
+	f, _, _, svc, conv, host, _, _ := newOutingConv(t)
 	hikerSelim := uuid.New()
 	f.addPendingRequest(*conv.OutingID, hikerSelim)
 	dm, err := svc.StartDM(context.Background(), host, hikerSelim)
@@ -516,7 +540,7 @@ func Test_StartDM_HostDmsRequester(t *testing.T) {
 	}
 }
 func Test_StartDM_MemberDMsPending(t *testing.T) {
-	f, _, svc, conv, _, m1, _ := newOutingConv(t)
+	f, _, _, svc, conv, _, m1, _ := newOutingConv(t)
 	hikerSelim := uuid.New()
 	f.addPendingRequest(*conv.OutingID, hikerSelim)
 	_, err := svc.StartDM(context.Background(), m1, hikerSelim)
@@ -524,7 +548,7 @@ func Test_StartDM_MemberDMsPending(t *testing.T) {
 }
 
 func Test_StartDM_Strangers(t *testing.T) {
-	f, _, svc, _, _, _, _ := newOutingConv(t)
+	f, _, _, svc, _, _, _, _ := newOutingConv(t)
 	hikerCafer := uuid.New()
 	hikerSero := uuid.New()
 	_, err := svc.StartDM(context.Background(), hikerCafer, hikerSero)
@@ -535,7 +559,7 @@ func Test_StartDM_Strangers(t *testing.T) {
 }
 
 func Test_PostDM_Accepted(t *testing.T) {
-	f, _, svc, _, _, m1, m2 := newOutingConv(t)
+	f, _, _, svc, _, _, m1, m2 := newOutingConv(t)
 	dm, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
@@ -558,7 +582,7 @@ func Test_PostDM_Accepted(t *testing.T) {
 
 }
 func Test_PostDM_Declined(t *testing.T) {
-	f, _, svc, _, _, m1, m2 := newOutingConv(t)
+	f, _, _, svc, _, _, m1, m2 := newOutingConv(t)
 	dm, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
@@ -581,7 +605,7 @@ func Test_PostDM_Declined(t *testing.T) {
 }
 func Test_PostDM_Pending(t *testing.T) {
 	clock := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
-	f, _, svc, _, _, m1, m2 := newOutingConv(t)
+	f, _, _, svc, _, _, m1, m2 := newOutingConv(t)
 	svc.now = func() time.Time {
 		return clock
 	}
@@ -617,34 +641,56 @@ func Test_PostDM_Pending(t *testing.T) {
 	}
 
 }
+func countType(es []events.Event, t string) int {
+	count := 0
+	for _, e := range es {
+		if e.Type == t {
+			count++
+		}
+	}
+	return count
+}
 func Test_AcceptDM(t *testing.T) {
-	f, fb, svc, _, _, m1, m2 := newOutingConv(t)
+	f, fb, fn, svc, _, _, m1, m2 := newOutingConv(t)
 	fb.sent = nil
 	dm, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
+	if len(fn.events) != 1 {
+		t.Fatalf("expected 1 notification, got %d", len(fn.events))
+	}
 	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
 		t.Errorf("expected status pending got %v", dm.DmStatus)
 	}
 	got := fb.sentTo(m2)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 got %v", len(got))
-	}
-	if got[0].Type != "dm.requested" {
-		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+	if countType(got, "dm.requested") != 1 {
+		t.Fatalf("expected 1 got %d", countType(got, "dm.requested"))
 	}
 	fb.sent = nil
 	err = svc.AcceptDM(context.Background(), dm.ID, m2)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-	got = fb.sentTo(m1)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 got %v", len(got))
+
+	if countType(got, "notification.created") != 1 {
+		t.Errorf("expected 1 notification poke, got %d", countType(got, "notification.created"))
 	}
-	if got[0].Type != "dm.accepted" {
-		t.Fatalf("expected type: dm.accepted got: %v", got[0].Type)
+	got = fb.sentTo(m1)
+	if countType(got, "dm.accepted") != 1 {
+		t.Fatalf("expected 1 got %d", countType(got, "dm.accepted"))
+	}
+	if len(fn.events) != 2 {
+		t.Fatalf("expected 2 notification, got %d", len(fn.events))
+	}
+	if fn.events[1].HikerID != m1 {
+		t.Errorf("expected hikerID: %v got %v", m1, fn.events[1].HikerID)
+	}
+	if fn.events[1].Kind != notification.KindDMAccepted {
+		t.Errorf("expected event_kind: %s got %s", notification.KindDMAccepted, fn.events[1].Kind)
+	}
+	if fn.events[1].Payload["conversation_id"] != dm.ID.String() {
+		t.Errorf("payload conversation_id = %v", fn.events[1].Payload["conversation_id"])
 	}
 
 	if *f.converstations[dm.ID].DmStatus != DMStatusAccepted {
@@ -671,7 +717,7 @@ func Test_AcceptDM(t *testing.T) {
 }
 
 func Test_AcceptDM_Rejections(t *testing.T) {
-	f, fb, svc, c, _, m1, m2 := newOutingConv(t)
+	f, fb, _, svc, c, _, m1, m2 := newOutingConv(t)
 	fb.sent = nil
 	dm, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
@@ -681,11 +727,8 @@ func Test_AcceptDM_Rejections(t *testing.T) {
 		t.Errorf("expected status pending got %v", dm.DmStatus)
 	}
 	got := fb.sentTo(m2)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 got %v", len(got))
-	}
-	if got[0].Type != "dm.requested" {
-		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+	if countType(got, "dm.requested") != 1 {
+		t.Fatalf("expected 1 got %v", countType(got, "dm.requested"))
 	}
 	cases := []struct {
 		name      string
@@ -723,7 +766,7 @@ func Test_AcceptDM_Rejections(t *testing.T) {
 }
 
 func Test_Decline_DM(t *testing.T) {
-	f, fb, svc, _, _, m1, m2 := newOutingConv(t)
+	f, fb, _, svc, _, _, m1, m2 := newOutingConv(t)
 	fb.sent = nil
 	dm, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
@@ -733,11 +776,8 @@ func Test_Decline_DM(t *testing.T) {
 		t.Errorf("expected status pending got %v", dm.DmStatus)
 	}
 	got := fb.sentTo(m2)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 got %v", len(got))
-	}
-	if got[0].Type != "dm.requested" {
-		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+	if countType(got, "dm.requested") != 1 {
+		t.Fatalf("expected 1 got %v", countType(got, "dm.requested"))
 	}
 	fb.sent = nil
 	err = svc.DeclineDM(context.Background(), dm.ID, m2)
@@ -766,7 +806,7 @@ func Test_Decline_DM(t *testing.T) {
 }
 
 func Test_Decline_DM_Rejections(t *testing.T) {
-	f, fb, svc, c, _, m1, m2 := newOutingConv(t)
+	f, fb, _, svc, c, _, m1, m2 := newOutingConv(t)
 	fb.sent = nil
 	dm, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
@@ -776,11 +816,8 @@ func Test_Decline_DM_Rejections(t *testing.T) {
 		t.Errorf("expected status pending got %v", dm.DmStatus)
 	}
 	got := fb.sentTo(m2)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 got %v", len(got))
-	}
-	if got[0].Type != "dm.requested" {
-		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+	if countType(got, "dm.requested") != 1 {
+		t.Fatalf("expected 1 got %v", countType(got, "dm.requested"))
 	}
 	fb.sent = nil
 	cases := []struct {
@@ -819,7 +856,7 @@ func Test_Decline_DM_Rejections(t *testing.T) {
 }
 
 func Test_Decline_AcceptedDM(t *testing.T) {
-	f, fb, svc, _, _, m1, m2 := newOutingConv(t)
+	f, fb, _, svc, _, _, m1, m2 := newOutingConv(t)
 	fb.sent = nil
 	dm, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
@@ -829,11 +866,8 @@ func Test_Decline_AcceptedDM(t *testing.T) {
 		t.Errorf("expected status pending got %v", dm.DmStatus)
 	}
 	got := fb.sentTo(m2)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 got %v", len(got))
-	}
-	if got[0].Type != "dm.requested" {
-		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+	if countType(got, "dm.requested") != 1 {
+		t.Fatalf("expected 1 got %v", countType(got, "dm.requested"))
 	}
 
 	fb.sent = nil
@@ -842,11 +876,8 @@ func Test_Decline_AcceptedDM(t *testing.T) {
 		t.Fatalf("expected no error got %v", err)
 	}
 	got = fb.sentTo(m1)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 got %v", len(got))
-	}
-	if got[0].Type != "dm.accepted" {
-		t.Fatalf("expected type: dm.accepted got: %v", got[0].Type)
+	if countType(got, "dm.accepted") != 1 {
+		t.Fatalf("expected 1 got %v", countType(got, "dm.accepted"))
 	}
 
 	fb.sent = nil
@@ -876,7 +907,7 @@ func Test_Decline_AcceptedDM(t *testing.T) {
 }
 
 func Test_Reopen_DM(t *testing.T) {
-	f, fb, svc, _, _, m1, m2 := newOutingConv(t)
+	f, fb, fn, svc, _, _, m1, m2 := newOutingConv(t)
 	fb.sent = nil
 	dm, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
@@ -886,11 +917,9 @@ func Test_Reopen_DM(t *testing.T) {
 		t.Errorf("expected status pending got %v", dm.DmStatus)
 	}
 	got := fb.sentTo(m2)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 got %v", len(got))
-	}
-	if got[0].Type != "dm.requested" {
-		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+
+	if countType(got, "dm.requested") != 1 {
+		t.Fatalf("expected 1 got %v", countType(got, "dm.requested"))
 	}
 
 	fb.sent = nil
@@ -902,8 +931,8 @@ func Test_Reopen_DM(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("expected 1 got %v", len(got))
 	}
-	if got[0].Type != "dm.declined" {
-		t.Fatalf("expected type: dm.declined got: %v", got[0].Type)
+	if countType(got, "dm.declined") != 1 {
+		t.Fatalf("expected 1 got %v", countType(got, "dm.declined"))
 	}
 
 	fb.sent = nil
@@ -912,12 +941,22 @@ func Test_Reopen_DM(t *testing.T) {
 		t.Fatalf("expected no error got %v", err)
 	}
 	got = fb.sentTo(m1)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 got %v", len(got))
+	if countType(got, "dm.reopened") != 1 {
+		t.Fatalf("expected 1 got %v", countType(got, "dm.reopened"))
 	}
-	if got[0].Type != "dm.reopened" {
-		t.Fatalf("expected type: dm.declined got: %v", got[0].Type)
+	if len(fn.events) != 2 {
+		t.Fatalf("expected 2 got %v", len(fn.events))
 	}
+	if fn.events[1].HikerID != m1 {
+		t.Errorf("expected hikerID: %v got %v", m1, fn.events[1].HikerID)
+	}
+	if fn.events[1].Kind != notification.KindDMReopened {
+		t.Errorf("expected event_kind: %s got %s", notification.KindDMReopened, fn.events[1].Kind)
+	}
+	if fn.events[1].Payload["conversation_id"] != dm.ID.String() {
+		t.Errorf("payload conversation_id = %v", fn.events[1].Payload["conversation_id"])
+	}
+
 	if *f.converstations[dm.ID].DmStatus != DMStatusAccepted {
 		t.Fatalf("expected %s got %s", DMStatusAccepted, *f.converstations[dm.ID].DmStatus)
 	}
@@ -933,7 +972,7 @@ func Test_Reopen_DM(t *testing.T) {
 }
 
 func Test_Reopen_Rejections(t *testing.T) {
-	f, fb, svc, c, _, m1, m2 := newOutingConv(t)
+	f, fb, _, svc, c, _, m1, m2 := newOutingConv(t)
 	fb.sent = nil
 	dm, err := svc.StartDM(context.Background(), m1, m2)
 	if err != nil {
@@ -943,11 +982,8 @@ func Test_Reopen_Rejections(t *testing.T) {
 		t.Errorf("expected status pending got %v", dm.DmStatus)
 	}
 	got := fb.sentTo(m2)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 got %v", len(got))
-	}
-	if got[0].Type != "dm.requested" {
-		t.Fatalf("expected type: dm.requested got: %v", got[0].Type)
+	if countType(got, "dm.requested") != 1 {
+		t.Fatalf("expected 1 got %v", countType(got, "dm.requested"))
 	}
 
 	fb.sent = nil

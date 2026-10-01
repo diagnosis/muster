@@ -93,7 +93,7 @@ func run() error {
 	dispatcher := notification.NewDispatcher(notificationStore, m, cfg.App.DispatcherInterval, cfg.App.BaseURL)
 	hub := events.NewHub()
 
-	messages := message.NewService(messageStore, hub)
+	messages := message.NewService(messageStore, hub, notificationStore)
 	outings := outing.NewService(outingsStore, notificationStore, hub)
 	srv := api.NewServer(cfg, hikers, signer, outings, notificationStore, hub, messages)
 
