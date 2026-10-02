@@ -87,6 +87,8 @@ export function NotificationBell( ){
                                         onClick={() => {
                                             if (!n.read_at) markRead.mutate(n.id)
                                             const outingId = n.payload?.outing_id
+                                            const convId = n.payload?.conversation_id
+                                            if (convId) navigate({to:'/conversations/$id', params:{id: String(convId)}})
                                             if (outingId) navigate({ to: '/outings/$id', params: { id: String(outingId) } })
                                             setOpen(false)   // close the dropdown after navigating
                                         }}
@@ -106,6 +108,7 @@ export function NotificationBell( ){
 
 function notificationText(n: NotificationEvent): string {
     const title = n.payload?.outing_title ?? 'an outing'
+    const hikerName = n.payload?.from_name ?? 'someone'
     switch (n.kind) {
         case 'join_request_created':   return `New request to join ${title}`
         case 'join_request_approved':  return `Your request to join ${title} was approved`
@@ -114,6 +117,9 @@ function notificationText(n: NotificationEvent): string {
         case 'member_removed':         return `You were removed from ${title}`
         case 'outing_cancelled':       return `${title} was cancelled`
         case 'outing_updated':         return `${title} was updated`
+        case 'dm_requested': return `${hikerName} send a dm request`
+        case 'dm_reopened': return  `${hikerName} reopened the dm`
+        case 'dm_accepted': return  `${hikerName} accepted the dm`
         default:                       return 'You have a new notification'
     }
 }

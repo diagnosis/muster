@@ -35,6 +35,7 @@ type Storage interface {
 	UpdateDMStatus(ctx context.Context, convID uuid.UUID, status DMStatus, declinedBy *uuid.UUID) error
 	ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*ConversationSummary, error)
 	GetConversationView(ctx context.Context, convID uuid.UUID) (*ConversationView, error)
+	HikerName(ctx context.Context, hikerId uuid.UUID) (string, error)
 }
 
 const maxBodyRunes = 500
@@ -243,7 +244,7 @@ func (s *Service) StartDM(ctx context.Context, h1, h2 uuid.UUID) (*Conversation,
 		if err = s.broadcast(ctx, conv, "dm.requested"); err != nil {
 			return nil, err
 		}
-		s.notify(ctx, h2, conv, notification.KindDMRequested)
+		s.notify(ctx, h1, h2, conv, notification.KindDMRequested)
 	}
 	return conv, nil
 
@@ -270,7 +271,7 @@ func (s *Service) AcceptDM(ctx context.Context, convID, actor uuid.UUID) error {
 	if err = s.store.UpdateDMStatus(ctx, convID, DMStatusAccepted, nil); err != nil {
 		return err
 	}
-	s.notify(ctx, *conv.DmInitiator, conv, notification.KindDMAccepted)
+	s.notify(ctx, actor, *conv.DmInitiator, conv, notification.KindDMAccepted)
 	return s.broadcast(ctx, conv, "dm.accepted")
 }
 
@@ -322,9 +323,9 @@ func (s *Service) ReopenDM(ctx context.Context, convID, actor uuid.UUID) error {
 		return err
 	}
 	if actor != *conv.DmA {
-		s.notify(ctx, *conv.DmA, conv, notification.KindDMReopened)
+		s.notify(ctx, actor, *conv.DmA, conv, notification.KindDMReopened)
 	} else {
-		s.notify(ctx, *conv.DmB, conv, notification.KindDMReopened)
+		s.notify(ctx, actor, *conv.DmB, conv, notification.KindDMReopened)
 	}
 
 	return s.broadcast(ctx, conv, "dm.reopened")
@@ -355,13 +356,17 @@ func (s *Service) GetConversation(ctx context.Context, convID, hikerID uuid.UUID
 	return conv, nil
 }
 
-func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, conv *Conversation, kind notification.Kind) {
+func (s *Service) notify(ctx context.Context, actor, hikerID uuid.UUID, conv *Conversation, kind notification.Kind) {
+	actorName, err := s.store.HikerName(ctx, actor)
+	if err != nil {
+		logger.Warn(ctx, "failed to capture actor name", "err", err)
+	}
 	e := &notification.Event{
 		HikerID: hikerID,
 		Kind:    kind,
-		Payload: map[string]any{"conversation_id": conv.ID.String()},
+		Payload: map[string]any{"conversation_id": conv.ID.String(), "from_name": actorName},
 	}
-	if err := s.notifications.Insert(ctx, e); err != nil {
+	if err = s.notifications.Insert(ctx, e); err != nil {
 		logger.Warn(ctx, "failed to send notification", "err", err)
 	} else {
 		data, _ := json.Marshal(map[string]any{"kind": kind, "conversation_id": conv.ID})

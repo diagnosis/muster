@@ -257,5 +257,12 @@ func (f *fakeStore) GetConversationView(ctx context.Context, convID uuid.UUID) (
 	})
 	return view, nil
 }
+func (f *fakeStore) HikerName(ctx context.Context, hikerID uuid.UUID) (string, error) {
+	v, ok := f.names[hikerID]
+	if !ok {
+		return "", apperr.NotFound("not found", "not found")
+	}
+	return v, nil
+}
 
 var _ Storage = (*fakeStore)(nil)

@@ -154,7 +154,7 @@ export interface NotificationEvent{
     id: string
     hiker_id: string
     kind: string
-    payload: {outing_id:string,outing_title:string}
+    payload: {outing_id:string,outing_title:string, from_name:string, conversation_id:string}
     created_at: string
     read_at:  string|null
 }

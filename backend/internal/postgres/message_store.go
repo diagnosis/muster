@@ -410,6 +410,21 @@ func (s *MessageStore) UpdateDMStatus(ctx context.Context, convID uuid.UUID, sta
 	return nil
 }
 
+// HikerName returns the hiker's display name, used to label notifications
+// ("X wants to message you"). NotFound when no such hiker exists.
+func (s *MessageStore) HikerName(ctx context.Context, hikerID uuid.UUID) (string, error) {
+	q := `SELECT name FROM hikers where id = $1`
+	var hikerName string
+	if err := s.pool.QueryRow(ctx, q, hikerID).Scan(&hikerName); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", apperr.NotFound("hiker not found", "row not found")
+		}
+		return "", apperr.Database("failed to get hiker name", "scanning hiker name failed", err)
+	}
+	return hikerName, nil
+
+}
+
 var _ message.Storage = (*MessageStore)(nil)
 
 // helper

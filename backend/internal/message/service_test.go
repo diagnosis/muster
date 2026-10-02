@@ -605,7 +605,7 @@ func Test_PostDM_Declined(t *testing.T) {
 }
 func Test_PostDM_Pending(t *testing.T) {
 	clock := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
-	f, _, _, svc, _, _, m1, m2 := newOutingConv(t)
+	f, _, fn, svc, _, _, m1, m2 := newOutingConv(t)
 	svc.now = func() time.Time {
 		return clock
 	}
@@ -615,6 +615,12 @@ func Test_PostDM_Pending(t *testing.T) {
 	}
 	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
 		t.Errorf("expected status pending got %v", dm.DmStatus)
+	}
+	if len(fn.events) != 1 {
+		t.Fatalf("expected 1 got %d", len(fn.events))
+	}
+	if fn.events[0].Payload["from_name"] != f.names[m1] {
+		t.Errorf("expected %s got %s", f.names[m1], fn.events[0].Payload["from_names"])
 	}
 	_, err = svc.PostMessage(context.Background(), dm.ID, m1, "hello, have ice axe?")
 	if err != nil {
@@ -955,6 +961,9 @@ func Test_Reopen_DM(t *testing.T) {
 	}
 	if fn.events[1].Payload["conversation_id"] != dm.ID.String() {
 		t.Errorf("payload conversation_id = %v", fn.events[1].Payload["conversation_id"])
+	}
+	if fn.events[1].Payload["from_name"] != f.names[m2] {
+		t.Errorf("expected from name %s got %s", f.names[m2], fn.events[1].Payload["from_name"])
 	}
 
 	if *f.converstations[dm.ID].DmStatus != DMStatusAccepted {
