@@ -649,13 +649,13 @@ func Test_HandleGetConversation(t *testing.T) {
 				if resp.Data.ID != c.ID {
 					t.Errorf("expected convID: %v got %v", c.ID, resp.Data.ID)
 				}
-				if len(resp.Data.Participants) != 2{
+				if len(resp.Data.Participants) != 2 {
 					t.Errorf("expected 2 got %d", len(resp.Data.Participants))
 				}
 				hikerNames := make(map[string]bool)
-				hikerNames["A"] =true
-				hikerNames["B"] =true
-				for _, p := range resp.Data.Participants{
+				hikerNames["A"] = true
+				hikerNames["B"] = true
+				for _, p := range resp.Data.Participants {
 					if _, ok := hikerNames[p.Name]; !ok {
 						t.Errorf("unexpected hiker name %s", p.Name)
 					}

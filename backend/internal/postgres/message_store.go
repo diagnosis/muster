@@ -27,7 +27,7 @@ type MessageStore struct {
 // conversation doesn't exist.
 func (s *MessageStore) GetConversationView(ctx context.Context, convID uuid.UUID) (*message.ConversationView, error) {
 	q1 := ` 
-	SELECT c.id, c.kind, o.title, o.starts_at, c.outing_id, c.dm_a, c.dm_b, c.dm_initiator, c.dm_status, c.dm_declined_by, c.created_at 
+	SELECT c.id, c.kind, o.title, o.starts_at, c.outing_id, o.host_id, c.dm_a, c.dm_b, c.dm_initiator, c.dm_status, c.dm_declined_by, c.created_at 
 	FROM conversations c LEFT JOIN outings o ON o.id = c.outing_id 
 	WHERE c.id = $1
 `
@@ -56,6 +56,7 @@ func (s *MessageStore) GetConversationView(ctx context.Context, convID uuid.UUID
 		&cv.OutingTitle,
 		&cv.OutingStartsAt,
 		&cv.OutingID,
+		&cv.OutingHostID,
 		&cv.DmA,
 		&cv.DmB,
 		&cv.DmInitiator,

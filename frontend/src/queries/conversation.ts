@@ -1,5 +1,5 @@
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
-import type {Conversation, ListConversationsResponse} from "@/types.ts";
+import type {Conversation, ConversationView, ListConversationsResponse} from "@/types.ts";
 import {queryOptions, useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 
 
@@ -87,7 +87,7 @@ export function useReopenDM(cid:string){
 }
 
 export async function getConversation(cid: string){
-    const res = await apiClient.get<Conversation>(`/api/conversations/${cid}`)
+    const res = await apiClient.get<ConversationView>(`/api/conversations/${cid}`)
     if (res.ok){
         return res.data
     }

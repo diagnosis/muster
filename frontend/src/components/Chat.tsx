@@ -5,31 +5,31 @@ import type {MeResponse} from "@/types.ts";
 import {useState} from "react";
 import styles from '@/components/Chat.module.css'
 
-import {useOuting} from "@/queries.ts";
 interface ChatProps {
     cid: string
-    oid: string
     me: MeResponse
+    canPost: boolean
+    canModerate: boolean
+    nameFor : (id: string) => string
 }
 
-export function Chat({cid, oid, me}:ChatProps){
-    const {data: detail} = useOuting(oid)
+export function Chat({cid, me, canPost,canModerate, nameFor}:ChatProps){
 
     const [body, setBody] = useState("")
     const messages = useListMessages(cid)
     const postMessage = usePostMessage(cid)
     const deleteMessage = useDeleteMessage(cid)
+
     return <>
         <div>
-            <h1>{detail.outing.title}</h1>
             <div>
                 {messages.data?.messages.map(m =>
                    <div key={m.id} className={styles.messageRow}>
                        <p >
-                           {m.hiker_id === detail.host.hiker_id?detail.host.name:(detail.roster.find(r => r.hiker_id === m.hiker_id))?.name}
+                           <strong>{nameFor(m.hiker_id)}</strong>
                            {` : ${m.body}`}
                        </p>
-                       {(me.id === m.hiker_id || me.id === detail.host.hiker_id) &&
+                       {(me.id === m.hiker_id || canModerate) &&
                            <button onClick={(e)=>{
                                e.preventDefault()
                                deleteMessage.mutate(m.id)
@@ -48,14 +48,16 @@ export function Chat({cid, oid, me}:ChatProps){
                 if (!body.trim()) return
                 postMessage.mutate({body}, {onSuccess: ()=> setBody("")})
             }}>
+
                 <textarea
                     aria-label='chat-box'
+                    disabled={!canPost}
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
                     placeholder={"start typing..."}
                 >
                 </textarea>
-                <button type='submit'>send</button>
+                <button type='submit' disabled={!canPost}>send</button>
             </form>
         </div>
     </>

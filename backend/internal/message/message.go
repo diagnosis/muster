@@ -77,6 +77,7 @@ type ConversationView struct {
 	OutingStartsAt *time.Time       `json:"outing_starts_at"`
 	Participants   []Participant    `json:"participants"`
 	OutingID       *uuid.UUID       `json:"outing_id"`
+	OutingHostID   *uuid.UUID       `json:"outing_host_id"`
 	DmA            *uuid.UUID       `json:"dm_a"`
 	DmB            *uuid.UUID       `json:"dm_b"`
 	DmInitiator    *uuid.UUID       `json:"dm_initiator"`

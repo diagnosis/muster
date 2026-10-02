@@ -195,7 +195,7 @@ export function OutingDetailPage() {
                 {detail.outing.notes && <p>{detail.outing.notes}</p>}
             </section>}
             {canSeeChat&&<div>
-                <Link className={'btn btn-primary'} to={'/outings/$id/conversation'} params={{id:id}}>Outing chat</Link>
+                <Link className={'btn btn-primary'} to={'/conversations/$id'} params={{id:detail.outing.conversation_id}}>Outing chat</Link>
             </div>}
             {canSeeComments&&(
                 <Comments outingId={id} hostId={detail.outing.host_id} readOnly={isReadOnly}/>

@@ -244,6 +244,10 @@ func (f *fakeStore) GetConversationView(ctx context.Context, convID uuid.UUID) (
 		if d, okk := f.outingStarts[*c.OutingID]; okk {
 			view.OutingStartsAt = &d
 		}
+		if h, okk := f.hosts[*c.OutingID]; okk {
+			view.OutingHostID = &h
+		}
+
 	}
 	for id := range f.members[convID] {
 		view.Participants = append(view.Participants, Participant{HikerID: id, Name: f.names[id]})
