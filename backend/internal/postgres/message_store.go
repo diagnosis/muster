@@ -18,6 +18,78 @@ type MessageStore struct {
 	pool *pgxpool.Pool
 }
 
+// GetConversationView loads one conversation with everything the chat page needs:
+// the row itself, the outing's title and start time when kind is outing (NULL for
+// DMs), and the participants with their names — host and accepted members for an
+// outing, both parties for a DM. The participant query is viewer-independent on
+// purpose; the caller (message.Service) enforces membership with IsMember, and the
+// client picks "the other party" for a DM by excluding itself. NotFound when the
+// conversation doesn't exist.
+func (s *MessageStore) GetConversationView(ctx context.Context, convID uuid.UUID) (*message.ConversationView, error) {
+	q1 := ` 
+	SELECT c.id, c.kind, o.title, o.starts_at, c.outing_id, c.dm_a, c.dm_b, c.dm_initiator, c.dm_status, c.dm_declined_by, c.created_at 
+	FROM conversations c LEFT JOIN outings o ON o.id = c.outing_id 
+	WHERE c.id = $1
+`
+	q2 := `
+		SELECT h.id, h.name 
+		FROM conversations c 
+		JOIN outings o ON o.id = c.outing_id
+		JOIN hikers h ON h.id = o.host_id
+		WHERE c.id = $1
+		UNION 
+		SELECT h.id, h.name
+		FROM conversations c
+		JOIN join_requests jr ON jr.outing_id = c.outing_id
+		JOIN hikers h ON h.id = jr.hiker_id
+		WHERE c.id = $1 and jr.status = 'accepted'
+		UNION 
+		SELECT h.id, h.name
+		FROM conversations c 
+		JOIN hikers h ON h.id IN (c.dm_a, c.dm_b)
+		WHERE c.id = $1
+`
+	cv := &message.ConversationView{}
+	if err := s.pool.QueryRow(ctx, q1, convID).Scan(
+		&cv.ID,
+		&cv.Kind,
+		&cv.OutingTitle,
+		&cv.OutingStartsAt,
+		&cv.OutingID,
+		&cv.DmA,
+		&cv.DmB,
+		&cv.DmInitiator,
+		&cv.DmStatus,
+		&cv.DmDeclinedBy,
+		&cv.CreatedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperr.NotFound("conversation not found", "no row for id")
+		}
+		return nil, apperr.Database("failed to get conversation", "failed to scan conversation view", err)
+	}
+	participants := []message.Participant{}
+	rows, err := s.pool.Query(ctx, q2, convID)
+	if err != nil {
+		return nil, apperr.Database("failed to get conversation", "failed to get participants for conversation", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		p := message.Participant{}
+		if verr := rows.Scan(&p.HikerID, &p.Name); verr != nil {
+			return nil, apperr.Database("failed to get conversation", "failed to scan participant row", verr)
+		}
+		participants = append(participants, p)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, apperr.Database("failed to get conversation", "failed to iterate participants", err)
+	}
+	cv.Participants = participants
+
+	return cv, nil
+
+}
+
 // ListConversations loads all conversations for a hiker
 func (s *MessageStore) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*message.ConversationSummary, error) {
 	q := `

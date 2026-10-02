@@ -1052,6 +1052,22 @@ func Test_GetConv(t *testing.T) {
 	if DMStatusAccepted != *conv.DmStatus {
 		t.Errorf("expected dm status: %s got %s", DMStatusAccepted, *conv.DmStatus)
 	}
+	if len(conv.Participants) != 2 {
+		t.Errorf("expected participants len 2 got %d", len(conv.Participants))
+	}
+	ids := map[uuid.UUID]bool{}
+	for _, p := range conv.Participants {
+		if p.Name == "" {
+			t.Errorf("participant %v has no name", p.HikerID)
+		}
+		ids[p.HikerID] = true
+	}
+	if !ids[m1] || !ids[m2] {
+		t.Errorf("participants = %v", conv.Participants)
+	}
+	if conv.OutingTitle != nil {
+		t.Errorf("expected title nil got %s", *conv.OutingTitle)
+	}
 	_, err = svc.GetConversation(context.Background(), dm.ID, host)
 	wantStatus(t, err, apperr.CodeForbidden)
 
@@ -1070,6 +1086,12 @@ func Test_GetConv(t *testing.T) {
 	}
 	if outingConv.Kind != ConversationKindOuting {
 		t.Errorf("expected kind: %s got %s", ConversationKindOuting, outingConv.Kind)
+	}
+	if outingConv.OutingTitle == nil {
+		t.Error("expected to have a title got nil")
+	}
+	if len(outingConv.Participants) != 3 {
+		t.Errorf("expected participants 3 got %d", len(outingConv.Participants))
 	}
 
 }

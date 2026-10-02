@@ -85,3 +85,20 @@ export function useReopenDM(cid:string){
         }
     })
 }
+
+export async function getConversation(cid: string){
+    const res = await apiClient.get<Conversation>(`/api/conversations/${cid}`)
+    if (res.ok){
+        return res.data
+    }
+    throw new ApiRequestError(res.error, res.httpStatus)
+}
+
+export const conversationQueryOptions = (cid:string) => queryOptions({
+    queryKey:['conversation', cid],
+    queryFn: () =>  getConversation(cid)
+})
+
+export function useConversation(cid:string){
+    return useQuery(conversationQueryOptions(cid))
+}

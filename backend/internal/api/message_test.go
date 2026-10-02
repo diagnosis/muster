@@ -585,7 +585,7 @@ func Test_HandleGetConversation(t *testing.T) {
 	stranger := uuid.New()
 	hikerA, hikerB := uuid.New(), uuid.New()
 	dmStatus := message.DMStatusAccepted
-	c := &message.Conversation{
+	c := &message.ConversationView{
 		ID:           uuid.New(),
 		Kind:         message.ConversationKindDM,
 		DmA:          &hikerA,
@@ -594,6 +594,7 @@ func Test_HandleGetConversation(t *testing.T) {
 		DmStatus:     &dmStatus,
 		DmDeclinedBy: nil,
 		CreatedAt:    time.Now(),
+		Participants: []message.Participant{{HikerID: hikerA, Name: "A"}, {HikerID: hikerB, Name: "B"}},
 	}
 	cases := []struct {
 		name     string
@@ -623,7 +624,7 @@ func Test_HandleGetConversation(t *testing.T) {
 			if cc.wantCode == 404 {
 				f.err = apperr.NotFound("not found", "not found")
 			}
-			f.conversation = c
+			f.conversationView = c
 			s := &Server{messages: f}
 
 			s.handleGetConversation(w, r)
@@ -639,7 +640,7 @@ func Test_HandleGetConversation(t *testing.T) {
 					t.Error("no member got in conversation")
 				}
 				resp := struct {
-					Data *message.Conversation `json:"data"`
+					Data *message.ConversationView `json:"data"`
 				}{}
 				dec := json.NewDecoder(w.Body)
 				if err := dec.Decode(&resp); err != nil {
@@ -647,6 +648,17 @@ func Test_HandleGetConversation(t *testing.T) {
 				}
 				if resp.Data.ID != c.ID {
 					t.Errorf("expected convID: %v got %v", c.ID, resp.Data.ID)
+				}
+				if len(resp.Data.Participants) != 2{
+					t.Errorf("expected 2 got %d", len(resp.Data.Participants))
+				}
+				hikerNames := make(map[string]bool)
+				hikerNames["A"] =true
+				hikerNames["B"] =true
+				for _, p := range resp.Data.Participants{
+					if _, ok := hikerNames[p.Name]; !ok {
+						t.Errorf("unexpected hiker name %s", p.Name)
+					}
 				}
 			}
 		})

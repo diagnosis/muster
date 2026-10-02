@@ -1,18 +1,20 @@
 // src/components/Chat.tsx
 
 import {useDeleteMessage, useListMessages, usePostMessage} from "@/queries/message.ts";
-import type {Detail, MeResponse} from "@/types.ts";
+import type {MeResponse} from "@/types.ts";
 import {useState} from "react";
-import {useConversationEvents} from "@/events/useConversationEvents.ts";
 import styles from '@/components/Chat.module.css'
+
+import {useOuting} from "@/queries.ts";
 interface ChatProps {
     cid: string
-    detail: Detail
+    oid: string
     me: MeResponse
 }
 
-export function Chat({cid, detail, me}:ChatProps){
-    useConversationEvents(cid)
+export function Chat({cid, oid, me}:ChatProps){
+    const {data: detail} = useOuting(oid)
+
     const [body, setBody] = useState("")
     const messages = useListMessages(cid)
     const postMessage = usePostMessage(cid)

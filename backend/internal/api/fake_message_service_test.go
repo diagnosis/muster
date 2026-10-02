@@ -11,6 +11,7 @@ type fakeMessageService struct {
 	message               *message.Message
 	messages              []*message.Message
 	conversation          *message.Conversation
+	conversationView      *message.ConversationView
 	conversationSummaries []*message.ConversationSummary
 	gotConvID             uuid.UUID
 	gotHikerID            uuid.UUID
@@ -58,9 +59,9 @@ func (f *fakeMessageService) ListConversations(ctx context.Context, hikerID uuid
 	f.gotHikerID = hikerID
 	return f.conversationSummaries, f.err
 }
-func (f *fakeMessageService) GetConversation(ctx context.Context, convID, hikerID uuid.UUID) (*message.Conversation, error) {
+func (f *fakeMessageService) GetConversation(ctx context.Context, convID, hikerID uuid.UUID) (*message.ConversationView, error) {
 	f.gotConvID, f.gotHikerID = convID, hikerID
-	return f.conversation, f.err
+	return f.conversationView, f.err
 }
 
 func newFakeMessageService() *fakeMessageService {

@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
+import { Route as ConversationsIdRouteImport } from './routes/conversations_.$id'
 import { Route as MeOutingsRouteImport } from './routes/me.outings'
 import { Route as MeProfileRouteImport } from './routes/me.profile'
 import { Route as OutingsIdRouteImport } from './routes/outings.$id'
@@ -44,6 +45,11 @@ const SignupRoute = SignupRouteImport.update({
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
   id: '/verify-email',
   path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConversationsIdRoute = ConversationsIdRouteImport.update({
+  id: '/conversations_/$id',
+  path: '/conversations/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MeOutingsRoute = MeOutingsRouteImport.update({
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/conversations/$id': typeof ConversationsIdRoute
   '/me/outings': typeof MeOutingsRoute
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/conversations/$id': typeof ConversationsIdRoute
   '/me/outings': typeof MeOutingsRoute
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/conversations_/$id': typeof ConversationsIdRoute
   '/me/outings': typeof MeOutingsRoute
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/verify-email'
+    | '/conversations/$id'
     | '/me/outings'
     | '/me/profile'
     | '/outings/$id'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/verify-email'
+    | '/conversations/$id'
     | '/me/outings'
     | '/me/profile'
     | '/outings/$id'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/verify-email'
+    | '/conversations_/$id'
     | '/me/outings'
     | '/me/profile'
     | '/outings/$id'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  ConversationsIdRoute: typeof ConversationsIdRoute
   MeOutingsRoute: typeof MeOutingsRoute
   MeProfileRoute: typeof MeProfileRoute
   OutingsIdRoute: typeof OutingsIdRoute
@@ -208,6 +221,13 @@ declare module '@tanstack/react-router' {
       path: '/verify-email'
       fullPath: '/verify-email'
       preLoaderRoute: typeof VerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/conversations_/$id': {
+      id: '/conversations_/$id'
+      path: '/conversations/$id'
+      fullPath: '/conversations/$id'
+      preLoaderRoute: typeof ConversationsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/me/outings': {
@@ -261,6 +281,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  ConversationsIdRoute: ConversationsIdRoute,
   MeOutingsRoute: MeOutingsRoute,
   MeProfileRoute: MeProfileRoute,
   OutingsIdRoute: OutingsIdRoute,

@@ -53,7 +53,7 @@ type messageService interface {
 	DeclineDM(ctx context.Context, convID, actor uuid.UUID) error
 	ReopenDM(ctx context.Context, convID, actor uuid.UUID) error
 	ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*message.ConversationSummary, error)
-	GetConversation(ctx context.Context, convID, hikerID uuid.UUID) (*message.Conversation, error)
+	GetConversation(ctx context.Context, convID, hikerID uuid.UUID) (*message.ConversationView, error)
 }
 
 // Routes returns the fully wired HTTP handler.

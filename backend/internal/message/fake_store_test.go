@@ -19,6 +19,9 @@ type fakeStore struct {
 	hosts           map[uuid.UUID]uuid.UUID
 	dms             map[[2]uuid.UUID]*Conversation
 	pendingRequests map[uuid.UUID]map[uuid.UUID]struct{}
+	outingTitles    map[uuid.UUID]string
+	outingStarts    map[uuid.UUID]time.Time
+	names           map[uuid.UUID]string
 }
 
 func (f *fakeStore) InsertMessage(ctx context.Context, m *Message, now time.Time) error {
@@ -53,6 +56,9 @@ func newFakeStore() *fakeStore {
 		hosts:           make(map[uuid.UUID]uuid.UUID),
 		dms:             make(map[[2]uuid.UUID]*Conversation),
 		pendingRequests: make(map[uuid.UUID]map[uuid.UUID]struct{}),
+		outingTitles:    make(map[uuid.UUID]string),
+		outingStarts:    make(map[uuid.UUID]time.Time),
+		names:           make(map[uuid.UUID]string),
 	}
 }
 
@@ -73,6 +79,12 @@ func (f *fakeStore) IsMember(ctx context.Context, conversationID, hikerID uuid.U
 	return false, nil
 }
 
+func (f *fakeStore) addHiker(m uuid.UUID, name string) {
+	if _, ok := f.names[m]; !ok {
+		f.names[m] = name
+	}
+
+}
 func (f *fakeStore) addOutingConversation(outingID, host uuid.UUID, outingStatus outing.Status, members ...uuid.UUID) *Conversation {
 	conv := &Conversation{
 		ID:       uuid.New(),
@@ -82,12 +94,16 @@ func (f *fakeStore) addOutingConversation(outingID, host uuid.UUID, outingStatus
 	f.converstations[conv.ID] = conv
 	f.outingStatuses[outingID] = outingStatus
 	f.hosts[outingID] = host
+	f.outingTitles[outingID] = "outing " + outingID.String()[:8]
+	f.outingStarts[outingID] = time.Now().Add(7 * 24 * time.Hour)
+	f.addHiker(host, "host "+host.String()[:4])
 	memberSet := make(map[uuid.UUID]struct{})
 	f.members[conv.ID] = memberSet
 
 	memberSet[host] = struct{}{}
 	for _, m := range members {
 		memberSet[m] = struct{}{}
+		f.addHiker(m, "hiker "+m.String()[:4])
 	}
 	return conv
 }
@@ -169,6 +185,8 @@ func (f *fakeStore) GetOrCreateDM(ctx context.Context, lo, hi, a uuid.UUID) (*Co
 	f.members[c.ID] = map[uuid.UUID]struct{}{lo: {}, hi: {}}
 	f.members[c.ID][lo] = struct{}{}
 	f.members[c.ID][hi] = struct{}{}
+	f.addHiker(lo, "hiker "+lo.String()[:4])
+	f.addHiker(hi, "hiker "+hi.String()[:4])
 	return c, true, nil
 }
 func (f *fakeStore) CanDM(ctx context.Context, h1, h2 uuid.UUID) (bool, error) {
@@ -206,6 +224,34 @@ func (f *fakeStore) UpdateDMStatus(ctx context.Context, convID uuid.UUID, status
 func (f *fakeStore) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*ConversationSummary, error) {
 
 	return nil, apperr.Internal("not implemented", "not implemented")
+}
+
+func (f *fakeStore) GetConversationView(ctx context.Context, convID uuid.UUID) (*ConversationView, error) {
+	c, ok := f.converstations[convID]
+	if !ok {
+		return nil, apperr.NotFound("not found", "not found")
+	}
+	view := &ConversationView{
+		ID: c.ID, Kind: c.Kind, OutingID: c.OutingID,
+		DmA: c.DmA, DmB: c.DmB, DmInitiator: c.DmInitiator,
+		DmStatus: c.DmStatus, DmDeclinedBy: c.DmDeclinedBy,
+		CreatedAt: c.CreatedAt,
+	}
+	if c.Kind == ConversationKindOuting && c.OutingID != nil {
+		if t, okk := f.outingTitles[*c.OutingID]; okk {
+			view.OutingTitle = &t
+		}
+		if d, okk := f.outingStarts[*c.OutingID]; okk {
+			view.OutingStartsAt = &d
+		}
+	}
+	for id := range f.members[convID] {
+		view.Participants = append(view.Participants, Participant{HikerID: id, Name: f.names[id]})
+	}
+	sort.Slice(view.Participants, func(i, j int) bool {
+		return view.Participants[i].HikerID.String() < view.Participants[j].HikerID.String()
+	})
+	return view, nil
 }
 
 var _ Storage = (*fakeStore)(nil)
