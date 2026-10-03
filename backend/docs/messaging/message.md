@@ -25,7 +25,7 @@ Scope: v1 roster-scoped outing chat and DMs, on one primitive. Rev 5 was the des
 **Status at rev 6.** D1–D12 are implemented. Two notes:
 
 - **D12 as built:** `EventsProvider` handles `EventSource.onerror` by closing the stream and calling refresh. 200 → reopen; 401 → stop; anything else → retry with backoff (1 s doubling to 30 s).
-- **D4 gap:** D4 says reconnect refetch covers dropped pokes. Reopening the stream does not invalidate any query today, so a poke sent while the stream is down is recovered only by the next poke or a window-focus refetch. See §5.
+- **D4 as built:** when the stream reopens after a drop, `EventsProvider` calls `invalidateQueries()` with no key, so every query on screen refetches and any poke missed while the stream was down is made up. The first open at page load does not refetch. Not covered by a test; see §5.
 
 ---
 
@@ -137,7 +137,7 @@ Subscriptions live in `useConversationEvents(cid)` (conversation page), `inbox.t
 
 ### Delivery
 
-Hub uses non-blocking send with drop (`select { case c.Send <- ev: default: }`). A dropped poke is recovered by the next poke or a window-focus refetch; see the D4 gap in §1 and §5.
+Hub uses non-blocking send with drop (`select { case c.Send <- ev: default: }`). A poke dropped because the hub buffer was full is recovered by the next poke or a window-focus refetch. Pokes missed while the stream was down are recovered by the refetch on reopen (D4 as built, §1).
 
 ### HTTP surface
 
@@ -165,7 +165,7 @@ POST   /api/conversations/{id}/reopen        204
 | `dm_accepted` | the initiator | recipient accepts |
 | `dm_reopened` | the other party | the closer reopens |
 
-Decline and close are silent: no notification, only the `dm.declined` poke. Stored payload: `{conversation_id, from_name}`. `from_name` is the actor's name at insert time; if the name lookup fails the row is still inserted with an empty `from_name` and the bell falls back to "someone". There is no bell entry per message (D7).
+Decline and close are silent: no notification, only the `dm.declined` poke. Each of the three kinds also sends an email with its own subject and a link to `/conversations/{id}` (`contentFor` in the dispatcher). Stored payload: `{conversation_id, from_name}`. `from_name` is the actor's name at insert time; if the name lookup fails the row is still inserted with an empty `from_name` and the bell falls back to "someone". There is no bell entry per message (D7).
 
 ---
 
@@ -184,10 +184,10 @@ Decline and close are silent: no notification, only the `dm.declined` poke. Stor
 
 **DMs**
 - **CanDM doors** (checked when a DM is started; a self-DM → 400):
-    1. Both hikers belong to the same outing, each as host or accepted member.
-    2. The initiator hosts an outing on which the other hiker has a pending request. One-way: the requester cannot open a DM with the host.
+  1. Both hikers belong to the same outing, each as host or accepted member.
+  2. The initiator hosts an outing on which the other hiker has a pending request. One-way: the requester cannot open a DM with the host.
 - Posting by status: `accepted` → allowed. `pending` → the initiator may have one opening message; the recipient gets 403. `declined` → 403 for both.
-- Delete: the author only. There is no host moderation in a DM.
+- Delete: the author only, and only once the DM is no longer `pending`. While pending, nothing can be deleted (403), so the initiator's one opening message stays spent. There is no host moderation in a DM.
 - Roster removal does **not** close an existing accepted DM. The doors are checked only at start.
 - Either party may close (`accepted → declined`); only the closer may reopen. No separate `closed` status.
 
@@ -196,12 +196,12 @@ Decline and close are silent: no notification, only the `dm.declined` poke. Stor
 ## 5. Known limitations (recorded, not bugs)
 
 1. **`seq` is insert-time, not commit-time.** Two concurrent inserts can commit in reverse `seq` order. Under D4 (load-all) both appear; nothing is lost. Only matters if a cursor is ever introduced.
-2. **Dropped pokes** (hub buffer full, or the stream is down) delay visibility until the next poke or a window-focus refetch. **Reopening the stream does not refetch** (the D4 gap). On the ledger.
+2. **Dropped pokes** (hub buffer full) delay visibility until the next poke or a window-focus refetch. Pokes missed while the stream is down are made up by the refetch on reopen. **That refetch has no test**: a spec cannot easily drop a live stream, and going offline in the browser triggers TanStack Query's own refetch, which would mask it.
 3. **A live stream outlives its token's `exp`.** By design: the server checks auth at connect only. Roster removal is handled by D8.
 4. **DM threads unbounded** (D5).
 5. **Single instance** (D9): a second API instance would split the hub. Must be revisited before horizontal scaling.
-6. **Hard deletes reset counters.** The pending-DM "one opening message" rule and the rate limit both count existing rows. An initiator who deletes their opening message can send another while still pending. Each one reaches the recipient's inbox preview; none rings the bell.
-7. **DM notifications are emailed with the generic template.** The email dispatcher drains every notification row; it has no content for the three DM kinds, so they fall through to "You have a new notification" and log `contentFor: unhandled kind`.
+6. **Hard deletes reset the rate limit.** The limit counts rows in the last minute, so deleting a message frees a slot. The pending-DM "one opening message" rule also counts rows, which is why deleting is refused while a DM is pending (§4).
+7. **Every notification kind is emailed.** The dispatcher drains every notification row. A kind with no case in `contentFor` falls through to a generic "You have a new notification" email and logs `contentFor: unhandled kind`.
 8. **Notification kinds have several homes**: see the checklist in §7.
 
 ---
@@ -239,7 +239,7 @@ Sabotage before green: mutate the roster check to always-true, watch the non-mem
 
 **Added with DMs (rev 6)**
 
-- Service tests cover the state machine in §2 and the posting rules in §4. Handler tests run against a fake service (`api.messageService`).
+- Service tests cover the state machine in §2 and the posting and delete rules in §4. A table test covers the email content for the three DM kinds. Handler tests run against a fake service (`api.messageService`).
 - Store SQL (CanDM, GetOrCreateDM, the inbox query, ConversationView) is proven by hand in psql and through the API suite, not by Go integration tests.
 - API suite `dm.spec.ts`: 64 passing at rev 6.
 - Playwright `message.spec.ts`, "host DMs a pending requester": two contexts, nothing reloads. Proves the bell poke, the inbox row arriving by `dm.requested`, `dm.accepted` reaching the initiator's open page, and messages crossing both ways. Two sabotages witnessed: skipping Accept, and removing the inbox's `dm.requested` subscription.
@@ -268,10 +268,9 @@ For a new **event type** on the stream (not a notification kind): add it to `EVE
 - Read tracking (badges, receipts, `last_read`, `last_fetched`) — cut for v1, don't re-raise.
 - Pagination — v2, triggered by D5's N.
 - Multi-instance fan-out — v2+.
-- Refetch on stream reopen (the D4 gap).
+- A test for the refetch on stream reopen.
 - Name the unnamed declined-by CHECK on `conversations` (new migration; the table is in prod).
-- Email content for DM kinds, or exclude them from the dispatcher.
-- Pending-DM opening message can be repeated by delete-and-resend (§5.6).
+- The chat still shows a delete button on a pending DM's message; the server refuses it.
 - Bell entry per message and unread badges — v2, one feature with read tracking.
 - Presence via hub count — v2.
 - Outing notification kinds could carry the actor's name, as DM kinds do.

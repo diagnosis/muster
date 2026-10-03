@@ -1,5 +1,6 @@
 import {createContext, type ReactNode, useCallback, useContext, useEffect, useRef} from "react";
 import {refreshSession} from "@/lib/api.ts";
+import {useQueryClient} from "@tanstack/react-query";
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 type Handler = (data:string) => void
 
@@ -9,7 +10,7 @@ export const EVENT_TYPES =["message.created", "message.deleted", "notification.c
 const Ctx = createContext<{subscribe: (type: string, h:Handler) => () => void} | null >(null)
 
 export function EventsProvider({children, enabled}:{children: ReactNode, enabled:boolean}){
-
+    const qc = useQueryClient()
     const handlers =useRef(new Map<string, Set<Handler>>())
 
     useEffect(() => {
@@ -17,6 +18,7 @@ export function EventsProvider({children, enabled}:{children: ReactNode, enabled
         let es: EventSource | null = null
         let stopped = false
         let delay = 1000
+        let opened = false
         let timer: ReturnType<typeof setTimeout> | null = null
 
         const reconnect = async () => {
@@ -37,12 +39,16 @@ export function EventsProvider({children, enabled}:{children: ReactNode, enabled
                     handlers.current.get(type)?.forEach(h=>h((e as MessageEvent).data))
                 })
             }
-            es.onopen = () => { delay = 1000 }
+            es.onopen = () => {
+                delay = 1000
+                if (opened) qc.invalidateQueries()
+                opened = true
+            }
             es.onerror = reconnect
         }
         open()
         return () => {stopped= true;if (timer) clearTimeout(timer); es?.close()}
-    }, [enabled])
+    }, [enabled,qc])
 
     const subscribe = useCallback((type: string, h: Handler) => {
         const set = handlers.current.get(type) ?? new Set()

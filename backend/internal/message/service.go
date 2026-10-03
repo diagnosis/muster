@@ -161,7 +161,9 @@ func (s *Service) ListMessages(ctx context.Context, convID, hikerID uuid.UUID) (
 	return messages, nil
 }
 
-// DeleteMessage removes selected messages. Host or author
+// DeleteMessage removes a message. The author may delete their own; an outing's
+// host may delete any message in that outing's chat. Nothing can be deleted from
+// a DM while it is pending, so the initiator's single opening message stays spent.
 func (s *Service) DeleteMessage(ctx context.Context, messageID, hikerID uuid.UUID) error {
 	message, err := s.store.GetMessage(ctx, messageID)
 	if err != nil {
@@ -172,6 +174,9 @@ func (s *Service) DeleteMessage(ctx context.Context, messageID, hikerID uuid.UUI
 		return err
 	}
 	allowed := message.HikerID == hikerID
+	if conv.DmStatus != nil {
+		allowed = message.HikerID == hikerID && *conv.DmStatus != DMStatusPending
+	}
 	if !allowed && conv.OutingID != nil {
 		hostID, convErr := s.store.OutingHost(ctx, *conv.OutingID)
 		if convErr != nil {
@@ -180,7 +185,7 @@ func (s *Service) DeleteMessage(ctx context.Context, messageID, hikerID uuid.UUI
 		allowed = hostID == hikerID
 	}
 	if !allowed {
-		return apperr.Forbidden("forbidden", "author or host can delete")
+		return apperr.Forbidden("forbidden", "author or host can delete. In addition, user with pending dm request cannot delete")
 	}
 
 	if err = s.store.DeleteMessage(ctx, messageID); err != nil {

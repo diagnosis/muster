@@ -810,6 +810,30 @@ func Test_Decline_DM(t *testing.T) {
 	}
 
 }
+func Test_Decline_InitiatorCannotDeleteFistMessage(t *testing.T) {
+	f, fb, _, svc, _, _, m1, m2 := newOutingConv(t)
+	fb.sent = nil
+	dm, err := svc.StartDM(context.Background(), m1, m2)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if dm.DmStatus == nil || *dm.DmStatus != DMStatusPending {
+		t.Errorf("expected status pending got %v", dm.DmStatus)
+	}
+	message, err := svc.PostMessage(context.Background(), dm.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	fb.sent = nil
+	err = svc.DeleteMessage(context.Background(), message.ID, m1)
+	wantStatus(t, err, apperr.CodeForbidden)
+	if _, err = f.GetMessage(context.Background(), message.ID); err != nil {
+		t.Errorf("message should still exist after refused delete, got %v", err)
+	}
+	if fb.sent != nil {
+		t.Errorf("expected nothing broadcasted got len %d", len(fb.sent))
+	}
+}
 
 func Test_Decline_DM_Rejections(t *testing.T) {
 	f, fb, _, svc, c, _, m1, m2 := newOutingConv(t)

@@ -79,6 +79,16 @@ func (d *Dispatcher) contentFor(ctx context.Context, u *Unsent) email.Content {
 	if v, ok := u.Event.Payload["outing_id"].(string); ok {
 		id = v
 	}
+	var convID string
+	fromName := "A hiker"
+	if v, ok := u.Event.Payload["conversation_id"].(string); ok {
+		convID = v
+	}
+	if v, ok := u.Event.Payload["from_name"].(string); ok {
+		if v != "" {
+			fromName = v
+		}
+	}
 	switch u.Event.Kind {
 	case KindJoinRequestApproved:
 		return email.Content{
@@ -130,6 +140,30 @@ func (d *Dispatcher) contentFor(ctx context.Context, u *Unsent) email.Content {
 			CTALabel: "View outing",
 			CTAURL:   d.outingURL(id),
 		}
+	case KindDMRequested:
+		return email.Content{
+			Subject:  "Muster - new message request",
+			Heading:  "New message request",
+			Body:     fmt.Sprintf("%s requested to dm", fromName),
+			CTALabel: "View Request",
+			CTAURL:   d.conversationURL(convID),
+		}
+	case KindDMReopened:
+		return email.Content{
+			Subject:  "Muster - message conversation reopened",
+			Heading:  "Message reopened",
+			Body:     fmt.Sprintf("%s reopened the conversation", fromName),
+			CTALabel: "View Conversation",
+			CTAURL:   d.conversationURL(convID),
+		}
+	case KindDMAccepted:
+		return email.Content{
+			Subject:  "Muster - message request accepted",
+			Heading:  "Message request accepted",
+			Body:     fmt.Sprintf("%s accepted your dm request", fromName),
+			CTALabel: "View Conversation",
+			CTAURL:   d.conversationURL(convID),
+		}
 	}
 	logger.Warn(ctx, "contentFor: unhandled kind", "kind", u.Event.Kind)
 	return email.Content{
@@ -141,4 +175,7 @@ func (d *Dispatcher) contentFor(ctx context.Context, u *Unsent) email.Content {
 }
 func (d *Dispatcher) outingURL(id string) string {
 	return fmt.Sprintf("%s/outings/%s", d.baseURL, id)
+}
+func (d *Dispatcher) conversationURL(id string) string {
+	return fmt.Sprintf("%s/conversations/%s", d.baseURL, id)
 }
