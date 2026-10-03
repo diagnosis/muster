@@ -38,8 +38,8 @@ test.describe("chat message", ()=> {
 
         await expect(hikerPage.getByText("hello")).toBeVisible()
 
-        await strangerPage.goto(`/outings/${outing.id}/conversation`)
-        await expect(strangerPage).toHaveURL(`/outings/${outing.id}`)
+        await strangerPage.goto(`/conversations/${outing.conversation_id}`)
+        await expect(strangerPage).toHaveURL(`/conversations/${outing.conversation_id}`)
 
 
     });
@@ -106,8 +106,7 @@ test.describe("chat message", ()=> {
 
         // the hiker is parked on a page that is NOT the inbox, so the bell badge
         // can only change via the notification.created poke
-        await hikerPage.goto("/")
-
+        await hikerPage.goto("/inbox")
         // --- host starts the DM from the requester's row (one click: POST /api/dms + navigate)
         await hostPage.goto(`/outings/${outing.id}`)
         await hostPage.getByRole("button", { name: `Message ${hiker.user.name}` }).click()
@@ -119,14 +118,19 @@ test.describe("chat message", ()=> {
         await expect(hikerPage.getByRole("button", { name: "Notifications" })).toContainText("1")
 
         // --- the hiker finds the request in the inbox and accepts
-        await hikerPage.goto("/inbox")
-        await expect(hikerPage.getByText(host.user.name)).toBeVisible()
+        await hikerPage.getByRole("link", { name:host.user.name}).click()
+        await expect(hikerPage).toHaveURL(/\/conversations\//)
         await hikerPage.getByRole("button", { name: "Accept" }).click()
 
         // --- host's page, never reloaded, flips to a usable composer: proves dm.accepted
-        await expect(hostPage.getByRole("textbox", { name: "chat-box" })).toBeEnabled()
+        await expect(hostPage.getByRole("button", {name:"Close Conversation"})).toBeVisible()
         await hostPage.getByRole("textbox", { name: "chat-box" }).fill("got microspikes?")
         await hostPage.getByRole("button", { name: "send" }).click()
         await expect(hikerPage.getByText("got microspikes?")).toBeVisible()
+
+        await hikerPage.getByRole('textbox', {name: "chat-box"}).fill("yea, i have Kahtali Michi")
+        await hikerPage.getByRole("button", { name: "send" }).click()
+        await expect(hostPage.getByText("yea, i have Kahtali Michi")).toBeVisible()
+
     })
 })

@@ -98,6 +98,7 @@ type ConversationSummary struct {
 	DmDeclinedBy  *uuid.UUID       `json:"dm_declined_by"`
 	LastMessageAt *time.Time       `json:"last_message_at"`
 	LastPreview   string           `json:"last_preview"`
+	CreatedAt     time.Time        `json:"created_at"`
 }
 
 // Message is one row of messages. Seq is the DB-assigned ordering (D6);

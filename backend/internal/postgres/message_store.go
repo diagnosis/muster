@@ -94,31 +94,31 @@ func (s *MessageStore) GetConversationView(ctx context.Context, convID uuid.UUID
 // ListConversations loads all conversations for a hiker
 func (s *MessageStore) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*message.ConversationSummary, error) {
 	q := `
-	SELECT c.id, c.kind, o.title, c.dm_status, c.dm_initiator, c.dm_declined_by,
-       	lm.created_at, COALESCE(LEFT(lm.body, 80), '')
-	FROM conversations c
-	JOIN outings o ON o.id = c.outing_id
-	LEFT JOIN LATERAL (
-    	SELECT body, created_at FROM messages m
-    	WHERE m.conversation_id = c.id ORDER BY seq DESC LIMIT 1
-	) lm ON true
-	WHERE c.kind = 'outing'
-  		AND (o.host_id = $1 OR EXISTS (SELECT 1 FROM join_requests jr
-        	WHERE jr.outing_id = o.id AND jr.hiker_id = $1 AND jr.status = 'accepted'))
-
-	UNION ALL
-
-	SELECT c.id, c.kind, h.name, c.dm_status, c.dm_initiator, c.dm_declined_by,
-       lm.created_at, COALESCE(LEFT(lm.body, 80), '')
-	FROM conversations c
-	JOIN hikers h ON h.id = CASE WHEN c.dm_a = $1 THEN c.dm_b ELSE c.dm_a END
-	LEFT JOIN LATERAL (
-    SELECT body, created_at FROM messages m
-    WHERE m.conversation_id = c.id ORDER BY seq DESC LIMIT 1
-	) lm ON true
-	WHERE c.kind = 'dm' AND $1 IN (c.dm_a, c.dm_b)
-
-	ORDER BY 7 DESC NULLS LAST
+	SELECT * FROM(
+		SELECT c.id, c.kind, o.title, c.dm_status, c.dm_initiator, c.dm_declined_by,
+			lm.created_at AS last_message_at, COALESCE(LEFT(lm.body, 80), ''), c.created_at AS created_at
+		FROM conversations c
+		JOIN outings o ON o.id = c.outing_id
+		LEFT JOIN LATERAL (
+			SELECT body, created_at FROM messages m
+			WHERE m.conversation_id = c.id ORDER BY seq DESC LIMIT 1
+		) lm ON true
+		WHERE c.kind = 'outing'
+			AND (o.host_id = $1 OR EXISTS (SELECT 1 FROM join_requests jr
+				WHERE jr.outing_id = o.id AND jr.hiker_id = $1 AND jr.status = 'accepted'))
+	
+		UNION ALL
+	
+		SELECT c.id, c.kind, h.name, c.dm_status, c.dm_initiator, c.dm_declined_by,
+		   lm.created_at, COALESCE(LEFT(lm.body, 80), ''), c.created_at
+		FROM conversations c
+		JOIN hikers h ON h.id = CASE WHEN c.dm_a = $1 THEN c.dm_b ELSE c.dm_a END
+		LEFT JOIN LATERAL (
+		SELECT body, created_at FROM messages m
+		WHERE m.conversation_id = c.id ORDER BY seq DESC LIMIT 1
+		) lm ON true
+		WHERE c.kind = 'dm' AND $1 IN (c.dm_a, c.dm_b)
+	) x ORDER BY COALESCE(x.last_message_at, x.created_at) DESC
 `
 	convSums := []*message.ConversationSummary{}
 	rows, err := s.pool.Query(ctx, q, hikerID)
@@ -128,7 +128,7 @@ func (s *MessageStore) ListConversations(ctx context.Context, hikerID uuid.UUID)
 	defer rows.Close()
 	for rows.Next() {
 		cs := message.ConversationSummary{}
-		err = rows.Scan(&cs.ID, &cs.Kind, &cs.Title, &cs.DmStatus, &cs.DmInitiator, &cs.DmDeclinedBy, &cs.LastMessageAt, &cs.LastPreview)
+		err = rows.Scan(&cs.ID, &cs.Kind, &cs.Title, &cs.DmStatus, &cs.DmInitiator, &cs.DmDeclinedBy, &cs.LastMessageAt, &cs.LastPreview, &cs.CreatedAt)
 		if err != nil {
 			return nil, apperr.Database("failed to get conversations summary", "failed to scan conversations", err)
 		}

@@ -146,7 +146,8 @@ export function OutingDetailPage() {
             detail.my_request?.status === 'requested'
     )
     const isReadOnly = detail.outing.status === 'cancelled' || new Date(detail.outing.starts_at) < new Date()
-    const canSeeChat = me && (me.id === detail.host.hiker_id || detail.roster.some(r => r.hiker_id === me.id)) && !!detail.outing.conversation_id
+    const canSeeStartDmBtn = me && (me.id === detail.host.hiker_id || detail.roster.some(r => r.hiker_id === me.id))
+    const canSeeChat =canSeeStartDmBtn && !!detail.outing.conversation_id
 
     return <>
         <div className={styles.container}>
@@ -175,16 +176,16 @@ export function OutingDetailPage() {
                 <h2 className={styles.subheading}>Who's going ({detail.roster.length + 1})</h2>
                 <div className={styles.memberRow}>
                     <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience} · host</p>
-                    {detail.host.hiker_id !== me?.id &&
+                    {canSeeStartDmBtn&&detail.host.hiker_id !== me?.id &&
                         <button className={"btn-quite"}
                                 aria-label={`Message ${detail.host.name}`}
+                                disabled={startDM.isPending}
                                 onClick={()=> {
                             startDM.mutate(detail.host.hiker_id, {onSuccess: (conv)=>
                                     navigate({to:'/conversations/$id', params: {id:conv.id}})})
-                        }}>Start dm</button>
+                        }}>✉️</button>
                     }
                 </div>
-
                 {detail.roster.map(m => <div className={styles.memberRow}
                     key={m.hiker_id}>{m.name} · {m.experience}
                     {me?.id === detail.outing.host_id &&
@@ -192,15 +193,17 @@ export function OutingDetailPage() {
                             setMemberToRemove(m)
                         }}>🗑️</button>
                     }
-                    {m.hiker_id !== me?.id &&
+                    {canSeeStartDmBtn && m.hiker_id !== me?.id &&
                         <button className={"btn-quite"}
                                 aria-label={`Message ${m.name}`}
+                                disabled={startDM.isPending}
                                 onClick={()=> {
                             startDM.mutate(m.hiker_id, {onSuccess: (conv)=>
                                     navigate({to:'/conversations/$id', params: {id:conv.id}})})
-                        }}>Start dm</button>
+                        }}>✉️</button>
                     }
                 </div>)}
+                {startDM.isError&&<p className={styles.error}>{startDM.error.message}</p>}
                 {memberToRemove&&<Modal title={`Remove ${memberToRemove.name}`} onClose={()=>setMemberToRemove(null)}>
                     <p>This removes them from the roster and frees their seats. They won't be able to request again.</p>
                     <div className={styles.actions}>

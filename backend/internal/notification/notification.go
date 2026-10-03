@@ -31,7 +31,7 @@ const (
 func (k Kind) Valid() bool {
 	switch k {
 	case KindJoinRequestCreated, KindJoinRequestApproved, KindJoinRequestDeclined, KindJoinRequestWithdrawn,
-		KindMemberRemoved, KindOutingCancelled, KindOutingUpdated, KindDMRequested:
+		KindMemberRemoved, KindOutingCancelled, KindOutingUpdated, KindDMRequested, KindDMAccepted, KindDMReopened:
 		return true
 	}
 	return false
