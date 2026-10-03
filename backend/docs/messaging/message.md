@@ -1,7 +1,7 @@
 # Muster — Messaging
-*As of 2026-09-16 (rev 5 — final before code) · spec = what · decisions before code · see MUSTER-ROADMAP.md for why/when*
+*As of 2026-10-03 (rev 6 — as built on `feat/dm`) · spec = what · see MUSTER-ROADMAP.md for why/when*
 
-Scope: v1 roster-scoped outing chat, then DMs, on one primitive. No open items. Changes to this doc go through a PR like code.
+Scope: v1 roster-scoped outing chat and DMs, on one primitive. Rev 5 was the design before code; rev 6 records what was built and where it differs. Changes to this doc go through a PR like code.
 
 ---
 
@@ -22,91 +22,187 @@ Scope: v1 roster-scoped outing chat, then DMs, on one primitive. No open items. 
 | D11 | **Heartbeat**: handler writes an SSE comment line (`: ping`) every **15 s** (< mobile NAT idle ~30–60 s, < Nginx read timeout) | Idle streams are cut by proxies; browser can't tell dead-TCP from quiet. | — |
 | D12 | **Client owns stream lifetime (option b).** On `EventSource.onerror`: call refresh; on success, reopen the stream; on failure, stop (user is logged out). Also reopen after any successful refresh triggered by `request()`. Server does nothing special at token `exp` beyond rejecting the next connect with 401. | Hole A. `EventSource` retries only dropped connections; a **401 fails permanently, no retry**. Heartbeats are server→client and cannot trigger refresh; with no other fetch in flight, `onerror` is the only signal the client gets. | (a) server-side close at `exp`. |
 
+**Status at rev 6.** D1–D12 are implemented. Two notes:
+
+- **D12 as built:** `EventsProvider` handles `EventSource.onerror` by closing the stream and calling refresh. 200 → reopen; 401 → stop; anything else → retry with backoff (1 s doubling to 30 s).
+- **D4 gap:** D4 says reconnect refetch covers dropped pokes. Reopening the stream does not invalidate any query today, so a poke sent while the stream is down is recovered only by the next poke or a window-focus refetch. See §5.
+
 ---
 
 ## 2. Schema
 
-One primitive for outing chat and DMs.
+One primitive for outing chat and DMs. As migrated in `20260919050620_init_conversations_messages.sql`:
 
 ```
 conversations
-  id          UUID PK
-  kind        TEXT CHECK (kind IN ('outing','dm'))
-  outing_id   UUID NULL REFERENCES outings(id) ON DELETE CASCADE   -- kind='outing' only; UNIQUE
-  dm_a        UUID NULL REFERENCES hikers(id) ON DELETE CASCADE    -- kind='dm' only; dm_a < dm_b
-  dm_b        UUID NULL REFERENCES hikers(id) ON DELETE CASCADE
-  created_at  TIMESTAMPTZ
-  CHECK ((kind='outing' AND outing_id IS NOT NULL AND dm_a IS NULL AND dm_b IS NULL)
-      OR (kind='dm' AND outing_id IS NULL AND dm_a < dm_b))
+  id             UUID PK
+  kind           TEXT NOT NULL CHECK (kind IN ('outing','dm'))
+  outing_id      UUID NULL UNIQUE REFERENCES outings(id) ON DELETE CASCADE   -- kind='outing' only
+  dm_a           UUID NULL REFERENCES hikers(id) ON DELETE CASCADE           -- kind='dm' only; dm_a < dm_b
+  dm_b           UUID NULL REFERENCES hikers(id) ON DELETE CASCADE
+  dm_initiator   UUID NULL REFERENCES hikers(id)
+  dm_status      TEXT NULL CHECK (dm_status IN ('pending','accepted','declined'))
+  dm_declined_by UUID NULL REFERENCES hikers(id)
+  created_at     TIMESTAMPTZ NOT NULL
+  CHECK ((dm_status = 'declined') = (dm_declined_by IS NOT NULL))            -- unnamed; see ledger
+  CONSTRAINT conversations_kind_shape CHECK (
+       (kind='outing' AND outing_id IS NOT NULL AND dm_a IS NULL AND dm_b IS NULL
+                      AND dm_initiator IS NULL AND dm_status IS NULL)
+    OR (kind='dm'     AND outing_id IS NULL AND dm_a IS NOT NULL AND dm_b IS NOT NULL AND dm_a < dm_b
+                      AND dm_initiator IN (dm_a, dm_b) AND dm_status IS NOT NULL))
   UNIQUE (dm_a, dm_b)
 
 messages
   id              UUID PK
-  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE
-  hiker_id        UUID REFERENCES hikers(id) ON DELETE CASCADE
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE
+  hiker_id        UUID NOT NULL REFERENCES hikers(id) ON DELETE CASCADE
   seq             BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE         -- D6
   body            TEXT NOT NULL
-  created_at      TIMESTAMPTZ
-  deleted_at      TIMESTAMPTZ NULL                                    -- soft-delete, as comments
+  created_at      TIMESTAMPTZ NOT NULL
   INDEX (conversation_id, seq)
 ```
 
-**Outing membership is derived at query time**: host + accepted `join_requests`. Never copied into `conversation_participants` (that would be a second home for the roster). The membership function branches on `kind`: `outing` → roster query; `dm` → `hiker IN (dm_a, dm_b)`. One function, two branches, both tested.
+**Deletes are hard deletes.** Rev 5 planned a `deleted_at` soft-delete; the table has no such column and the store runs `DELETE FROM messages`. Consequences are listed in §5.
 
-**Outing conversation row is created on outing creation** (same transaction). The message page greets the roster on landing. No backfill migration: prod has no outings yet — **receipt required before any wipe: `SELECT count(*) FROM outings` on prod, recorded in the PR.**
+**Outing membership is derived at query time**: host + accepted `join_requests`. Never copied into a participants table (that would be a second home for the roster). Membership branches on `kind`: `outing` → roster query; `dm` → `hiker IN (dm_a, dm_b)`.
 
-**DM state**: `dm_status TEXT NULL CHECK (dm_status IN ('pending','accepted','declined'))` and `dm_initiator UUID NULL` on `conversations` (`dm` kind only; NULL for outing). A DM is created `pending` by the initiator; the other hiker accepts or declines; Add `dm_declined_by UUID NULL` (set whenever status becomes `declined`, cleared on `accepted`). Transitions: `pending → accepted` (recipient); `pending → declined` (recipient); `accepted → declined` (either party — this is "close"); `declined → accepted` (**only** `dm_declined_by`: unblock / reopen is a late accept by whoever closed). No other transitions; nothing is deleted. Test: initiator closes, recipient tries to reopen → 403; initiator reopens → accepted. Messaging: allowed when `accepted`; while `pending`, the initiator may send **exactly one** opening message, the recipient none. `declined` is terminal for the initiator: a re-request hits `UNIQUE (dm_a, dm_b)` → 403. The declined row *is* the block; no block table.
+**Outing conversation row is created on outing creation** (same transaction).
 
-**DM lookup — option (b), normalized pair on `conversations`**: `dm_a UUID NULL, dm_b UUID NULL`, `CHECK (kind <> 'dm' OR dm_a < dm_b)`, `UNIQUE (dm_a, dm_b)`. Service sorts the two hiker IDs before insert. Create = `INSERT … ON CONFLICT (dm_a, dm_b) DO NOTHING RETURNING id`, then `SELECT` if nothing returned. No check-then-act; the DB serializes the duplicate-DM race. `conversation_participants` is **not needed in v1** (outing membership derived; DM membership is the pair). Tests: same pair passed in both orders resolves to one conversation (operand-swap class); two concurrent creates → `count(*)=1`, red before the constraint exists.
+**DM state machine** (service: `StartDM`, `AcceptDM`, `DeclineDM`, `ReopenDM`):
 
-DM UI and rules are deferred; only the primitive is settled here.
+| From | To | Who | Notes |
+|---|---|---|---|
+| (none) | `pending` | initiator, through a CanDM door (§4) | `dm_initiator` set |
+| `pending` | `accepted` | recipient only | initiator → 403; not pending → 409 |
+| `pending` | `declined` | either party | `dm_declined_by` = actor |
+| `accepted` | `declined` | either party ("close") | `dm_declined_by` = actor |
+| `declined` | `accepted` | only `dm_declined_by` ("reopen") | column cleared; anyone else → 403 |
 
-Soft-delete and host moderation: **same rules as comments.** v2: on outing complete/cancel, close the room (delete all vs freeze read-only — decide then, not now).
+No other transitions; nothing is deleted. A non-party gets 403 on every transition; a non-DM conversation gets 400.
+
+**DM lookup: normalized pair.** The service sorts the two hiker IDs, then the store runs `INSERT … ON CONFLICT (dm_a, dm_b) DO NOTHING RETURNING …` and falls back to a `SELECT` when nothing is returned. `GetOrCreateDM` reports `created`. No check-then-act; the DB serializes the duplicate-DM race.
+
+**Starting a DM that already exists returns the existing row, whatever its status**, with no poke and no notification. This differs from rev 5, which said a re-request after a decline returns 403. A declined DM stays declined until its closer reopens it; the declined row is still the block, and there is no block table.
 
 ---
 
 ## 3. Event contract (`GET /api/events`)
 
-Auth: cookie (`withCredentials`). Roster/participant check is **per event at publish time** (D8), not at connect.
+Auth: cookie (`withCredentials`). Membership is checked **per event at publish time** (D8), not at connect.
+
+### Event types
+
+| Event | Sent to | Data |
+|---|---|---|
+| `message.created` | every member of the conversation, author included | conversation poke |
+| `message.deleted` | every member of the conversation | conversation poke |
+| `dm.requested` | both parties | conversation poke |
+| `dm.accepted` | both parties | conversation poke |
+| `dm.declined` | both parties | conversation poke |
+| `dm.reopened` | both parties | conversation poke |
+| `notification.created` | the one recipient | notification poke |
 
 ```
 event: message.created
-data: {"conversation_id":"<uuid>","kind":"outing","outing_id":"<uuid>"}
+data: {"conversation_id":"<uuid>","conversation_kind":"outing","outing_id":"<uuid>"}
+
+event: dm.accepted
+data: {"conversation_id":"<uuid>","conversation_kind":"dm"}
+
+event: notification.created
+data: {"kind":"join_request_created","outing_id":"<uuid>"}
+
+event: notification.created
+data: {"kind":"dm_requested","conversation_id":"<uuid>"}
 
 : ping                                     -- heartbeat, D11
 ```
 
-Client dispatch: on `message.created`, `invalidateQueries(['conversation', conversation_id, 'messages'])`. Nothing else. Unknown event types are ignored.
+- **Conversation poke:** `conversation_id`, `conversation_kind` (`outing` | `dm`; renamed from `kind` in rev 6), and `outing_id` for outing conversations only (omitted for DMs).
+- **Notification poke:** `kind` plus `outing_id` for outing kinds or `conversation_id` for DM kinds.
+- The stream never carries message bodies or notification text (D3).
+- The client registers listeners for exactly the seven types in `EVENT_TYPES` (`EventProvider.tsx`). A new event type must be added there or it is silently ignored.
 
-Later event types ride the same stream (`notification.created` for the bell is the obvious next one — a separate decision, not v1 chat).
+### Client dispatch: query-key map
 
-Delivery: hub uses non-blocking send with drop (`select { case c.Send <- ev: default: }`). A dropped poke costs nothing beyond D4's refetch-on-focus/reconnect.
+| Query key | Fetches | Invalidated by events | Invalidated by mutations |
+|---|---|---|---|
+| `['messages', cid]` | `GET /api/conversations/{cid}/messages` | `message.created`, `message.deleted` where `conversation_id === cid` | post message, delete message |
+| `['conversation', cid]` | `GET /api/conversations/{cid}` | the four `dm.*` where `conversation_id === cid` | accept, decline, reopen |
+| `['conversations']` | `GET /api/conversations` (inbox) | on the conversation page: the four `dm.*` for that `cid`. On `/inbox`: `message.created`, `message.deleted` and the four `dm.*`, unfiltered | start DM, accept, decline, reopen |
+| `['notifications']` | `GET /api/notifications` (bell) | `notification.created` | mark read, read all |
+| `['outing', id]`, `['outings']`, `['my-outings']`, `['outing-join-requests', id]` | outing detail page | `notification.created` where `outing_id === id` | (outing mutations) |
+
+Subscriptions live in `useConversationEvents(cid)` (conversation page), `inbox.tsx`, `NotificationBell.tsx` and `outings.$id.tsx`.
+
+### Delivery
+
+Hub uses non-blocking send with drop (`select { case c.Send <- ev: default: }`). A dropped poke is recovered by the next poke or a window-focus refetch; see the D4 gap in §1 and §5.
+
+### HTTP surface
+
+```
+GET    /api/events
+GET    /api/conversations                    inbox; list is never null
+GET    /api/conversations/{id}               ConversationView; non-member → 403
+GET    /api/conversations/{id}/messages
+POST   /api/conversations/{id}/messages
+DELETE /api/messages/{id}
+POST   /api/dms                              {hiker_id} → conversation (new or existing)
+POST   /api/conversations/{id}/accept        204
+POST   /api/conversations/{id}/decline       204
+POST   /api/conversations/{id}/reopen        204
+```
+
+- **`ConversationView`** (viewer-independent): the conversation row, `participants: [{hiker_id, name}]`, and `outing_title`, `outing_starts_at`, `outing_host_id` (null for DMs).
+- **`ConversationSummary`** (inbox row, viewer-dependent): `id`, `kind`, `title` (outing title, or the other party's name for a DM), `dm_status`, `dm_initiator`, `dm_declined_by`, `last_message_at` (null when empty), `last_preview` (first 80 chars, `''` when empty), `created_at`. Ordered by `COALESCE(last_message_at, created_at) DESC`, so an empty conversation sorts by when it was created.
+
+### Notifications from DMs
+
+| Kind | Recipient | When |
+|---|---|---|
+| `dm_requested` | the other hiker | a DM is created (not when an existing one is returned) |
+| `dm_accepted` | the initiator | recipient accepts |
+| `dm_reopened` | the other party | the closer reopens |
+
+Decline and close are silent: no notification, only the `dm.declined` poke. Stored payload: `{conversation_id, from_name}`. `from_name` is the actor's name at insert time; if the name lookup fails the row is still inserted with an empty `from_name` and the bell falls back to "someone". There is no bell entry per message (D7).
 
 ---
 
 ## 4. Outing-scoping and anti-spam rules (service layer; each rule = one red test)
 
+**Both kinds**
+- Body: 1–500 characters after trim; empty or whitespace-only → 400; longer → 400.
+- Rate limit: 10 messages per hiker per minute per conversation → 429. The count is of rows in the last minute.
+- Read and post: members only. Anyone else → 403.
+
 **Outing chat**
-- Post/read: host + roster (accepted `join_requests`). Anyone else → 403.
-- Outing `open` → post allowed. `cancelled` → 403 (read stays until the v2 close-room decision).
-- Body: 1–500 chars after trim; empty/whitespace-only → 400.
-- Rate limit: 10 messages per hiker per minute per conversation → 429. Sliding window or fixed bucket — store mechanics, service policy; fake mirrors the mechanics.
+- Members: host + roster (accepted `join_requests`).
+- Outing `open` → post allowed. Any other status → 403 (read stays until the v2 close-room decision).
+- Delete: the author, or the outing's host.
 - D5's N=100 is a pagination trigger, **not** a cap. No per-outing message ceiling.
 
 **DMs**
-- Host and roster members of a shared outing may open a DM with each other; host may open one with a *pending* requester.
-- State machine in §2 governs who may message when.
-- Roster removal does **not** close an existing accepted DM.
-- Either party may **close** a DM = `accepted → declined` with `dm_declined_by` = closer. Only the closer may reopen. No separate `closed` status.
-- Same body cap and rate limit as outing chat.
+- **CanDM doors** (checked when a DM is started; a self-DM → 400):
+    1. Both hikers belong to the same outing, each as host or accepted member.
+    2. The initiator hosts an outing on which the other hiker has a pending request. One-way: the requester cannot open a DM with the host.
+- Posting by status: `accepted` → allowed. `pending` → the initiator may have one opening message; the recipient gets 403. `declined` → 403 for both.
+- Delete: the author only. There is no host moderation in a DM.
+- Roster removal does **not** close an existing accepted DM. The doors are checked only at start.
+- Either party may close (`accepted → declined`); only the closer may reopen. No separate `closed` status.
+
+---
 
 ## 5. Known limitations (recorded, not bugs)
 
 1. **`seq` is insert-time, not commit-time.** Two concurrent inserts can commit in reverse `seq` order. Under D4 (load-all) both appear; nothing is lost. Only matters if a cursor is ever introduced.
-2. **Dropped pokes** (hub buffer full) delay visibility until the next poke, focus, or reconnect. Acceptable under D3/D4.
-3. **Stream outlives credential** until D12 is implemented. Roster *removal* is already handled by D8.
+2. **Dropped pokes** (hub buffer full, or the stream is down) delay visibility until the next poke or a window-focus refetch. **Reopening the stream does not refetch** (the D4 gap). On the ledger.
+3. **A live stream outlives its token's `exp`.** By design: the server checks auth at connect only. Roster removal is handled by D8.
 4. **DM threads unbounded** (D5).
 5. **Single instance** (D9): a second API instance would split the hub. Must be revisited before horizontal scaling.
+6. **Hard deletes reset counters.** The pending-DM "one opening message" rule and the rate limit both count existing rows. An initiator who deletes their opening message can send another while still pending. Each one reaches the recipient's inbox preview; none rings the bell.
+7. **DM notifications are emailed with the generic template.** The email dispatcher drains every notification row; it has no content for the three DM kinds, so they fall through to "You have a new notification" and log `contentFor: unhandled kind`.
+8. **Notification kinds have several homes**: see the checklist in §7.
 
 ---
 
@@ -141,9 +237,42 @@ E2E (Playwright):
 
 Sabotage before green: mutate the roster check to always-true, watch the non-member test go red, restore.
 
+**Added with DMs (rev 6)**
+
+- Service tests cover the state machine in §2 and the posting rules in §4. Handler tests run against a fake service (`api.messageService`).
+- Store SQL (CanDM, GetOrCreateDM, the inbox query, ConversationView) is proven by hand in psql and through the API suite, not by Go integration tests.
+- API suite `dm.spec.ts`: 64 passing at rev 6.
+- Playwright `message.spec.ts`, "host DMs a pending requester": two contexts, nothing reloads. Proves the bell poke, the inbox row arriving by `dm.requested`, `dm.accepted` reaching the initiator's open page, and messages crossing both ways. Two sabotages witnessed: skipping Accept, and removing the inbox's `dm.requested` subscription.
+
+---
+
+## 7. Checklist: adding a notification kind
+
+A kind lives in seven places. Miss one and it fails quietly.
+
+1. **Go const** in `internal/notification/notification.go`.
+2. **`Kind.Valid()`** in the same file: add it to the switch.
+3. **DB CHECK** `notification_events_kind_check`: a new migration that widens the list. The deploy runs migrations before the new binary starts, so the migration must be safe under the old binary (widening is).
+4. **Stored payload**: decide the keys and write them in the service's `notify`. Outing kinds carry `{outing_id, outing_title}`; DM kinds carry `{conversation_id, from_name}`.
+5. **Poke**: the `notification.created` data carries `kind` plus the id the client filters on.
+6. **Email**: add a case to `contentFor` in `internal/notification/dispatcher.go`, or accept the generic fallback on purpose.
+7. **Frontend bell** in `NotificationBell.tsx`: the text in `notificationText`, and the click target (conversation if `conversation_id`, else outing if `outing_id`).
+
+Then: one service test that the right recipient gets the kind, and one line in the API suite.
+
+For a new **event type** on the stream (not a notification kind): add it to `EVENT_TYPES` in `EventProvider.tsx`, subscribe where needed, and add a row to the tables in §3.
+
 ---
 
 ## Ledger additions from this doc
 - Read tracking (badges, receipts, `last_read`, `last_fetched`) — cut for v1, don't re-raise.
 - Pagination — v2, triggered by D5's N.
 - Multi-instance fan-out — v2+.
+- Refetch on stream reopen (the D4 gap).
+- Name the unnamed declined-by CHECK on `conversations` (new migration; the table is in prod).
+- Email content for DM kinds, or exclude them from the dispatcher.
+- Pending-DM opening message can be repeated by delete-and-resend (§5.6).
+- Bell entry per message and unread badges — v2, one feature with read tracking.
+- Presence via hub count — v2.
+- Outing notification kinds could carry the actor's name, as DM kinds do.
+- Fake `ListConversations` in the service tests is a stub.
