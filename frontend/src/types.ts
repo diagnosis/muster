@@ -154,7 +154,7 @@ export interface NotificationEvent{
     id: string
     hiker_id: string
     kind: string
-    payload: {outing_id:string,outing_title:string}
+    payload: {outing_id:string,outing_title:string, from_name:string, conversation_id:string}
     created_at: string
     read_at:  string|null
 }
@@ -201,6 +201,55 @@ export interface Message {
     hiker_id: string
     seq: number
     body: string
+    created_at: string
+}
+
+export interface Conversation{
+    id: string
+    kind: ConversationKind
+    outing_id: string | null
+    dm_a: string | null
+    dm_b: string | null
+    dm_initiator: string | null
+    dm_status: DMStatus | null
+    dm_declined_by: string | null
+    created_at: string
+}
+export interface Participant{
+    hiker_id: string
+    name: string
+}
+export interface ConversationView{
+    id: string
+    kind: ConversationKind
+    outing_title: string | null
+    outing_starts_at: string | null
+    participants: Participant[]
+    outing_id: string | null
+    outing_host_id: string | null
+    dm_a: string | null
+    dm_b: string | null
+    dm_initiator: string | null
+    dm_status: DMStatus | null
+    dm_declined_by: string | null
+    created_at: string
+}
+
+
+export interface ListConversationsResponse{
+    conversations: ConversationSummary[]
+}
+export type ConversationKind = "outing" | "dm"
+export type DMStatus = "pending" | "accepted" | "declined"
+export interface ConversationSummary{
+    id: string
+    kind: ConversationKind
+    title: string,
+    dm_status: DMStatus | null
+    dm_initiator: string | null
+    dm_declined_by: string | null
+    last_message_at: string | null
+    last_preview: string
     created_at: string
 }
 

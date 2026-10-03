@@ -38,8 +38,8 @@ test.describe("chat message", ()=> {
 
         await expect(hikerPage.getByText("hello")).toBeVisible()
 
-        await strangerPage.goto(`/outings/${outing.id}/conversation`)
-        await expect(strangerPage).toHaveURL(`/outings/${outing.id}`)
+        await strangerPage.goto(`/conversations/${outing.conversation_id}`)
+        await expect(strangerPage).toHaveURL(`/conversations/${outing.conversation_id}`)
 
 
     });
@@ -89,5 +89,48 @@ test.describe("chat message", ()=> {
 
         await expect(hostPage.getByText("Requests (1)")).toBeVisible()   // no reload
         await expect(hostPage.getByRole("button", { name: "Notifications" })).toContainText("1")
+    })
+    test("host DMs a pending requester; bell rings; accept opens the composer", async ({ browser }) => {
+        // --- seed over the API: a host, a hiker with a *pending* request (host↔pending is a DM door)
+        const host = await createActor()
+        const hiker = await createActor()
+        const hostCtx = await browser.newContext()
+        const hikerCtx = await browser.newContext()
+        await actorInBrowser(host, hostCtx)
+        await actorInBrowser(hiker, hikerCtx)
+        const outing = await createOuting(host)
+        await joinRequest(hiker, outing.id)          // left pending on purpose
+
+        const hostPage = await hostCtx.newPage()
+        const hikerPage = await hikerCtx.newPage()
+
+        // the hiker is parked on a page that is NOT the inbox, so the bell badge
+        // can only change via the notification.created poke
+        await hikerPage.goto("/inbox")
+        // --- host starts the DM from the requester's row (one click: POST /api/dms + navigate)
+        await hostPage.goto(`/outings/${outing.id}`)
+        await hostPage.getByRole("button", { name: `Message ${hiker.user.name}` }).click()
+        await expect(hostPage).toHaveURL(/\/conversations\//)
+        // pending from the initiator's side: one opening message allowed, then it's on them
+        await expect(hostPage.getByText(/waiting/i)).toBeVisible()
+
+        // --- the hiker's bell moves with no reload: proves KindDMRequested + the poke
+        await expect(hikerPage.getByRole("button", { name: "Notifications" })).toContainText("1")
+
+        // --- the hiker finds the request in the inbox and accepts
+        await hikerPage.getByRole("link", { name:host.user.name}).click()
+        await expect(hikerPage).toHaveURL(/\/conversations\//)
+        await hikerPage.getByRole("button", { name: "Accept" }).click()
+
+        // --- host's page, never reloaded, flips to a usable composer: proves dm.accepted
+        await expect(hostPage.getByRole("button", {name:"Close Conversation"})).toBeVisible()
+        await hostPage.getByRole("textbox", { name: "chat-box" }).fill("got microspikes?")
+        await hostPage.getByRole("button", { name: "send" }).click()
+        await expect(hikerPage.getByText("got microspikes?")).toBeVisible()
+
+        await hikerPage.getByRole('textbox', {name: "chat-box"}).fill("yea, i have Kahtali Michi")
+        await hikerPage.getByRole("button", { name: "send" }).click()
+        await expect(hostPage.getByText("yea, i have Kahtali Michi")).toBeVisible()
+
     })
 })

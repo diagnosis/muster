@@ -18,6 +18,128 @@ type MessageStore struct {
 	pool *pgxpool.Pool
 }
 
+// GetConversationView loads one conversation with everything the chat page needs:
+// the row itself, the outing's title and start time when kind is outing (NULL for
+// DMs), and the participants with their names — host and accepted members for an
+// outing, both parties for a DM. The participant query is viewer-independent on
+// purpose; the caller (message.Service) enforces membership with IsMember, and the
+// client picks "the other party" for a DM by excluding itself. NotFound when the
+// conversation doesn't exist.
+func (s *MessageStore) GetConversationView(ctx context.Context, convID uuid.UUID) (*message.ConversationView, error) {
+	q1 := ` 
+	SELECT c.id, c.kind, o.title, o.starts_at, c.outing_id, o.host_id, c.dm_a, c.dm_b, c.dm_initiator, c.dm_status, c.dm_declined_by, c.created_at 
+	FROM conversations c LEFT JOIN outings o ON o.id = c.outing_id 
+	WHERE c.id = $1
+`
+	q2 := `
+		SELECT h.id, h.name 
+		FROM conversations c 
+		JOIN outings o ON o.id = c.outing_id
+		JOIN hikers h ON h.id = o.host_id
+		WHERE c.id = $1
+		UNION 
+		SELECT h.id, h.name
+		FROM conversations c
+		JOIN join_requests jr ON jr.outing_id = c.outing_id
+		JOIN hikers h ON h.id = jr.hiker_id
+		WHERE c.id = $1 and jr.status = 'accepted'
+		UNION 
+		SELECT h.id, h.name
+		FROM conversations c 
+		JOIN hikers h ON h.id IN (c.dm_a, c.dm_b)
+		WHERE c.id = $1
+`
+	cv := &message.ConversationView{}
+	if err := s.pool.QueryRow(ctx, q1, convID).Scan(
+		&cv.ID,
+		&cv.Kind,
+		&cv.OutingTitle,
+		&cv.OutingStartsAt,
+		&cv.OutingID,
+		&cv.OutingHostID,
+		&cv.DmA,
+		&cv.DmB,
+		&cv.DmInitiator,
+		&cv.DmStatus,
+		&cv.DmDeclinedBy,
+		&cv.CreatedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperr.NotFound("conversation not found", "no row for id")
+		}
+		return nil, apperr.Database("failed to get conversation", "failed to scan conversation view", err)
+	}
+	participants := []message.Participant{}
+	rows, err := s.pool.Query(ctx, q2, convID)
+	if err != nil {
+		return nil, apperr.Database("failed to get conversation", "failed to get participants for conversation", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		p := message.Participant{}
+		if verr := rows.Scan(&p.HikerID, &p.Name); verr != nil {
+			return nil, apperr.Database("failed to get conversation", "failed to scan participant row", verr)
+		}
+		participants = append(participants, p)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, apperr.Database("failed to get conversation", "failed to iterate participants", err)
+	}
+	cv.Participants = participants
+
+	return cv, nil
+
+}
+
+// ListConversations loads all conversations for a hiker
+func (s *MessageStore) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*message.ConversationSummary, error) {
+	q := `
+	SELECT * FROM(
+		SELECT c.id, c.kind, o.title, c.dm_status, c.dm_initiator, c.dm_declined_by,
+			lm.created_at AS last_message_at, COALESCE(LEFT(lm.body, 80), ''), c.created_at AS created_at
+		FROM conversations c
+		JOIN outings o ON o.id = c.outing_id
+		LEFT JOIN LATERAL (
+			SELECT body, created_at FROM messages m
+			WHERE m.conversation_id = c.id ORDER BY seq DESC LIMIT 1
+		) lm ON true
+		WHERE c.kind = 'outing'
+			AND (o.host_id = $1 OR EXISTS (SELECT 1 FROM join_requests jr
+				WHERE jr.outing_id = o.id AND jr.hiker_id = $1 AND jr.status = 'accepted'))
+	
+		UNION ALL
+	
+		SELECT c.id, c.kind, h.name, c.dm_status, c.dm_initiator, c.dm_declined_by,
+		   lm.created_at, COALESCE(LEFT(lm.body, 80), ''), c.created_at
+		FROM conversations c
+		JOIN hikers h ON h.id = CASE WHEN c.dm_a = $1 THEN c.dm_b ELSE c.dm_a END
+		LEFT JOIN LATERAL (
+		SELECT body, created_at FROM messages m
+		WHERE m.conversation_id = c.id ORDER BY seq DESC LIMIT 1
+		) lm ON true
+		WHERE c.kind = 'dm' AND $1 IN (c.dm_a, c.dm_b)
+	) x ORDER BY COALESCE(x.last_message_at, x.created_at) DESC
+`
+	convSums := []*message.ConversationSummary{}
+	rows, err := s.pool.Query(ctx, q, hikerID)
+	if err != nil {
+		return nil, apperr.Database("failed to get conversations summary", "scanning summary failed", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		cs := message.ConversationSummary{}
+		err = rows.Scan(&cs.ID, &cs.Kind, &cs.Title, &cs.DmStatus, &cs.DmInitiator, &cs.DmDeclinedBy, &cs.LastMessageAt, &cs.LastPreview, &cs.CreatedAt)
+		if err != nil {
+			return nil, apperr.Database("failed to get conversations summary", "failed to scan conversations", err)
+		}
+		convSums = append(convSums, &cs)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, apperr.Database("failed to get comversations summary", "failed to iterate  conversations", err)
+	}
+	return convSums, nil
+}
+
 // NewMessageStore returns a MessageStore over pool.
 func NewMessageStore(pool *pgxpool.Pool) *MessageStore {
 	return &MessageStore{pool: pool}
@@ -206,6 +328,101 @@ func (s *MessageStore) OutingHost(ctx context.Context, outingID uuid.UUID) (uuid
 		return uuid.Nil, apperr.Database("failed to fetch outing host id", "failed to scan host id", err)
 	}
 	return hostID, nil
+}
+
+// CanDM reports whether initiator may open a DM with other: both are host or
+// accepted members of a common outing, or initiator hosts an outing other has a
+// pending request on. The pending door is one-way.
+func (s *MessageStore) CanDM(ctx context.Context, initiator, other uuid.UUID) (bool, error) {
+	q := `SELECT EXISTS (
+    SELECT 1
+    FROM outings o
+    WHERE
+        -- door 1: both hikers belong to this outing (host or accepted)
+        (
+            (o.host_id = $1 OR EXISTS (
+                SELECT 1 FROM join_requests jr
+                WHERE jr.outing_id = o.id AND jr.hiker_id = $1 AND jr.status = 'accepted'))
+            AND
+            (o.host_id = $2 OR EXISTS (
+                SELECT 1 FROM join_requests jr
+                WHERE jr.outing_id = o.id AND jr.hiker_id = $2 AND jr.status = 'accepted'))
+        )
+        OR
+        -- door 2: $1 hosts this outing and $2 has a pending request on it (one-way)
+        (
+            o.host_id = $1 AND EXISTS (
+                SELECT 1 FROM join_requests jr
+                WHERE jr.outing_id = o.id AND jr.hiker_id = $2 AND jr.status = 'requested')
+        )
+)`
+	var can bool
+	if err := s.pool.QueryRow(ctx, q, initiator, other).Scan(&can); err != nil {
+		return false, apperr.Database("starting DM failed", "failed to scan if user can dm.", err)
+	}
+	return can, nil
+}
+
+// GetOrCreateDM inserts the DM for the sorted pair (lo < hi) as pending with the
+// given initiator, or returns the existing one. The bool reports whether this call
+// created it; the UNIQUE (dm_a, dm_b) constraint serializes concurrent creates.
+func (s *MessageStore) GetOrCreateDM(ctx context.Context, lo, hi, initiator uuid.UUID) (*message.Conversation, bool, error) {
+	q := `
+		INSERT INTO conversations (kind, dm_a, dm_b, dm_initiator, dm_status)
+		VALUES ('dm', $1, $2, $3, 'pending')
+		ON CONFLICT (dm_a, dm_b) DO NOTHING
+		RETURNING id, kind, outing_id, dm_a, dm_b, dm_initiator, dm_status, dm_declined_by, created_at
+		`
+	conv, err := scanConversation(s.pool.QueryRow(ctx, q, lo, hi, initiator))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			q = `
+				SELECT id, kind, outing_id, dm_a, dm_b, dm_initiator, dm_status, dm_declined_by, created_at
+				FROM conversations WHERE dm_a = $1 AND dm_b = $2
+				`
+			conv, err = scanConversation(s.pool.QueryRow(ctx, q, lo, hi))
+			if err != nil {
+				return nil, false, apperr.Database("failed to get dm", "failed to scan existing outing", err)
+			}
+			return conv, false, nil
+		}
+		return nil, false, apperr.Database("failed to create dm", "failed to insert dm", err)
+	}
+	return conv, true, nil
+
+}
+
+// UpdateDMStatus sets dm_status and dm_declined_by on a DM conversation;
+// NotFound when no such conversation exists.
+func (s *MessageStore) UpdateDMStatus(ctx context.Context, convID uuid.UUID, status message.DMStatus, declinedBy *uuid.UUID) error {
+	q := `
+		UPDATE conversations
+		SET dm_status = $2, dm_declined_by = $3
+		WHERE id = $1 AND kind = 'dm'
+`
+	ct, err := s.pool.Exec(ctx, q, convID, status, declinedBy)
+	if err != nil {
+		return apperr.Database("failed to update dm status", "failed to exec command for updating dm status", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return apperr.NotFound("dm is not found", "row not found for dm")
+	}
+	return nil
+}
+
+// HikerName returns the hiker's display name, used to label notifications
+// ("X wants to message you"). NotFound when no such hiker exists.
+func (s *MessageStore) HikerName(ctx context.Context, hikerID uuid.UUID) (string, error) {
+	q := `SELECT name FROM hikers where id = $1`
+	var hikerName string
+	if err := s.pool.QueryRow(ctx, q, hikerID).Scan(&hikerName); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", apperr.NotFound("hiker not found", "row not found")
+		}
+		return "", apperr.Database("failed to get hiker name", "scanning hiker name failed", err)
+	}
+	return hikerName, nil
+
 }
 
 var _ message.Storage = (*MessageStore)(nil)

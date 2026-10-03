@@ -58,6 +58,49 @@ type Conversation struct {
 	CreatedAt    time.Time        `json:"created_at"`
 }
 
+// Participant is one hiker in a conversation, with the name used to label their
+// messages in the UI.
+type Participant struct {
+	HikerID uuid.UUID `json:"hiker_id"`
+	Name    string    `json:"name"`
+}
+
+// ConversationView is a conversation with everything the chat page needs to
+// render it: the row itself, its participants (host and accepted members for an
+// outing, both parties for a DM), and the outing's title and start time when
+// kind is outing. It is viewer-independent — the client picks "the other party"
+// for a DM by excluding itself from Participants.
+type ConversationView struct {
+	ID             uuid.UUID        `json:"id"`
+	Kind           ConversationKind `json:"kind"`
+	OutingTitle    *string          `json:"outing_title"`
+	OutingStartsAt *time.Time       `json:"outing_starts_at"`
+	Participants   []Participant    `json:"participants"`
+	OutingID       *uuid.UUID       `json:"outing_id"`
+	OutingHostID   *uuid.UUID       `json:"outing_host_id"`
+	DmA            *uuid.UUID       `json:"dm_a"`
+	DmB            *uuid.UUID       `json:"dm_b"`
+	DmInitiator    *uuid.UUID       `json:"dm_initiator"`
+	DmStatus       *DMStatus        `json:"dm_status"`
+	DmDeclinedBy   *uuid.UUID       `json:"dm_declined_by"`
+	CreatedAt      time.Time        `json:"created_at"`
+}
+
+// ConversationSummary is one inbox row: what a hiker sees before opening a
+// conversation. Title is the outing's title for kind=outing and the other
+// hiker's name for kind=dm. LastMessageAt is nil when nothing has been posted.
+type ConversationSummary struct {
+	ID            uuid.UUID        `json:"id"`
+	Kind          ConversationKind `json:"kind"`
+	Title         string           `json:"title"`
+	DmStatus      *DMStatus        `json:"dm_status"`
+	DmInitiator   *uuid.UUID       `json:"dm_initiator"`
+	DmDeclinedBy  *uuid.UUID       `json:"dm_declined_by"`
+	LastMessageAt *time.Time       `json:"last_message_at"`
+	LastPreview   string           `json:"last_preview"`
+	CreatedAt     time.Time        `json:"created_at"`
+}
+
 // Message is one row of messages. Seq is the DB-assigned ordering (D6);
 // a non-nil DeletedAt marks a soft-deleted message.
 type Message struct {

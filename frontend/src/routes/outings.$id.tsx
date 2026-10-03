@@ -1,4 +1,4 @@
-import {createFileRoute, Link} from '@tanstack/react-router'
+import {createFileRoute, Link, useNavigate} from '@tanstack/react-router'
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import type {Detail, Member} from "@/types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
@@ -12,6 +12,7 @@ import {Badges} from "@/components/Badges.tsx";
 import {Modal} from "@/components/Modal.tsx";
 import {Comments} from "@/components/Comments.tsx";
 import {useEvents} from "@/events/EventProvider.tsx";
+import {useStartDM} from "@/queries/conversation.ts";
 
 
 export const Route = createFileRoute('/outings/$id')({
@@ -20,10 +21,12 @@ export const Route = createFileRoute('/outings/$id')({
 
 export function OutingDetailPage() {
     const {id} = Route.useParams()
+    const navigate = useNavigate()
     const qc = useQueryClient()
     const [showForm, setShowForm] = useState(false)
     const {data: me} = useMeQuery()
     const {data:detail, isPending, error} = useOuting(id)
+    const startDM = useStartDM()
     const [memberToRemove, setMemberToRemove] = useState<Member|null>(null)
     const { subscribe } = useEvents()
     useEffect(()=> {
@@ -143,7 +146,8 @@ export function OutingDetailPage() {
             detail.my_request?.status === 'requested'
     )
     const isReadOnly = detail.outing.status === 'cancelled' || new Date(detail.outing.starts_at) < new Date()
-    const canSeeChat = me && (me.id === detail.host.hiker_id || detail.roster.some(r => r.hiker_id === me.id))
+    const canSeeStartDmBtn = me && (me.id === detail.host.hiker_id || detail.roster.some(r => r.hiker_id === me.id))
+    const canSeeChat =canSeeStartDmBtn && !!detail.outing.conversation_id
 
     return <>
         <div className={styles.container}>
@@ -170,7 +174,18 @@ export function OutingDetailPage() {
 
             <section className={styles.section}>
                 <h2 className={styles.subheading}>Who's going ({detail.roster.length + 1})</h2>
-                <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience} · host</p>
+                <div className={styles.memberRow}>
+                    <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience} · host</p>
+                    {canSeeStartDmBtn&&detail.host.hiker_id !== me?.id &&
+                        <button className={"btn-quite"}
+                                aria-label={`Message ${detail.host.name}`}
+                                disabled={startDM.isPending}
+                                onClick={()=> {
+                            startDM.mutate(detail.host.hiker_id, {onSuccess: (conv)=>
+                                    navigate({to:'/conversations/$id', params: {id:conv.id}})})
+                        }}>✉️</button>
+                    }
+                </div>
                 {detail.roster.map(m => <div className={styles.memberRow}
                     key={m.hiker_id}>{m.name} · {m.experience}
                     {me?.id === detail.outing.host_id &&
@@ -178,7 +193,17 @@ export function OutingDetailPage() {
                             setMemberToRemove(m)
                         }}>🗑️</button>
                     }
+                    {canSeeStartDmBtn && m.hiker_id !== me?.id &&
+                        <button className={"btn-quite"}
+                                aria-label={`Message ${m.name}`}
+                                disabled={startDM.isPending}
+                                onClick={()=> {
+                            startDM.mutate(m.hiker_id, {onSuccess: (conv)=>
+                                    navigate({to:'/conversations/$id', params: {id:conv.id}})})
+                        }}>✉️</button>
+                    }
                 </div>)}
+                {startDM.isError&&<p className={styles.error}>{startDM.error.message}</p>}
                 {memberToRemove&&<Modal title={`Remove ${memberToRemove.name}`} onClose={()=>setMemberToRemove(null)}>
                     <p>This removes them from the roster and frees their seats. They won't be able to request again.</p>
                     <div className={styles.actions}>
@@ -195,7 +220,7 @@ export function OutingDetailPage() {
                 {detail.outing.notes && <p>{detail.outing.notes}</p>}
             </section>}
             {canSeeChat&&<div>
-                <Link className={'btn btn-primary'} to={'/outings/$id/conversation'} params={{id:id}}>Outing chat</Link>
+                <Link className={'btn btn-primary'} to={'/conversations/$id'} params={{id:detail.outing.conversation_id}}>Outing chat</Link>
             </div>}
             {canSeeComments&&(
                 <Comments outingId={id} hostId={detail.outing.host_id} readOnly={isReadOnly}/>

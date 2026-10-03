@@ -48,6 +48,12 @@ type messageService interface {
 	PostMessage(ctx context.Context, convID, hikerID uuid.UUID, body string) (*message.Message, error)
 	ListMessages(ctx context.Context, convID, hikerID uuid.UUID) ([]*message.Message, error)
 	DeleteMessage(ctx context.Context, msgID, hikerID uuid.UUID) error
+	StartDM(ctx context.Context, h1, h2 uuid.UUID) (*message.Conversation, error)
+	AcceptDM(ctx context.Context, convID, actor uuid.UUID) error
+	DeclineDM(ctx context.Context, convID, actor uuid.UUID) error
+	ReopenDM(ctx context.Context, convID, actor uuid.UUID) error
+	ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*message.ConversationSummary, error)
+	GetConversation(ctx context.Context, convID, hikerID uuid.UUID) (*message.ConversationView, error)
 }
 
 // Routes returns the fully wired HTTP handler.
@@ -109,6 +115,14 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/conversations/{id}/messages", requireAuth(http.HandlerFunc(s.handlePostMessage)))
 	mux.Handle("DELETE /api/messages/{id}", requireAuth(http.HandlerFunc(s.handleDeleteMessage)))
 	mux.Handle("GET /api/conversations/{id}/messages", requireAuth(http.HandlerFunc(s.handleListMessages)))
+
+	// dms
+	mux.Handle("POST /api/dms", requireAuth(http.HandlerFunc(s.handleStartDM)))
+	mux.Handle("POST /api/conversations/{id}/accept", requireAuth(http.HandlerFunc(s.handleAcceptDM)))
+	mux.Handle("POST /api/conversations/{id}/decline", requireAuth(http.HandlerFunc(s.handleDeclineDM)))
+	mux.Handle("POST /api/conversations/{id}/reopen", requireAuth(http.HandlerFunc(s.handleReopenDM)))
+	mux.Handle("GET /api/conversations", requireAuth(http.HandlerFunc(s.handleListConversations)))
+	mux.Handle("GET /api/conversations/{id}", requireAuth(http.HandlerFunc(s.handleGetConversation)))
 
 	var h http.Handler = mux
 	h = middleware.RateLimit(rate.Limit(s.cfg.RateLimiter.RPS), int(s.cfg.RateLimiter.Burst), 5*time.Minute)(h)

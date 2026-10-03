@@ -73,6 +73,7 @@ export function Header(){
                 {data ? (
                         <div className={styles.userOutings}>
                             <Link className={styles.navLink} to="/me/outings" onClick={()=> setOpen(false)}>My outings</Link>
+                            <Link className={styles.navLink} to="/inbox" onClick={() => setOpen(false)}>Inbox</Link>
                             <Link className={styles.navLink} to="/outings/new" onClick={() => setOpen(false)}>Create outing</Link>
                             <Link className={styles.navLink} onClick={()=>setOpen(false)} to={"/me/profile"}>{data.name}</Link>
                             <span className={styles.desktopBell}><NotificationBell/></span>

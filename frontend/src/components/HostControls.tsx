@@ -7,13 +7,15 @@ import {useOutingJoinRequests} from "@/queries.ts";
 import {useState} from "react";
 import {Modal} from "@/components/Modal.tsx";
 import styles from "@/components/HostControls.module.css"
-import {Link} from "@tanstack/react-router";
+import {Link, useNavigate} from "@tanstack/react-router";
+import {useStartDM} from "@/queries/conversation.ts";
 
 interface HostControlsProps{
     outingId: string
     detail: Detail
 }
 export function HostControls( {outingId, detail}: HostControlsProps ){
+    const navigate = useNavigate()
     const qc= useQueryClient()
     const [selectedRequest, setSelectedRequest] = useState<PendingRequestResponse | null>(null)
     const { data: requests, isPending: requestsPending, error:requestsError} = useOutingJoinRequests(outingId)
@@ -65,6 +67,8 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
         }
     })
 
+    const startDM = useStartDM()
+
 
     function handleCancel(){
 
@@ -80,13 +84,22 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
             {requestsPending&&<p>requests loading...</p>}
         <h2 className={styles.subheading}>Requests ({requestLen ?? 0})</h2>
         {requests?.map(r => (
-            <button
-                className={styles.requestRow}
-                onClick={()=>setSelectedRequest(r)}
-                key={r.id}>
-                {r.hiker_name} requests as {r.role}
-                {r.guests > 0 && ` and brings ${r.guests} guest${r.guests>1?'s':''}`}
-            </button>
+            <div key={r.id} className={styles.actions}>
+                <button
+                    className={styles.requestRow}
+                    onClick={()=>setSelectedRequest(r)}
+                    >
+                    {r.hiker_name} requests as {r.role}
+                    {r.guests > 0 && ` and brings ${r.guests} guest${r.guests>1?'s':''}`}
+                </button>
+                <button className={"btn-quite"}
+                        aria-label={`Message ${r.hiker_name}`}
+                        onClick={()=> {
+                            startDM.mutate(r.hiker_id, {onSuccess: (conv)=>
+                                    navigate({to:'/conversations/$id', params: {id:conv.id}})})
+                        }}>Start dm</button>
+            </div>
+
         ))}
         {selectedRequest&&(
             <Modal title={`${selectedRequest.hiker_name} · ${selectedRequest.hiker_experience}`} onClose={() => setSelectedRequest(null)}>

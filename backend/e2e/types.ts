@@ -192,6 +192,32 @@ export interface Message {
 export interface ListMessages{
     messages: Message[]
 }
+export type ConversationKind = "outing" | "dm"
+export type DMStatus = "pending" | "accepted" | "declined"
+export interface ConversationResponse{
+    id: string
+    kind: ConversationKind
+    outing_id: string | null
+    dma_a: string | null
+    dm_b: string | null
+    dm_initiator: string | null
+    dm_status: DMStatus | null
+    dm_declined_by: string | null
+    created_at: string
+}
+export interface ListConversationsResponse{
+    conversations: ConversationSummary[]
+}
+export interface ConversationSummary{
+    id: string
+    kind: ConversationKind
+    title: string,
+    dm_status: DMStatus | null
+    dm_initiator: string | null
+    dm_declined_by: string | null
+    last_message_at: string | null
+    last_preview: string
+}
 
 
 export const CODE_EMAIL_NOT_VERIFIED = "email_not_verified"

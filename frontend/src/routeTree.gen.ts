@@ -10,20 +10,26 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
+import { Route as ConversationsIdRouteImport } from './routes/conversations_.$id'
 import { Route as MeOutingsRouteImport } from './routes/me.outings'
 import { Route as MeProfileRouteImport } from './routes/me.profile'
 import { Route as OutingsIdRouteImport } from './routes/outings.$id'
 import { Route as OutingsNewRouteImport } from './routes/outings.new'
-import { Route as OutingsIdConversationRouteImport } from './routes/outings_.$id.conversation'
 import { Route as OutingsIdEditRouteImport } from './routes/outings_.$id.edit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InboxRoute = InboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -46,6 +52,11 @@ const VerifyEmailRoute = VerifyEmailRouteImport.update({
   path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConversationsIdRoute = ConversationsIdRouteImport.update({
+  id: '/conversations_/$id',
+  path: '/conversations/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MeOutingsRoute = MeOutingsRouteImport.update({
   id: '/me/outings',
   path: '/me/outings',
@@ -66,11 +77,6 @@ const OutingsNewRoute = OutingsNewRouteImport.update({
   path: '/outings/new',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OutingsIdConversationRoute = OutingsIdConversationRouteImport.update({
-  id: '/outings_/$id/conversation',
-  path: '/outings/$id/conversation',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const OutingsIdEditRoute = OutingsIdEditRouteImport.update({
   id: '/outings_/$id/edit',
   path: '/outings/$id/edit',
@@ -79,97 +85,104 @@ const OutingsIdEditRoute = OutingsIdEditRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/inbox': typeof InboxRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/conversations/$id': typeof ConversationsIdRoute
   '/me/outings': typeof MeOutingsRoute
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
   '/outings/new': typeof OutingsNewRoute
-  '/outings/$id/conversation': typeof OutingsIdConversationRoute
   '/outings/$id/edit': typeof OutingsIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/inbox': typeof InboxRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/conversations/$id': typeof ConversationsIdRoute
   '/me/outings': typeof MeOutingsRoute
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
   '/outings/new': typeof OutingsNewRoute
-  '/outings/$id/conversation': typeof OutingsIdConversationRoute
   '/outings/$id/edit': typeof OutingsIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/inbox': typeof InboxRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/conversations_/$id': typeof ConversationsIdRoute
   '/me/outings': typeof MeOutingsRoute
   '/me/profile': typeof MeProfileRoute
   '/outings/$id': typeof OutingsIdRoute
   '/outings/new': typeof OutingsNewRoute
-  '/outings_/$id/conversation': typeof OutingsIdConversationRoute
   '/outings_/$id/edit': typeof OutingsIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/inbox'
     | '/login'
     | '/reset-password'
     | '/signup'
     | '/verify-email'
+    | '/conversations/$id'
     | '/me/outings'
     | '/me/profile'
     | '/outings/$id'
     | '/outings/new'
-    | '/outings/$id/conversation'
     | '/outings/$id/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/inbox'
     | '/login'
     | '/reset-password'
     | '/signup'
     | '/verify-email'
+    | '/conversations/$id'
     | '/me/outings'
     | '/me/profile'
     | '/outings/$id'
     | '/outings/new'
-    | '/outings/$id/conversation'
     | '/outings/$id/edit'
   id:
     | '__root__'
     | '/'
+    | '/inbox'
     | '/login'
     | '/reset-password'
     | '/signup'
     | '/verify-email'
+    | '/conversations_/$id'
     | '/me/outings'
     | '/me/profile'
     | '/outings/$id'
     | '/outings/new'
-    | '/outings_/$id/conversation'
     | '/outings_/$id/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  InboxRoute: typeof InboxRoute
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  ConversationsIdRoute: typeof ConversationsIdRoute
   MeOutingsRoute: typeof MeOutingsRoute
   MeProfileRoute: typeof MeProfileRoute
   OutingsIdRoute: typeof OutingsIdRoute
   OutingsNewRoute: typeof OutingsNewRoute
-  OutingsIdConversationRoute: typeof OutingsIdConversationRoute
   OutingsIdEditRoute: typeof OutingsIdEditRoute
 }
 
@@ -180,6 +193,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inbox': {
+      id: '/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof InboxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -210,6 +230,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/conversations_/$id': {
+      id: '/conversations_/$id'
+      path: '/conversations/$id'
+      fullPath: '/conversations/$id'
+      preLoaderRoute: typeof ConversationsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/me/outings': {
       id: '/me/outings'
       path: '/me/outings'
@@ -238,13 +265,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OutingsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/outings_/$id/conversation': {
-      id: '/outings_/$id/conversation'
-      path: '/outings/$id/conversation'
-      fullPath: '/outings/$id/conversation'
-      preLoaderRoute: typeof OutingsIdConversationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/outings_/$id/edit': {
       id: '/outings_/$id/edit'
       path: '/outings/$id/edit'
@@ -257,15 +277,16 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  InboxRoute: InboxRoute,
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  ConversationsIdRoute: ConversationsIdRoute,
   MeOutingsRoute: MeOutingsRoute,
   MeProfileRoute: MeProfileRoute,
   OutingsIdRoute: OutingsIdRoute,
   OutingsNewRoute: OutingsNewRoute,
-  OutingsIdConversationRoute: OutingsIdConversationRoute,
   OutingsIdEditRoute: OutingsIdEditRoute,
 }
 export const routeTree = rootRouteImport
