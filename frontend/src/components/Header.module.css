@@ -68,7 +68,7 @@
     color: var(--color-primary);
 }
 
-/* ---- mobile ---- */
+/* ---- the menu panel (a dropdown on phones, inline on desktop) ---- */
 
 .panel{
     display: none;
@@ -102,9 +102,11 @@
     padding-block: var(--space-1);
     border-bottom: 1px solid var(--border-subtle);
 }
+/* :global(.btn) because "btn" is a global class; a bare .btn here would be renamed by the module */
 .panelOpen button,
-.panelOpen .btn,
+.panelOpen :global(.btn),
 .panelOpen .navCta{
+    display: flex;
     justify-content: center;
     width: 100%;
     margin-top: var(--space-3);
@@ -129,8 +131,38 @@
 
 .panel .bell{ display: none; }
 
-.desktopBell { display: none; }         /* mobile: hide desktop bell */
-.mobileBell  { display: inline-flex; }  /* mobile: show mobile bell */
+.desktopBell { display: none; }         /* phone: hide desktop bell */
+.mobileBell  { display: inline-flex; }  /* phone: show mobile bell */
+
+/* ---- phone only: the logged-in menu ---- */
+
+@media (max-width: 39.99em){
+    /* who you are comes first */
+    .panelOpen .profileLink{
+        order: -1;
+        padding-block: var(--space-2);
+        font-weight: 600;
+    }
+    .panelOpen .navLink{
+        min-height: 48px;
+    }
+    /* the one primary action, set apart from the links */
+    .panelOpen .navCta{
+        margin-top: var(--space-4);
+    }
+    /* log out: quiet text, not a second big button */
+    .panelOpen .logoutBtn{
+        margin-top: var(--space-2);
+        border: 0;
+        background: none;
+        color: var(--color-text-muted);
+    }
+    .panelOpen .logoutBtn:hover{
+        background: none;
+        color: var(--color-text);
+        text-decoration: underline;
+    }
+}
 
 /* ---- 640px and up ---- */
 
@@ -162,8 +194,9 @@
         border-bottom: 0;
     }
     .panelOpen button,
-    .panelOpen .btn,
+    .panelOpen :global(.btn),
     .panelOpen .navCta{
+        display: inline-flex;
         width: auto;
         margin-top: 0;
     }

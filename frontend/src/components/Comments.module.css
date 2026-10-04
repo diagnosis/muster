@@ -1,50 +1,151 @@
-.section {
-}
+/* src/components/Comments.module.css */
 
-.thread {
-    display: flex;
-    flex-direction: column; gap: var(--space-6);
-}
-
-.row {
+.section{
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--space-4);
+}
+.subheading{
+    font-family: var(--font-display);
+    font-size: var(--text-title);
+    line-height: var(--leading-title);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+.thread{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
 }
 
-/* author · time — quiet meta line */
-.meta {
-    font-size: 13px;
+/* one comment: initial on the left, everything else beside it */
+.row{
+    display: flex;
+    gap: var(--space-3);
+}
+.avatar{
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+    color: var(--color-primary-dark);
+    font-weight: 600;
+}
+.content{
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.meta{
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
     color: var(--color-text-muted);
 }
-.author { font-weight: 600; color: var(--color-text); }
+.author{
+    font-weight: 600;
+    color: var(--color-text);
+}
+.body{
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+.stub{
+    color: var(--color-text-muted);
+    font-style: italic;
+}
 
-.body { margin: 0; line-height: 1.5; }
-.stub { color: var(--color-text-muted); font-style: italic; }   /* [comment removed] */
-
-/* replies: indent + hairline — the nesting made visible */
-.replies {
-    margin-left: var(--space-6);
+/* replies: indented under the parent, with a hairline */
+.replies{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+    margin-left: calc(36px + var(--space-3));
     padding-left: var(--space-3);
     border-left: 2px solid var(--border-subtle);
-    display: flex; flex-direction: column; gap: var(--space-3);
+}
+.replies:empty{
+    display: none;
+}
+.replies .avatar{
+    width: 28px;
+    height: 28px;
+    font-size: var(--text-meta);
 }
 
-/* actions in a row, quiet buttons */
-.actions { display: flex; align-items: center; gap: var(--space-3); }
-.actionBtn {
-    background: none; border: 0; padding: 2px 4px;
-    font-size: 13px; color: var(--color-text-muted); cursor: pointer;
+.actions{
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+.actionBtn{
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 36px;
+    padding: 0 var(--space-2);
+    border: 0;
     border-radius: var(--radius-control);
+    background: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-meta);
 }
-.actionBtn:hover { background: var(--surface-sunken); color: var(--color-text); }
-.liked { color: var(--color-primary); }   /* the one accent — a liked heart goes teal */
+.actionBtn:hover{
+    background: var(--surface-sunken);
+    color: var(--color-text);
+}
+.actionBtn:disabled{
+    border: 0;
+    background: none;
+}
+.liked{
+    color: var(--color-primary);
+    font-weight: 600;
+}
 
-/* form */
-.form { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
-.textarea {
-    width: 100%; min-height: 72px; padding: var(--space-3);
-    border: 1px solid var(--border-subtle); border-radius: var(--radius-control);
-    background: var(--surface-raised); font: inherit; resize: vertical;
+/* composer: the same rounded box as chat */
+.form{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    padding: var(--space-2);
+    background: var(--surface-raised);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-card);
 }
-.formRow { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.form:focus-within{
+    border-color: var(--color-primary);
+}
+.textarea{
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    max-height: 10rem;
+    padding: var(--space-2);
+    border: 0;
+    background: transparent;
+    line-height: 1.5;
+    resize: none;
+    field-sizing: content;
+}
+.textarea:focus-visible{
+    outline: none;   /* the form's border shows focus */
+}
+.formRow{
+    flex: none;
+    display: flex;
+}
+.error{
+    flex-basis: 100%;
+    color: var(--color-danger);
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
+}

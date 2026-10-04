@@ -8,7 +8,7 @@ import {useState} from "react";
 import {useMeQuery} from "@/queries.ts";
 import {Modal} from "@/components/Modal.tsx";
 import {COMMENT_REMOVED} from "@/lib/copy.ts";
-
+import {HeartIcon} from "@/components/Icons.tsx";
 interface CommentsProp{
     outingId: string
     hostId: string
@@ -24,7 +24,7 @@ export function Comments({outingId, hostId, readOnly}:CommentsProp){
     const repliesOf = (id: string) => comments.filter(c => c.parent_id === id)
     return (
         <section className={styles.section}>
-            <h2 className={"subheading"}>Discussion</h2>
+            <h2 className={styles.subheading}>Discussion</h2>
             <div className={styles.thread}>
                 {topLevel.length===0&&
                     <p className={styles.meta}>No comments yet - start the conversation.</p>}
@@ -60,34 +60,37 @@ function CommentRow({ c, outingId, hostId, onReply }: { c: CommentView; outingId
     const canDelete = me?.id === c.hiker_id || me?.id === hostId
     return (
         <article className={styles.row}>
-            <div className={styles.meta}>
-                <span className={styles.author}>{c.author_name}</span> · <time>{relativeTime(c.created_at)}</time>
-            </div>
-            <p className={c.deleted ? `${styles.body} ${styles.stub}` : styles.body}>
-                {c.deleted ? COMMENT_REMOVED : c.body}
-            </p>
-            {!c.deleted && (
-                <div className={styles.actions}>
-                    <button aria-label={"Like"}
-                        className={`${styles.actionBtn} ${c.liked_by_me ? styles.liked : ''}`} aria-pressed={c.liked_by_me} disabled={busy} onClick={toggle}>
-                        ♥ {c.like_count}
-                    </button>
-                    {onReply && <button type="button" className={styles.actionBtn} onClick={onReply}>Reply</button>}
-                    {isError && <span className={styles.meta}>{likeErr?.message}</span>}
-                    {canDelete&&<button className={styles.actionBtn} onClick={()=>{setCurrentComment(c)}}>Delete</button>}
+            <span className={styles.avatar} aria-hidden="true">{c.author_name.charAt(0).toUpperCase()}</span>
+            <div className={styles.content}>
+                <div className={styles.meta}>
+                    <span className={styles.author}>{c.author_name}</span> · <time>{relativeTime(c.created_at)}</time>
                 </div>
-            )}
-            {currentComment&&<Modal title={'Delete this comment? Replies will stay.'} onClose={()=>setCurrentComment(null)}>
-                <div>
+                <p className={c.deleted ? `${styles.body} ${styles.stub}` : styles.body}>
+                    {c.deleted ? COMMENT_REMOVED : c.body}
+                </p>
+                {!c.deleted && (
                     <div className={styles.actions}>
-                        <button className="btn btn-danger" disabled={del.isPending} onClick={() => del.mutate(currentComment.id, {
-                            onSuccess: () => setCurrentComment(null)
-                        })}>Yes</button>
-                        <button className={"btn btn-quite"} onClick={() => setCurrentComment(null)}>Never mind</button>
+                        <button aria-label={"Like"}
+                                className={`${styles.actionBtn} ${c.liked_by_me ? styles.liked : ''}`} aria-pressed={c.liked_by_me} disabled={busy} onClick={toggle}>
+                            <HeartIcon filled={c.liked_by_me}/> {c.like_count}
+                        </button>
+                        {onReply && <button type="button" className={styles.actionBtn} onClick={onReply}>Reply</button>}
+                        {isError && <span className={styles.meta}>{likeErr?.message}</span>}
+                        {canDelete&&<button className={styles.actionBtn} onClick={()=>{setCurrentComment(c)}}>Delete</button>}
                     </div>
-                    {del.isError&&<p className={"error"}>{del.error.message}</p>}
-                </div>
-            </Modal>}
+                )}
+                {currentComment&&<Modal title={'Delete this comment? Replies will stay.'} onClose={()=>setCurrentComment(null)}>
+                    <div>
+                        <div className={styles.actions}>
+                            <button className="btn btn-danger" disabled={del.isPending} onClick={() => del.mutate(currentComment.id, {
+                                onSuccess: () => setCurrentComment(null)
+                            })}>Yes</button>
+                            <button className={"btn btn-quite"} onClick={() => setCurrentComment(null)}>Never mind</button>
+                        </div>
+                        {del.isError&&<p className={styles.error}>{del.error.message}</p>}
+                    </div>
+                </Modal>}
+            </div>
         </article>
     )
 }
@@ -101,6 +104,7 @@ function CommentForm({outingID,parentID, onDone}:{outingID:string, parentID:stri
             add.mutate({body, parent_id:parentID}, {onSuccess: () => {setBody(''); onDone?.()}})
         }}>
             <textarea
+                rows={1}
                 className={styles.textarea}
                 value={body}
                 placeholder={`${parentID?'Write a reply...':'Add to the discussion'}`}
@@ -110,7 +114,7 @@ function CommentForm({outingID,parentID, onDone}:{outingID:string, parentID:stri
             <div className={styles.formRow}>
                 <button className={"btn btn-primary"} type='submit' disabled={add.isPending||!body.trim()}>{`${parentID?'Post reply':'Post'}`}</button>
             </div>
-            {add.isError && <p className={"error"}>{add.error.message}</p>}
+            {add.isError && <p className={styles.error}>{add.error.message}</p>}
         </form>
     )
 }
