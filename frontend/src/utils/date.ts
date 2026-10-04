@@ -20,3 +20,19 @@ export function relativeTime(createdAt: string): string {
     // older than a week: show the date
     return new Date(createdAt).toLocaleDateString()
 }
+
+// "4:12 PM" for today, "Oct 2, 4:12 PM" for older messages.
+export function messageTime(iso: string): string {
+    const d = new Date(iso)
+    const time = d.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})
+    if (d.toDateString() === new Date().toDateString()) return time
+    return `${d.toLocaleDateString([], {month: 'short', day: 'numeric'})}, ${time}`
+}
+
+// "Sat, Oct 10 · 6:00 AM"
+export function outingWhen(iso: string): string {
+    const d = new Date(iso)
+    const date = d.toLocaleDateString('en-US', {weekday: 'short', month: 'short', day: 'numeric'})
+    const time = d.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'})
+    return `${date} · ${time}`
+}
