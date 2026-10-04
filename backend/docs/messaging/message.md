@@ -1,5 +1,5 @@
 # Muster — Messaging
-*As of 2026-10-03 (rev 6 — as built on `feat/dm`) · spec = what · see MUSTER-ROADMAP.md for why/when*
+*As of 2026-10-04 (rev 7 — rev 6 as built, plus the unread-count design in §8) · spec = what · see MUSTER-ROADMAP.md for why/when*
 
 Scope: v1 roster-scoped outing chat and DMs, on one primitive. Rev 5 was the design before code; rev 6 records what was built and where it differs. Changes to this doc go through a PR like code.
 
@@ -15,14 +15,14 @@ Scope: v1 roster-scoped outing chat and DMs, on one primitive. Rev 5 was the des
 | D4 | **Client: poke → invalidate → refetch whole thread** (TanStack Query) | Load-all is exact; no "missed the middle" case. Reconnect/focus refetch covers dropped pokes. | Cursor/`?after=` (see D5). |
 | D5 | **Load-all, no pagination in v1.** Assumed ceiling: **N = 100** messages per outing conversation | Roster 5–20 people over a few weeks. Pagination is the v2 trigger when N is exceeded. **DM threads have no end date — known risk, not solved in v1.** | Keyset pagination. |
 | D6 | **Ordering column: `seq BIGINT GENERATED ALWAYS AS IDENTITY`** on `messages`, `ORDER BY seq` | PKs are UUIDv4 (random) — `ORDER BY id` is no order. `created_at` has ties and is tx-start, not commit time. `seq` has no ties and no clock. | `created_at`; UUID id. |
-| D7 | **No read tracking of any kind in v1** — no `last_read`, no unread badge, no receipts | Product call: this isn't for close friends. A "server saw a GET" signal lies under D4 (background tabs refetch). Reopenable later as one column + one PATCH. **On the ledger: don't re-raise.** | `unread_count` column (two-homes), `last_read_message_id`, `last_fetched_at`. |
+| D7 | **Read tracking is a per-member read marker; unread counts are derived from it** (rev 7, replaces "no read tracking in v1"). No read receipts: nobody sees whether someone else has read. Design in §8. | Without any signal a new message is invisible unless the inbox happens to be open. The bell stays for events, not messages; email per message is too much. Rev 5's two warnings still hold and shape §8: a "server saw a GET" signal lies under D4 (background tabs refetch), and a stored count is a second home. | Stored `unread_count` column (two-homes); marking read on `GET`; bell entry or email per message; read receipts. |
 | D8 | **Hub routes by `hiker_id`; it holds no roster.** Registry is a `sync.RWMutex`-guarded `map[hikerID]map[*client]struct{}` (no actor loop, no register/unregister channels). Per-client buffered `Send` channel; publish is a non-blocking send under `RLock`. Only the stream goroutine writes to its `ResponseWriter`. The messaging *service* loads membership from the store at publish time and calls `BroadcastToUser` per member. | Hole B: membership checked at publish time, against the store. Host removes a hiker → next publish doesn't include them. No second home for the roster. | Hub keyed by outing (subscribe-time membership = stale). |
 | D9 | **Single API instance for v1.** Hub is in-process. | DO droplet, one binary. Multi-instance fan-out (Postgres `LISTEN/NOTIFY`, Redis) is a v2+ decision, recorded here so it's not an omission. | — |
 | D10 | **Nginx: dedicated `location /api/events`** modeled on the existing `/api/sse` block (`proxy_buffering off`, `proxy_http_version 1.1`, `Connection ''`, long `proxy_read_timeout`). Handler also sends `X-Accel-Buffering: no`. | Current `muster-api` block is a bare `location /` with defaults: buffering on, 60s read timeout. SSE dies. Header is belt-and-braces against a future config edit. | — |
 | D11 | **Heartbeat**: handler writes an SSE comment line (`: ping`) every **15 s** (< mobile NAT idle ~30–60 s, < Nginx read timeout) | Idle streams are cut by proxies; browser can't tell dead-TCP from quiet. | — |
 | D12 | **Client owns stream lifetime (option b).** On `EventSource.onerror`: call refresh; on success, reopen the stream; on failure, stop (user is logged out). Also reopen after any successful refresh triggered by `request()`. Server does nothing special at token `exp` beyond rejecting the next connect with 401. | Hole A. `EventSource` retries only dropped connections; a **401 fails permanently, no retry**. Heartbeats are server→client and cannot trigger refresh; with no other fetch in flight, `onerror` is the only signal the client gets. | (a) server-side close at `exp`. |
 
-**Status at rev 6.** D1–D12 are implemented. Two notes:
+**Status at rev 7.** D1–D6 and D8–D12 are implemented. D7 was reopened on 2026-10-04 and is designed in §8 but not built. Two notes on what is built:
 
 - **D12 as built:** `EventsProvider` handles `EventSource.onerror` by closing the stream and calling refresh. 200 → reopen; 401 → stop; anything else → retry with backoff (1 s doubling to 30 s).
 - **D4 as built:** when the stream reopens after a drop, `EventsProvider` calls `invalidateQueries()` with no key, so every query on screen refetches and any poke missed while the stream was down is made up. The first open at page load does not refetch. Not covered by a test; see §5.
@@ -264,14 +264,95 @@ For a new **event type** on the stream (not a notification kind): add it to `EVE
 
 ---
 
+## 8. Unread counts (rev 7, designed, not yet built)
+
+**What the user gets**
+
+- The header's Inbox link shows the total number of unread messages across all of the viewer's conversations.
+- Each inbox row shows that conversation's unread count, for DMs and outing chats alike.
+- DM requests do not add to the count as requests; they already ring the bell. A request's opening message is a message and counts as one.
+- Nothing changes in the bell, and no email is sent per message.
+
+**The marker**
+
+```
+conversation_reads
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE
+  hiker_id        UUID NOT NULL REFERENCES hikers(id) ON DELETE CASCADE
+  last_read_seq   BIGINT NOT NULL
+  updated_at      TIMESTAMPTZ NOT NULL
+  PRIMARY KEY (conversation_id, hiker_id)
+```
+
+One rule everywhere: **unread = messages in the conversation with `seq` greater than my marker, that I did not write.** No marker means zero, that is, from the beginning. The count is computed in the inbox query; nothing stores it. A deleted message drops out of the count by itself.
+
+**Where a marker comes from**
+
+| Moment | Marker |
+|---|---|
+| A hiker's join request is accepted | set to the conversation's current highest `seq` (0 if it has no messages), in the same transaction as the accept. Earlier messages stay readable and are not counted. |
+| Accepted again after withdrawing | the same write moves the marker up to the current highest `seq`. |
+| Host at outing creation; both people in a new DM | none. No marker means from the beginning, which is correct for them. |
+| Deploy day | the migration backfills a marker at each conversation's current highest `seq` for every existing host, accepted member and DM pair, so history does not show up as unread. |
+| The member reads | see "Marking read" below. |
+
+The accept path lives in the outing service and writes a row that belongs to messaging, as outing creation already does for the conversation row.
+
+**Marking read**
+
+`POST /api/conversations/{id}/read` with `{"seq": <n>}` → 204.
+
+- Members only; anyone else → 403 and nothing is written.
+- The server clamps `seq` to the conversation's highest `seq`, so a marker cannot point past what exists.
+- The marker only moves forward: the stored value becomes the greater of the old marker and the clamped `seq`. A late or repeated call cannot move it back.
+- No event is broadcast. Reading is private.
+
+**When the client calls it** (D7's rule: reading is an explicit signal, never a side effect of a `GET`)
+
+- When the conversation page is open and the tab is visible, it reports the highest `seq` it is showing: on load, and again whenever a new message arrives.
+- A tab in the background does not report. When it becomes visible again, it reports then.
+- On success the client invalidates `['conversations']`, so the row count and the header total drop.
+
+**Reading the counts**
+
+- `ConversationSummary` gains `unread_count`. The header total is the sum over the same `['conversations']` data; there is no second endpoint.
+- The header subscribes to `message.created`, `message.deleted` and the four `dm.*` events and invalidates `['conversations']`, so the total moves on any page. The inbox page's own subscriptions then become redundant and are removed, leaving one home.
+- No new event types.
+
+**Rules to test (red first)**
+
+Service:
+- marking read as a non-member → 403, no marker written
+- a lower `seq` after a higher one leaves the marker unchanged
+- a `seq` beyond the conversation's highest is clamped
+- my own messages never count as unread
+- accept sets the marker: messages before it are not counted, messages after it are
+- accept after a withdrawal moves the marker forward
+
+Store (psql, then the API suite): `unread_count` per inbox row with no marker, with a marker mid-thread, and after an unread message is deleted.
+
+Playwright (one spec): hiker parked off the inbox; host posts; the header's Inbox count shows 1 with no reload; hiker opens the conversation; the count clears.
+
+Not covered by a test: a background tab not marking read. Check it by hand.
+
+**Known limits of this design**
+
+- Every message poke makes each online member refetch the inbox list. Fine at D9's scale; revisit with multi-instance fan-out.
+- A second tab of the same user keeps its old count until its next poke or focus.
+- `seq` is insert-time (§5.1): a message that commits late with a `seq` below a marker set in between is never counted as unread. Rare, and the message is still shown.
+- Someone who is not on the site learns nothing until they return. A once-a-day digest email is on the ledger as a maybe.
+
+---
+
 ## Ledger additions from this doc
-- Read tracking (badges, receipts, `last_read`, `last_fetched`) — cut for v1, don't re-raise.
+- Read receipts (who has read what) — cut, don't re-raise. Unread counts are in: §8.
+- Once-a-day digest email of unread messages for people who are away — maybe, undecided.
 - Pagination — v2, triggered by D5's N.
 - Multi-instance fan-out — v2+.
 - A test for the refetch on stream reopen.
 - Name the unnamed declined-by CHECK on `conversations` (new migration; the table is in prod).
 - The chat still shows a delete button on a pending DM's message; the server refuses it.
-- Bell entry per message and unread badges — v2, one feature with read tracking.
+- Bell entry per message — not planned; unread counts (§8) cover it.
 - Presence via hub count — v2.
 - Outing notification kinds could carry the actor's name, as DM kinds do.
 - Fake `ListConversations` in the service tests is a stub.

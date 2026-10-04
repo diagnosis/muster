@@ -34,8 +34,6 @@ test.describe("chat message", ()=> {
 
         await hostPage.getByRole("textbox", {name:"chat-box"}).fill("hello")
         await hostPage.getByRole("button", { name: "send" }).click();
-
-
         await expect(hikerPage.getByText("hello")).toBeVisible()
 
         await strangerPage.goto(`/conversations/${outing.conversation_id}`)
@@ -43,6 +41,39 @@ test.describe("chat message", ()=> {
 
 
     });
+    test("post message using enter + shift enter for new line", async({browser})=> {
+        const host = await createActor()
+        const hiker = await createActor()
+
+        const hostCtx = await browser.newContext()
+        const hikerCtx = await browser.newContext()
+
+        await actorInBrowser(host, hostCtx)
+        await actorInBrowser(hiker, hikerCtx)
+
+        const outing =await createOuting(host)
+        const jr = await joinRequest(hiker, outing.id)
+        await acceptRequest(host, jr.id)
+
+        const hostPage = await hostCtx.newPage();
+        const hikerPage = await hikerCtx.newPage();
+        await hostPage.goto(`/conversations/${outing.conversation_id}`)
+        await hikerPage.goto(`/conversations/${outing.conversation_id}`)
+
+        const hostChatBox = hostPage.getByRole("textbox", {name: "chat-box"})
+        await hostChatBox.fill("hello from enter")
+        await hostChatBox.press("Enter")
+        await expect(hikerPage.getByText("hello from enter")).toBeVisible()
+
+        const hikerChatBox = hikerPage.getByRole("textbox", {name: "chat-box"})
+        await hikerChatBox.fill("hello maho.")
+        await hikerChatBox.press("Shift+Enter")
+        await hikerChatBox.pressSequentially("h r u?")
+        await hikerChatBox.press("Enter")
+        await expect(hostPage.getByText("hello maho.")).toBeVisible()
+        await expect(hostPage.getByText("h r u?")).toBeVisible()
+
+    })
     test("post message(api will take care) -> delete message; owner deletes own, host deletes all", async ({browser})=> {
         const host = await createActor()
         const hiker = await createActor()
@@ -65,10 +96,12 @@ test.describe("chat message", ()=> {
         await hostPage.getByRole('link', {name:'Outing chat'}).click()
         await hikerPage.goto(`/outings/${outing.id}`)
         await hikerPage.getByRole('link', {name:'Outing chat'}).click()
+        await hostPage.getByText("whats up").click()
         await hostPage.getByRole("button", { name: `delete message ${memberMessage.id}` }).click()
         await expect(hikerPage.getByText("whats up")).not.toBeVisible()
         memberMessage = await postMessage(hiker, outing.conversation_id, {body:"why did you delete my message?"})
         await expect(hostPage.getByText("why did you delete my message?")).toBeVisible()
+        await hikerPage.getByText("why did you delete my message?").click()
         await hikerPage.getByRole("button", { name: `delete message ${memberMessage.id}` }).click()
         await expect(hostPage.getByText("why did you delete my message?")).not.toBeVisible()
         await expect(hikerPage.getByRole("button", { name: `delete message ${hostMessage.id}` })).not.toBeVisible()

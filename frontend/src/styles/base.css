@@ -62,3 +62,27 @@ textarea{
     resize: vertical;
     min-height: 5rem;
 }
+
+/* icon-only button: 44px target, no border */
+.icon-btn{
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--color-text-muted);
+}
+.icon-btn:hover{
+    background: var(--surface-sunken);
+    color: var(--color-text);
+}
+.icon-btn:disabled{
+    border: 0;
+    background: none;
+    opacity: 0.5;
+}

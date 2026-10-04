@@ -1,0 +1,148 @@
+/* src/components/Chat.module.css */
+
+.chat{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.messages{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding-block: var(--space-2);
+}
+.empty{
+    padding-block: var(--space-6);
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: var(--text-label);
+}
+
+/* one column per message: [name] [row: delete + bubble] [time] */
+.message{
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.mine{
+    align-items: flex-end;
+}
+.theirs{
+    align-items: flex-start;
+}
+
+/* the bubble and its delete button share a row, so they center on each other */
+.row{
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    max-width: 85%;
+}
+.theirs .row{
+    flex-direction: row-reverse;
+}
+
+.author{
+    padding-inline: var(--space-1);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+    font-weight: 600;
+}
+.bubble{
+    min-width: 0;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-card);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+.theirs .bubble{
+    background: var(--surface-raised);
+    border: 1px solid var(--border-subtle);
+    border-bottom-left-radius: 4px;
+}
+.mine .bubble{
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border-bottom-right-radius: 4px;
+}
+.time{
+    padding-inline: var(--space-1);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+    color: var(--color-text-muted);
+}
+
+/* a message you may delete is a button: tap it to show Delete, tap again to hide */
+.bubbleBtn{
+    font: inherit;
+    line-height: var(--leading-body);
+    text-align: left;
+    cursor: pointer;
+}
+.mine .bubbleBtn{
+    border: 1px solid var(--color-primary);
+}
+.mine .bubbleBtn:hover{
+    background: var(--color-primary-dark);
+}
+.bubbleSelected{
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.deleteBtn{
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 44px;
+    padding: 0 var(--space-3);
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+    font-size: var(--text-label);
+    white-space: nowrap;
+}
+.deleteBtn:hover{
+    background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+}
+
+/* composer: one rounded box holding the text area and Send */
+.composer{
+    position: sticky;
+    bottom: var(--space-4);
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    background: var(--surface-raised);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-card);
+}
+.composer:focus-within{
+    border-color: var(--color-primary);
+}
+.composerDisabled{
+    background: var(--surface-page);
+    border-style: dashed;
+}
+.input{
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    max-height: 10rem;
+    padding: var(--space-2);
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    line-height: 1.5;
+    resize: none;
+    field-sizing: content;
+}
+.input:focus-visible{
+    outline: none;   /* the composer's border shows focus */
+}
+.send{
+    flex: none;
+    min-height: 44px;
+}

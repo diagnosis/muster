@@ -1,4 +1,15 @@
-/*src/routes/outings.$id.module.css*/
+/* src/routes/outings.$id.module.css */
+
+.container{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+.section{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
 
 .heading{
     font-family: var(--font-display);
@@ -6,8 +17,8 @@
     line-height: var(--leading-display);
     font-weight: 600;
     letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
 }
-
 .subheading{
     font-family: var(--font-display);
     font-size: var(--text-title);
@@ -15,69 +26,188 @@
     font-weight: 600;
     letter-spacing: -0.01em;
 }
-.container{
+
+/* date, place, meeting point: one line each, icon first */
+.meta{
     display: flex;
     flex-direction: column;
-    gap: var(--space-6)
+    gap: var(--space-1);
+    padding: 0;
+    color: var(--color-text-muted);
 }
-
-.section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-}
-
-.slot{
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-4);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-card);
-    background: var(--surface-raised);
-    align-items: flex-start;
-}
-
-.slotActive{
-    border-color: var(--color-primary)
-}
-.hostRow{
-    font-weight: 600;
-}
-.memberRow{
+.metaItem{
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    text-wrap: pretty;
 }
-.warning{
-    color: var(--color-warning);
-    font-size: var(--text-label);
-    line-height: var(--leading-label);
+.metaItem svg{
+    flex: none;
+}
+.metaStrong{
+    color: var(--color-text);
+    font-weight: 600;
 }
 .metaLine{
     color: var(--color-text-muted);
     text-wrap: pretty;
 }
 
-.actions {
+/* your status: text on the left, actions on the right, stacking when narrow */
+.slot{
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-card);
+    background: var(--surface-raised);
+}
+.slot > p{
+    flex: 1 1 12rem;
+    font-weight: 600;
+}
+.slotActive{
+    border-color: var(--color-primary);
+}
+.slotActions{
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+/* host: a heading row, then the host controls underneath */
+.slotColumn{
+    flex-direction: column;
+    align-items: stretch;
+}
+.slotHead{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+.slotHead p{
+    font-weight: 600;
+}
+
+/* spots */
+.bar{
+    height: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-sunken);
+    overflow: hidden;
+}
+.barFill{
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--color-primary);
+}
+.warning{
+    color: var(--color-warning);
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
+}
+
+/* people */
+.card{
+    background: var(--surface-raised);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+}
+.memberRow{
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 56px;
+    padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+}
+.memberRow + .memberRow{
+    border-top: 1px solid var(--border-subtle);
+}
+.avatar{
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+    color: var(--color-primary-dark);
+    font-weight: 600;
+}
+.hostRow{
+    font-weight: 600;
+}
+.hostTag{
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-pill);
+    background: var(--surface-sunken);
+    font-size: var(--text-meta);
+    line-height: var(--leading-meta);
+}
+.rowActions{
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+.removeIcon:hover{
+    color: var(--color-danger);
+}
+
+/* waiting and withdrew groups: used once the lists feature lands */
+.groupLabel{
+    padding: var(--space-3) var(--space-4) var(--space-1);
+    border-top: 1px solid var(--border-subtle);
+    font-size: var(--text-meta);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+.chips{
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-4) var(--space-3);
+}
+.chip{
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-pill);
+}
+.chipAvatar{
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-sunken);
+    font-size: var(--text-meta);
+    font-weight: 600;
+}
+.withdrawn{
+    padding: var(--space-1) var(--space-4) var(--space-3);
+    color: var(--color-text-muted);
+}
+
+.actions{
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
     margin-top: var(--space-2);
 }
-
-
-.removeBtn{
-    border:0;
-    padding: var(--space-1) var(--space-1);
-    font-size: 1rem;
-    line-height: 1;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.error{
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius-control);
+    background: var(--surface-raised);
+    color: var(--color-danger);
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
 }
-.removeBtn:hover{
-    background: var(--surface-page);
-}
-

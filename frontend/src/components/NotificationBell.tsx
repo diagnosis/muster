@@ -8,6 +8,7 @@ import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import {useNavigate} from "@tanstack/react-router";
 import {useEvents} from "@/events/EventProvider.tsx";
+import {BellIcon} from "@/components/Icons.tsx";
 export function NotificationBell( ){
     const { subscribe } = useEvents()
     const queryClient = useQueryClient()
@@ -65,7 +66,7 @@ export function NotificationBell( ){
                 aria-expanded={open}
                 onClick={() => setOpen(o => !o)}
             >
-                🔔
+                <BellIcon/>
                 {count > 0 && <span className={styles.badge}>{count}</span>}
             </button>
 

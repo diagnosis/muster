@@ -1,6 +1,10 @@
+/* src/components/HostControls.module.css */
 
-/*src/components/HostControls.module.css*/
-
+.host{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
 .subheading{
     font-family: var(--font-display);
     font-size: var(--text-title);
@@ -8,31 +12,57 @@
     font-weight: 600;
     letter-spacing: -0.01em;
 }
+
+/* pending requests: one list, one row per request */
+.requestList{
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-card);
+    background: var(--surface-page);
+    overflow: hidden;
+}
+.requestItem{
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding-right: var(--space-1);
+}
+.requestItem + .requestItem{
+    border-top: 1px solid var(--border-subtle);
+}
 .requestRow{
-    width: 100%;
+    flex: 1;
+    min-width: 0;
+    min-height: 52px;
+    padding: var(--space-2) var(--space-4);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     text-align: left;
-    background: var(--surface-raised);
 }
 .requestRow:hover{
-    border-color: var(--color-text-muted);
+    background: var(--surface-sunken);
+}
+.reqName{
+    font-weight: 600;
 }
 
-
-.host{
+/* edit and cancel sit apart from the requests */
+.manage{
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: var(--space-2);
-    align-items: flex-start;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
 }
 
-
-.actions {
+/* used inside the decision modal */
+.actions{
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
     margin-top: var(--space-2);
 }
-
-.error {
+.error{
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--color-danger);
     border-radius: var(--radius-control);
@@ -40,4 +70,61 @@
     color: var(--color-danger);
     font-size: var(--text-label);
     line-height: var(--leading-label);
+}
+
+/* decision modal: the request as a small table */
+.facts{
+    margin: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+}
+.fact{
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-2) var(--space-3);
+}
+.fact + .fact{
+    border-top: 1px solid var(--border-subtle);
+}
+.fact dt{
+    color: var(--color-text-muted);
+    font-size: var(--text-label);
+}
+.fact dd{
+    margin: 0;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+.noteLabel{
+    margin-bottom: var(--space-1);
+    color: var(--color-text-muted);
+    font-size: var(--text-label);
+}
+.note{
+    padding: var(--space-3);
+    border-left: 3px solid var(--border-subtle);
+    border-radius: var(--radius-control);
+    background: var(--surface-page);
+    overflow-wrap: anywhere;
+}
+.impact{
+    color: var(--color-text-muted);
+    font-size: var(--text-label);
+}
+.warn{
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-warning);
+    border-radius: var(--radius-control);
+    color: var(--color-warning);
+    font-size: var(--text-label);
+}
+.decision{
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+.decision > button{
+    flex: 1;
 }

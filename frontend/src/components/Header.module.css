@@ -1,7 +1,7 @@
-/*/src/components/Header.module.css*/
+/* src/components/Header.module.css */
 
 .nav{
-    padding-block: var(--space-4);
+    padding-block: var(--space-2);
     border-bottom: 1px solid var(--border-subtle);
     position: relative;
 }
@@ -17,18 +17,58 @@
     font-family: var(--font-display);
     font-weight: 600;
     font-size: var(--text-title);
-    line-height: var(--leading-title);
+    line-height: 44px;
     letter-spacing: -0.01em;
 }
 
+.navLink{
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    white-space: nowrap;
+}
 .navLink:hover{
-    text-decoration: underline;
+    color: var(--color-primary);
 }
 .navLink[data-status="active"]{
     color: var(--color-primary);
+    font-weight: 600;
 }
 
-/* ---- mobile ---- */
+/* "Create outing": the one filled button in the header */
+.navCta{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+/* profile: initial in a circle + the name */
+.profileLink{
+    position: relative;
+    gap: var(--space-2);
+}
+.avatar{
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-sunken);
+    border: 1px solid var(--border-subtle);
+    color: var(--color-text);
+    font-size: var(--text-label);
+    font-weight: 600;
+    line-height: 1;
+}
+.profileLink[data-status="active"] .avatar{
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* ---- the menu panel (a dropdown on phones, inline on desktop) ---- */
 
 .panel{
     display: none;
@@ -53,17 +93,20 @@
     width: 100%;
 }
 .headerActions{
-display: flex;
+    display: flex;
     align-items: center;
 }
 
 /* nav links get row treatment; buttons don't */
 .panelOpen .navLink{
-    padding-block: var(--space-3);
+    padding-block: var(--space-1);
     border-bottom: 1px solid var(--border-subtle);
 }
+/* :global(.btn) because "btn" is a global class; a bare .btn here would be renamed by the module */
 .panelOpen button,
-.panelOpen .btn{
+.panelOpen :global(.btn),
+.panelOpen .navCta{
+    display: flex;
     justify-content: center;
     width: 100%;
     margin-top: var(--space-3);
@@ -76,21 +119,50 @@ display: flex;
     width: 44px;
     height: 44px;
     padding: 0;
-    font-size: 1.5rem;
     line-height: 1;
     background: none;
     border: 0;
     border-radius: var(--radius-control);
+    color: var(--color-text);
 }
 .hamburgerBtn:hover{
     background: var(--surface-raised);
 }
 
-
 .panel .bell{ display: none; }
 
-.desktopBell { display: none; }         /* mobile: hide desktop bell */
-.mobileBell  { display: inline-flex; }  /* mobile: show mobile bell */
+.desktopBell { display: none; }         /* phone: hide desktop bell */
+.mobileBell  { display: inline-flex; }  /* phone: show mobile bell */
+
+/* ---- phone only: the logged-in menu ---- */
+
+@media (max-width: 39.99em){
+    /* who you are comes first */
+    .panelOpen .profileLink{
+        order: -1;
+        padding-block: var(--space-2);
+        font-weight: 600;
+    }
+    .panelOpen .navLink{
+        min-height: 48px;
+    }
+    /* the one primary action, set apart from the links */
+    .panelOpen .navCta{
+        margin-top: var(--space-4);
+    }
+    /* log out: quiet text, not a second big button */
+    .panelOpen .logoutBtn{
+        margin-top: var(--space-2);
+        border: 0;
+        background: none;
+        color: var(--color-text-muted);
+    }
+    .panelOpen .logoutBtn:hover{
+        background: none;
+        color: var(--color-text);
+        text-decoration: underline;
+    }
+}
 
 /* ---- 640px and up ---- */
 
@@ -115,21 +187,52 @@ display: flex;
         width: auto;
     }
     .userOutings{
-        gap: var(--space-6);
+        gap: var(--space-4);
     }
     .panelOpen .navLink{
         padding-block: 0;
         border-bottom: 0;
     }
     .panelOpen button,
-    .panelOpen .btn{
+    .panelOpen :global(.btn),
+    .panelOpen .navCta{
+        display: inline-flex;
         width: auto;
         margin-top: 0;
     }
-    .inner { gap: var(--space-6); }
-    .panel, .panelOpen { margin-left: auto; }   /* nav group shoves right, pulling bell with it via normal flow */
+    .navCta{
+        padding: var(--space-2) var(--space-3);
+    }
+
+    /* the name stays in the DOM for screen readers and tests; only the initial shows */
+    .profileName{
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    /* log out: quiet text, not a boxed button */
+    .logoutBtn{
+        min-height: 44px;
+        padding: 0 var(--space-1);
+        border: 0;
+        background: none;
+        color: var(--color-text-muted);
+        white-space: nowrap;
+    }
+    .logoutBtn:hover{
+        background: none;
+        color: var(--color-text);
+        text-decoration: underline;
+    }
+
+    .inner { gap: var(--space-4); }
+    .panel, .panelOpen { margin-left: auto; }
     .headerActions { display: none; }
     .panel .bell{ display: inline-flex; }
-    .desktopBell { display: inline-flex; }  /* desktop: show */
-    .mobileBell  { display: none; }         /* desktop: hide */
+    .desktopBell { display: inline-flex; }
+    .mobileBell  { display: none; }
 }

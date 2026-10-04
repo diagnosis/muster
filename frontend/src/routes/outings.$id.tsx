@@ -13,6 +13,7 @@ import {Modal} from "@/components/Modal.tsx";
 import {Comments} from "@/components/Comments.tsx";
 import {useEvents} from "@/events/EventProvider.tsx";
 import {useStartDM} from "@/queries/conversation.ts";
+import {CalendarIcon, FlagIcon, MessageIcon, PinIcon, TrashIcon} from "@/components/Icons.tsx";
 
 
 export const Route = createFileRoute('/outings/$id')({
@@ -82,7 +83,11 @@ export function OutingDetailPage() {
             <Link className={'btn-primary btn'} to="/login">Request to join</Link>
         </div>
 
-        if (me.id === detail.outing.host_id) return <div className={styles.slot}>
+        if (me.id === detail.outing.host_id) return <div className={`${styles.slot} ${styles.slotColumn}`}>
+            <div className={styles.slotHead}>
+                <p>You're hosting</p>
+                {chatLink}
+            </div>
             <HostControls outingId={id} detail={detail}/>
         </div>
 
@@ -96,7 +101,10 @@ export function OutingDetailPage() {
         if (st === 'accepted')
             return <div className={`${styles.slot} ${styles.slotActive}`}>
                 <p>You're going! 🎉</p>
-                <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>
+                <div className={styles.slotActions}>
+                    {chatLink}
+                    <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>
+                </div>
             </div>
 
         if (st === 'declined')
@@ -148,83 +156,93 @@ export function OutingDetailPage() {
     const isReadOnly = detail.outing.status === 'cancelled' || new Date(detail.outing.starts_at) < new Date()
     const canSeeStartDmBtn = me && (me.id === detail.host.hiker_id || detail.roster.some(r => r.hiker_id === me.id))
     const canSeeChat =canSeeStartDmBtn && !!detail.outing.conversation_id
+    const isHost = me?.id === detail.outing.host_id
+    const initial = (name: string) => name.charAt(0).toUpperCase()
+    const totalSpots = detail.people_count + detail.spots_left
+    const filledPct = totalSpots > 0 ? Math.round((detail.people_count / totalSpots) * 100) : 0
 
-    return <>
+    const chatLink = canSeeChat &&
+        <Link className={'btn btn-primary'} to={'/conversations/$id'} params={{id: detail.outing.conversation_id}}>Outing chat</Link>
+
+    const messageBtn = (hikerId: string, name: string) => (
+        <button className="icon-btn"
+                aria-label={`Message ${name}`}
+                disabled={startDM.isPending}
+                onClick={() => startDM.mutate(hikerId, {
+                    onSuccess: (conv) => navigate({to: '/conversations/$id', params: {id: conv.id}})
+                })}>
+            <MessageIcon/>
+        </button>
+    )
+    return (
         <div className={styles.container}>
             <section className={styles.section}>
                 <h1 className={styles.heading}>{detail.outing.title}</h1>
-                <p className={styles.metaLine}>{detail.outing.destination}</p>
-                <p className={styles.metaLine}>{detail.outing.meet_label}</p>
-                <p className={styles.metaLine}>{starts_at_date} - {starts_at_time}</p>
+                <ul className={styles.meta}>
+                    <li className={`${styles.metaItem} ${styles.metaStrong}`}><CalendarIcon/> {starts_at_date} · {starts_at_time}</li>
+                    <li className={styles.metaItem}><PinIcon/> {detail.outing.destination}</li>
+                    <li className={styles.metaItem}><FlagIcon/> {detail.outing.meet_label}</li>
+                </ul>
                 <Badges outing={detail.outing}/>
-
             </section>
 
             <section className={styles.section}>
                 {renderSlot(detail)}
             </section>
+
             <section className={styles.section}>
                 <p>{detail.people_count} going · {detail.spots_left} of {effectiveCap} spots left</p>
+                <div className={styles.bar} aria-hidden="true">
+                    <div className={styles.barFill} style={{width: `${filledPct}%`}}/>
+                </div>
                 {isFull && <p className={styles.warning}>This outing is full.</p>}
                 {!isFull && detail.seats_short > 0 && <p>⚠️ {detail.seats_short} more seats needed — join as a driver?</p>}
                 {!isFull && detail.seats_short === 0 && detail.spots_left === 0 && <p>No seats left — a driver could open more spots. 🚗</p>}
             </section>
 
-
-
             <section className={styles.section}>
                 <h2 className={styles.subheading}>Who's going ({detail.roster.length + 1})</h2>
-                <div className={styles.memberRow}>
-                    <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience} · host</p>
-                    {canSeeStartDmBtn&&detail.host.hiker_id !== me?.id &&
-                        <button className={"btn-quite"}
-                                aria-label={`Message ${detail.host.name}`}
-                                disabled={startDM.isPending}
-                                onClick={()=> {
-                            startDM.mutate(detail.host.hiker_id, {onSuccess: (conv)=>
-                                    navigate({to:'/conversations/$id', params: {id:conv.id}})})
-                        }}>✉️</button>
-                    }
+                <div className={styles.card}>
+                    <div className={styles.memberRow}>
+                        <span className={styles.avatar} aria-hidden="true">{initial(detail.host.name)}</span>
+                        <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience}</p>
+                        <span className={styles.hostTag}>Host</span>
+                        <span className={styles.rowActions}>
+                        {canSeeStartDmBtn && detail.host.hiker_id !== me?.id && messageBtn(detail.host.hiker_id, detail.host.name)}
+                    </span>
+                    </div>
+                    {detail.roster.map(m => <div className={styles.memberRow} key={m.hiker_id}>
+                        <span className={styles.avatar} aria-hidden="true">{initial(m.name)}</span>
+                        {m.name} · {m.experience}
+                        <span className={styles.rowActions}>
+                        {canSeeStartDmBtn && m.hiker_id !== me?.id && messageBtn(m.hiker_id, m.name)}
+                            {isHost &&
+                                <button aria-label={'Remove'} className={`icon-btn ${styles.removeIcon}`}
+                                        onClick={() => setMemberToRemove(m)}><TrashIcon/></button>}
+                    </span>
+                    </div>)}
                 </div>
-                {detail.roster.map(m => <div className={styles.memberRow}
-                    key={m.hiker_id}>{m.name} · {m.experience}
-                    {me?.id === detail.outing.host_id &&
-                        <button aria-label={'Remove'} className={styles.removeBtn} onClick={()=>{
-                            setMemberToRemove(m)
-                        }}>🗑️</button>
-                    }
-                    {canSeeStartDmBtn && m.hiker_id !== me?.id &&
-                        <button className={"btn-quite"}
-                                aria-label={`Message ${m.name}`}
-                                disabled={startDM.isPending}
-                                onClick={()=> {
-                            startDM.mutate(m.hiker_id, {onSuccess: (conv)=>
-                                    navigate({to:'/conversations/$id', params: {id:conv.id}})})
-                        }}>✉️</button>
-                    }
-                </div>)}
-                {startDM.isError&&<p className={styles.error}>{startDM.error.message}</p>}
-                {memberToRemove&&<Modal title={`Remove ${memberToRemove.name}`} onClose={()=>setMemberToRemove(null)}>
+                {startDM.isError && <p className={styles.error}>{startDM.error.message}</p>}
+                {memberToRemove && <Modal title={`Remove ${memberToRemove.name}`} onClose={() => setMemberToRemove(null)}>
                     <p>This removes them from the roster and frees their seats. They won't be able to request again.</p>
                     <div className={styles.actions}>
                         <button className="btn-danger"
-                                onClick={()=>memberToRemove.request_id&&removeMemberMutation.mutate(memberToRemove.request_id)}>Yes, remove</button>
+                                onClick={() => memberToRemove.request_id && removeMemberMutation.mutate(memberToRemove.request_id)}>Yes, remove</button>
                         <button className={formStyles.quietBtn}
-                                onClick={()=>setMemberToRemove(null)}>Never mind</button>
+                                onClick={() => setMemberToRemove(null)}>Never mind</button>
                     </div>
-                    {removeMemberMutation.error&&<p className={formStyles.error}>{removeMemberMutation.error.message}</p>}
+                    {removeMemberMutation.error && <p className={formStyles.error}>{removeMemberMutation.error.message}</p>}
                 </Modal>}
             </section>
-            {detail.outing.notes&&<section className={styles.section}>
+
+            {detail.outing.notes && <section className={styles.section}>
                 <h2 className={styles.subheading}>Notes</h2>
-                {detail.outing.notes && <p>{detail.outing.notes}</p>}
+                <p>{detail.outing.notes}</p>
             </section>}
-            {canSeeChat&&<div>
-                <Link className={'btn btn-primary'} to={'/conversations/$id'} params={{id:detail.outing.conversation_id}}>Outing chat</Link>
-            </div>}
-            {canSeeComments&&(
+
+            {canSeeComments && (
                 <Comments outingId={id} hostId={detail.outing.host_id} readOnly={isReadOnly}/>
             )}
         </div>
-    </>
+    )
 }
