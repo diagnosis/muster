@@ -28,7 +28,7 @@ The test logged every request and response for one page, tagged with the run num
 
 **The fix**
 
-`invalidateFresh` in `src/lib/query.ts`. It checks whether a matching query is on its first fetch, invalidates, and if so invalidates once more after that fetch has finished.
+`invalidateFresh` in `src/queries.ts`. It checks whether a matching query is on its first fetch, invalidates, and if so invalidates once more after that fetch has finished.
 
 ```ts
 export async function invalidateFresh(qc: QueryClient, filters?: InvalidateQueryFilters) {

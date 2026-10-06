@@ -8,7 +8,7 @@ import {useEffect, useRef, useState} from "react";
 import {NotificationBell} from "@/components/NotificationBell.tsx";
 import {MenuIcon, MessageIcon} from "@/components/Icons.tsx";
 import {useConversations} from "@/queries/conversation.ts";
-import {EVENT_TYPES, useEvents} from "@/events/EventProvider.tsx";
+import {useEvents} from "@/events/EventProvider.tsx";
 
 
 
@@ -107,13 +107,17 @@ export function Header(){
     )
 }
 
+const INBOX_EVENTS = [
+    'message.created', 'message.deleted',
+    'dm.requested', 'dm.accepted', 'dm.declined', 'dm.reopened',
+]
 // Renders nothing. Keeps the inbox data fresh on every page while logged in.
 function InboxEvents() {
     const qc = useQueryClient()
     const {subscribe} = useEvents()
     useEffect(() => {
         const onPoke = () => { invalidateFresh(qc, {queryKey: ['conversations']}) }
-        const offs = EVENT_TYPES.map(type => subscribe(type, onPoke))
+        const offs = INBOX_EVENTS.map(type => subscribe(type, onPoke))
         return () => offs.forEach(off => off())
     }, [subscribe, qc])
     return null
