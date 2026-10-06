@@ -185,7 +185,7 @@ func (s *OutingStore) GetOuting(ctx context.Context, id uuid.UUID) (*outing.Outi
 	q := `
 		SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
 			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
-			o.created_at, o.updated_at, o.ends_at, c.id AS conversation_id
+			o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at
 		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 		WHERE o.id = $1
 `
@@ -255,7 +255,7 @@ func (s *OutingStore) ListUpcoming(ctx context.Context, now time.Time) ([]outing
 	q := `
 	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
 			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
-			o.created_at, o.updated_at, o.ends_at, c.id AS conversation_id
+			o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at
 		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 	WHERE status = 'open' AND starts_at > $1
 	ORDER BY starts_at
@@ -500,7 +500,7 @@ func (s *OutingStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*out
 	hostingQuery := `
 	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
 			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
-			o.created_at, o.updated_at, c.id AS conversation_id
+			o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at
 		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 		WHERE host_id = $1 
 		ORDER BY starts_at
@@ -508,7 +508,7 @@ func (s *OutingStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*out
 	joinedQuery := `
 	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
 			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
-			o.created_at, o.updated_at, o.ends_at, c.id AS conversation_id
+			o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at
 		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 		JOIN join_requests jr ON jr.outing_id = o.id
 		WHERE jr.hiker_id = $1 AND jr.status = 'accepted'
