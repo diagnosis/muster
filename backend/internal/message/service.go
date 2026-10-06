@@ -36,6 +36,9 @@ type Storage interface {
 	ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*ConversationSummary, error)
 	GetConversationView(ctx context.Context, convID uuid.UUID) (*ConversationView, error)
 	HikerName(ctx context.Context, hikerId uuid.UUID) (string, error)
+
+	MaxSeq(ctx context.Context, convID uuid.UUID) (int64, error)
+	MarkRead(ctx context.Context, convID, hikerID uuid.UUID, seq int64) error
 }
 
 const maxBodyRunes = 500
@@ -359,6 +362,32 @@ func (s *Service) GetConversation(ctx context.Context, convID, hikerID uuid.UUID
 		return nil, apperr.Forbidden("you're not part of this conversation", "get by non-member")
 	}
 	return conv, nil
+}
+
+// MarkRead records that hikerID has seen conversation convID up to seq.
+// Members only. seq is clamped to the conversation's highest, so a marker
+// can't point past what exists; the store never moves a marker backward.
+func (s *Service) MarkRead(ctx context.Context, convID, hikerID uuid.UUID, seq int64) error {
+	_, err := s.store.GetConversation(ctx, convID)
+	if err != nil {
+		return err
+	}
+	ok, err := s.store.IsMember(ctx, convID, hikerID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return apperr.Forbidden("you're not part of this conversation", "mark read by non-member")
+	}
+	maxSeq, err := s.store.MaxSeq(ctx, convID)
+	if err != nil {
+		return err
+	}
+	if err = s.store.MarkRead(ctx, convID, hikerID, min(maxSeq, seq)); err != nil {
+		return err
+	}
+	return nil
+
 }
 
 func (s *Service) notify(ctx context.Context, actor, hikerID uuid.UUID, conv *Conversation, kind notification.Kind) {

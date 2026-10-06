@@ -56,3 +56,16 @@
 .badgeMuted { background: var(--surface-page); color: var(--color-text-muted); border: 1px solid var(--border-subtle); }
 
 .empty { color: var(--color-text-muted); font-size: .9rem; margin: 0; padding: var(--space-1, .25rem) 0; }
+
+.unread{
+    flex: none;
+    min-width: 22px;
+    padding: 0 7px;
+    border-radius: var(--radius-pill);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-size: var(--text-meta);
+    font-weight: 600;
+    line-height: 22px;
+    text-align: center;
+}

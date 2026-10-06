@@ -3,8 +3,19 @@
 
 import type {Detail, MeResponse, MyOutings, NotificationsResponse, Outing, PendingRequestResponse} from "@/types.ts";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
-import {type QueryClient, useQuery} from "@tanstack/react-query";
+import {type InvalidateQueryFilters, type QueryClient, useQuery} from "@tanstack/react-query";
 import {redirect} from "@tanstack/react-router";
+
+
+// invalidateQueries, but safe during a query's first load.
+// TanStack reuses an in-flight first fetch instead of restarting it, and that
+// fetch may predate the change. If one is in flight, wait for it, then go again.
+export async function invalidateFresh(qc: QueryClient, filters?: InvalidateQueryFilters) {
+    const firstLoad = qc.getQueryCache().findAll(filters)
+        .some(q => q.state.fetchStatus === 'fetching' && q.state.data === undefined)
+    await qc.invalidateQueries(filters)
+    if (firstLoad) await qc.invalidateQueries(filters)
+}
 
 
 export const  getMe = async () => {
@@ -122,3 +133,4 @@ export function useNotifications() {
         },
     })
 }
+

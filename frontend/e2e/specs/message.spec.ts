@@ -3,6 +3,7 @@ import {actorInBrowser, createActor} from "../fixtures/actor.ts";
 import {acceptRequest, createOuting, joinRequest, postMessage} from "../fixtures/outingApiHelper.ts";
 
 
+
 test.describe("chat message", ()=> {
     test("post message -> receive message", async ({browser}) => {
         const host = await createActor()
@@ -165,5 +166,29 @@ test.describe("chat message", ()=> {
         await hikerPage.getByRole("button", { name: "send" }).click()
         await expect(hostPage.getByText("yea, i have Kahtali Michi")).toBeVisible()
 
+    });
+    test("validate inbox counts", async ({browser}) => {
+        const host = await createActor()
+        const hiker = await createActor()
+        const hostCtx = await browser.newContext()
+        const hikerCtx = await browser.newContext()
+        await actorInBrowser(host, hostCtx)
+        await actorInBrowser(hiker, hikerCtx)
+        const outing = await createOuting(host)
+        const jr = await joinRequest(hiker, outing.id)
+        await acceptRequest(host, jr.id)
+
+        // the hiker is parked off the inbox, so the count can only arrive by a poke
+        const hikerPage = await hikerCtx.newPage()
+        await hikerPage.goto('/')
+        const inbox = hikerPage.getByRole('banner').getByRole('link', { name: 'Inbox' })
+        await expect(inbox).toBeVisible()
+        // --- a new message shows up as a count, with no reload
+        await postMessage(host, outing.conversation_id, {body: "hello"})
+        await expect(inbox).toContainText('1')
+
+        // --- opening the conversation marks it read and clears the count
+        await hikerPage.goto(`/conversations/${outing.conversation_id}`)
+        await expect(inbox).toHaveText('Inbox')
     })
 })

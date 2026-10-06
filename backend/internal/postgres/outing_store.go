@@ -393,6 +393,7 @@ func (s *OutingStore) SetJoinRequestStatus(ctx context.Context, id uuid.UUID, st
 // Missing request → NotFound; full or not pending → Conflict.
 func (s *OutingStore) AcceptIfCapacity(ctx context.Context, requestID uuid.UUID) error {
 	q := `
+		WITH accepted AS(
 		UPDATE join_requests r
 		SET status = 'accepted', 
     		updated_at = now()
@@ -435,7 +436,20 @@ func (s *OutingStore) AcceptIfCapacity(ctx context.Context, requestID uuid.UUID)
         ), 0)
     )
   )
-RETURNING r.updated_at;
+RETURNING r.outing_id, r.hiker_id, r.updated_at
+), 
+marker AS(
+    INSERT INTO conversation_reads (conversation_id, hiker_id, last_read_seq)
+    SELECT c.id,
+           a.hiker_id,
+           COALESCE((SELECT MAX(m.seq) FROM messages m WHERE m.conversation_id = c.id), 0)
+    FROM accepted a
+    JOIN conversations c ON c.outing_id = a.outing_id
+    ON CONFLICT (conversation_id, hiker_id) DO UPDATE
+    SET last_read_seq = GREATEST(conversation_reads.last_read_seq, EXCLUDED.last_read_seq),
+        updated_at    = now()
+)
+SELECT updated_at FROM accepted;
 `
 	var updatedAt time.Time
 	err := s.pool.QueryRow(ctx, q, requestID).Scan(&updatedAt)

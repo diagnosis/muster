@@ -94,7 +94,18 @@ func (s *MessageStore) GetConversationView(ctx context.Context, convID uuid.UUID
 // ListConversations loads all conversations for a hiker
 func (s *MessageStore) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*message.ConversationSummary, error) {
 	q := `
-	SELECT * FROM(
+	SELECT x.*,
+	       ( SELECT count(*) FROM messages m
+	         WHERE m.conversation_id = x.id
+	         	AND m.hiker_id <> $1
+	         	AND m.seq > COALESCE(
+	         	            (SELECT r.last_read_seq
+	         	             FROM conversation_reads r 
+	         	             WHERE r.conversation_id = x.id
+	         	             AND r.hiker_id = $1), 
+	         	             0)
+	       ) AS unread_count
+	       FROM(
 		SELECT c.id, c.kind, o.title, c.dm_status, c.dm_initiator, c.dm_declined_by,
 			lm.created_at AS last_message_at, COALESCE(LEFT(lm.body, 80), ''), c.created_at AS created_at
 		FROM conversations c
@@ -128,7 +139,7 @@ func (s *MessageStore) ListConversations(ctx context.Context, hikerID uuid.UUID)
 	defer rows.Close()
 	for rows.Next() {
 		cs := message.ConversationSummary{}
-		err = rows.Scan(&cs.ID, &cs.Kind, &cs.Title, &cs.DmStatus, &cs.DmInitiator, &cs.DmDeclinedBy, &cs.LastMessageAt, &cs.LastPreview, &cs.CreatedAt)
+		err = rows.Scan(&cs.ID, &cs.Kind, &cs.Title, &cs.DmStatus, &cs.DmInitiator, &cs.DmDeclinedBy, &cs.LastMessageAt, &cs.LastPreview, &cs.CreatedAt, &cs.UnreadCount)
 		if err != nil {
 			return nil, apperr.Database("failed to get conversations summary", "failed to scan conversations", err)
 		}
@@ -422,6 +433,37 @@ func (s *MessageStore) HikerName(ctx context.Context, hikerID uuid.UUID) (string
 		return "", apperr.Database("failed to get hiker name", "scanning hiker name failed", err)
 	}
 	return hikerName, nil
+
+}
+
+// MaxSeq returns the highest seq among convID's messages, or 0 when the
+// conversation has no messages. An unknown conversation id also returns 0:
+// the query never looks at the conversations table.
+func (s *MessageStore) MaxSeq(ctx context.Context, convID uuid.UUID) (int64, error) {
+	q := `SELECT COALESCE(MAX(seq), 0) FROM messages WHERE conversation_id = $1`
+	var seq int64
+	if err := s.pool.QueryRow(ctx, q, convID).Scan(&seq); err != nil {
+		return 0, apperr.Database("failed to get max seq", "failed to scan max seq", err)
+	}
+	return seq, nil
+}
+
+// MarkRead upserts hikerID's read marker for convID. The marker never moves
+// backward: on conflict the stored value becomes the greater of the existing
+// marker and seq, in one statement, so concurrent calls cannot lower it.
+// It does not check membership or that seq exists; the service does both.
+func (s *MessageStore) MarkRead(ctx context.Context, convID, hikerID uuid.UUID, seq int64) error {
+	q := `
+	INSERT INTO conversation_reads (conversation_id, hiker_id, last_read_seq)
+	VALUES ($1, $2, $3)
+	ON CONFLICT (conversation_id, hiker_id) DO UPDATE
+	SET last_read_seq = GREATEST(conversation_reads.last_read_seq, EXCLUDED.last_read_seq),
+    	updated_at    = now()
+	`
+	if _, err := s.pool.Exec(ctx, q, convID, hikerID, seq); err != nil {
+		return apperr.Database("failed to mark as read", "failed to upsert into conversation reads", err)
+	}
+	return nil
 
 }
 

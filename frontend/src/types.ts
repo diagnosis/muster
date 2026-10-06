@@ -251,5 +251,6 @@ export interface ConversationSummary{
     last_message_at: string | null
     last_preview: string
     created_at: string
+    unread_count: number
 }
 

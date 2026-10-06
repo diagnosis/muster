@@ -10,18 +10,23 @@ import (
 	"github.com/google/uuid"
 )
 
+type readsKey struct {
+	convID  uuid.UUID
+	hikerID uuid.UUID
+}
 type fakeStore struct {
-	converstations  map[uuid.UUID]*Conversation
-	members         map[uuid.UUID]map[uuid.UUID]struct{}
-	messages        map[uuid.UUID]Message
-	seq             int64
-	outingStatuses  map[uuid.UUID]outing.Status
-	hosts           map[uuid.UUID]uuid.UUID
-	dms             map[[2]uuid.UUID]*Conversation
-	pendingRequests map[uuid.UUID]map[uuid.UUID]struct{}
-	outingTitles    map[uuid.UUID]string
-	outingStarts    map[uuid.UUID]time.Time
-	names           map[uuid.UUID]string
+	converstations    map[uuid.UUID]*Conversation
+	members           map[uuid.UUID]map[uuid.UUID]struct{}
+	messages          map[uuid.UUID]Message
+	seq               int64
+	outingStatuses    map[uuid.UUID]outing.Status
+	hosts             map[uuid.UUID]uuid.UUID
+	dms               map[[2]uuid.UUID]*Conversation
+	pendingRequests   map[uuid.UUID]map[uuid.UUID]struct{}
+	outingTitles      map[uuid.UUID]string
+	outingStarts      map[uuid.UUID]time.Time
+	names             map[uuid.UUID]string
+	conversationReads map[readsKey]int64
 }
 
 func (f *fakeStore) InsertMessage(ctx context.Context, m *Message, now time.Time) error {
@@ -48,17 +53,18 @@ func (f *fakeStore) MemberIDs(ctx context.Context, conversationID uuid.UUID) ([]
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
-		converstations:  make(map[uuid.UUID]*Conversation),
-		members:         make(map[uuid.UUID]map[uuid.UUID]struct{}),
-		messages:        make(map[uuid.UUID]Message),
-		seq:             0,
-		outingStatuses:  make(map[uuid.UUID]outing.Status),
-		hosts:           make(map[uuid.UUID]uuid.UUID),
-		dms:             make(map[[2]uuid.UUID]*Conversation),
-		pendingRequests: make(map[uuid.UUID]map[uuid.UUID]struct{}),
-		outingTitles:    make(map[uuid.UUID]string),
-		outingStarts:    make(map[uuid.UUID]time.Time),
-		names:           make(map[uuid.UUID]string),
+		converstations:    make(map[uuid.UUID]*Conversation),
+		members:           make(map[uuid.UUID]map[uuid.UUID]struct{}),
+		messages:          make(map[uuid.UUID]Message),
+		seq:               0,
+		outingStatuses:    make(map[uuid.UUID]outing.Status),
+		hosts:             make(map[uuid.UUID]uuid.UUID),
+		dms:               make(map[[2]uuid.UUID]*Conversation),
+		pendingRequests:   make(map[uuid.UUID]map[uuid.UUID]struct{}),
+		outingTitles:      make(map[uuid.UUID]string),
+		outingStarts:      make(map[uuid.UUID]time.Time),
+		names:             make(map[uuid.UUID]string),
+		conversationReads: make(map[readsKey]int64),
 	}
 }
 
@@ -263,6 +269,35 @@ func (f *fakeStore) HikerName(ctx context.Context, hikerID uuid.UUID) (string, e
 		return "", apperr.NotFound("not found", "not found")
 	}
 	return v, nil
+}
+func (f *fakeStore) MaxSeq(ctx context.Context, convID uuid.UUID) (int64, error) {
+	var maxSeq int64
+	for _, m := range f.messages {
+		if m.ConversationID == convID {
+			maxSeq = max(maxSeq, m.Seq)
+		}
+	}
+	return maxSeq, nil
+
+}
+func (f *fakeStore) MarkRead(ctx context.Context, convID, hikerID uuid.UUID, seq int64) error {
+	v, ok := f.conversationReads[readsKey{
+		convID:  convID,
+		hikerID: hikerID,
+	}]
+	if !ok {
+		f.conversationReads[readsKey{
+			convID:  convID,
+			hikerID: hikerID,
+		}] = seq
+	}
+	if v < seq {
+		f.conversationReads[readsKey{
+			convID:  convID,
+			hikerID: hikerID,
+		}] = seq
+	}
+	return nil
 }
 
 var _ Storage = (*fakeStore)(nil)

@@ -212,3 +212,43 @@ func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 	}
 	responder.JSON(w, http.StatusOK, conv, correlationID)
 }
+
+type markReadInput struct {
+	Seq int64 `json:"seq"`
+}
+
+func (s *Server) handleMarkRead(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	me, err := getAuthenticatedUserID(r)
+	if err != nil {
+		logger.Warn(r.Context(), "mark read: auth failed", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	convID, err := pathUUID(r, "id")
+	if err != nil {
+		logger.Warn(r.Context(), "failed to parse uuid", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	var in markReadInput
+	if err = decodeJSON(r, &in); err != nil {
+		logger.Warn(r.Context(), "bad request", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	if in.Seq < 0 {
+		responder.Error(w, apperr.BadRequest("seq cannot be negative", "seq cannot be negative"), correlationID)
+		return
+	}
+
+	if err = s.messages.MarkRead(r.Context(), convID, me, in.Seq); err != nil {
+		logger.Warn(r.Context(), "failed to mark message as read", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	w.WriteHeader(204)
+
+}
