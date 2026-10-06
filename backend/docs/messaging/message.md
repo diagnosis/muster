@@ -1,5 +1,5 @@
 # Muster — Messaging
-*As of 2026-10-04 (rev 7 — rev 6 as built, plus the unread-count design in §8) · spec = what · see MUSTER-ROADMAP.md for why/when*
+*As of 2026-10-06 (rev 8 — as built, including unread counts) · spec = what · see MUSTER-ROADMAP.md for why/when*
 
 Scope: v1 roster-scoped outing chat and DMs, on one primitive. Rev 5 was the design before code; rev 6 records what was built and where it differs. Changes to this doc go through a PR like code.
 
@@ -22,10 +22,10 @@ Scope: v1 roster-scoped outing chat and DMs, on one primitive. Rev 5 was the des
 | D11 | **Heartbeat**: handler writes an SSE comment line (`: ping`) every **15 s** (< mobile NAT idle ~30–60 s, < Nginx read timeout) | Idle streams are cut by proxies; browser can't tell dead-TCP from quiet. | — |
 | D12 | **Client owns stream lifetime (option b).** On `EventSource.onerror`: call refresh; on success, reopen the stream; on failure, stop (user is logged out). Also reopen after any successful refresh triggered by `request()`. Server does nothing special at token `exp` beyond rejecting the next connect with 401. | Hole A. `EventSource` retries only dropped connections; a **401 fails permanently, no retry**. Heartbeats are server→client and cannot trigger refresh; with no other fetch in flight, `onerror` is the only signal the client gets. | (a) server-side close at `exp`. |
 
-**Status at rev 7.** D1–D6 and D8–D12 are implemented. D7 was reopened on 2026-10-04 and is designed in §8 but not built. Two notes on what is built:
+**Status at rev 8.** D1–D12 are implemented. D7 was reopened on 2026-10-04 and built as §8. Two notes on what is built:
 
 - **D12 as built:** `EventsProvider` handles `EventSource.onerror` by closing the stream and calling refresh. 200 → reopen; 401 → stop; anything else → retry with backoff (1 s doubling to 30 s).
-- **D4 as built:** when the stream reopens after a drop, `EventsProvider` calls `invalidateQueries()` with no key, so every query on screen refetches and any poke missed while the stream was down is made up. The first open at page load does not refetch. Not covered by a test; see §5.
+- **D4 as built:** every time the stream opens, the first open included, `EventsProvider` refetches every query on screen through `invalidateFresh` (§8, "The first-load race"). A poke sent before the stream connected, or while it was down, is made up by that refetch. Rev 6 and rev 7 skipped the first open; that left a gap between a page's first fetch and its stream connecting. Covered by the Playwright spec "validate inbox counts".
 
 ---
 
@@ -196,7 +196,7 @@ Decline and close are silent: no notification, only the `dm.declined` poke. Each
 ## 5. Known limitations (recorded, not bugs)
 
 1. **`seq` is insert-time, not commit-time.** Two concurrent inserts can commit in reverse `seq` order. Under D4 (load-all) both appear; nothing is lost. Only matters if a cursor is ever introduced.
-2. **Dropped pokes** (hub buffer full) delay visibility until the next poke or a window-focus refetch. Pokes missed while the stream is down are made up by the refetch on reopen. **That refetch has no test**: a spec cannot easily drop a live stream, and going offline in the browser triggers TanStack Query's own refetch, which would mask it.
+2. **Dropped pokes** (hub buffer full) delay visibility until the next poke or a window-focus refetch. Pokes missed before the stream connected or while it was down are made up by the refetch on open (D4 as built, §8).
 3. **A live stream outlives its token's `exp`.** By design: the server checks auth at connect only. Roster removal is handled by D8.
 4. **DM threads unbounded** (D5).
 5. **Single instance** (D9): a second API instance would split the hub. Must be revisited before horizontal scaling.
@@ -264,7 +264,7 @@ For a new **event type** on the stream (not a notification kind): add it to `EVE
 
 ---
 
-## 8. Unread counts (rev 7, designed, not yet built)
+## 8. Unread counts (built in rev 8)
 
 **What the user gets**
 
@@ -272,6 +272,7 @@ For a new **event type** on the stream (not a notification kind): add it to `EVE
 - Each inbox row shows that conversation's unread count, for DMs and outing chats alike.
 - DM requests do not add to the count as requests; they already ring the bell. A request's opening message is a message and counts as one.
 - Nothing changes in the bell, and no email is sent per message.
+- On a phone the count sits on an inbox icon in the top bar, next to the bell. On desktop it sits on the Inbox link. The phone menu has no Inbox row.
 
 **The marker**
 
@@ -290,48 +291,57 @@ One rule everywhere: **unread = messages in the conversation with `seq` greater 
 
 | Moment | Marker |
 |---|---|
-| A hiker's join request is accepted | set to the conversation's current highest `seq` (0 if it has no messages), in the same transaction as the accept. Earlier messages stay readable and are not counted. |
+| A hiker's join request is accepted | set to the conversation's current highest `seq` (0 if it has no messages), in the same statement as the accept. Earlier messages stay readable and are not counted. |
 | Accepted again after withdrawing | the same write moves the marker up to the current highest `seq`. |
 | Host at outing creation; both people in a new DM | none. No marker means from the beginning, which is correct for them. |
 | Deploy day | the migration backfills a marker at each conversation's current highest `seq` for every existing host, accepted member and DM pair, so history does not show up as unread. |
 | The member reads | see "Marking read" below. |
 
-The accept path lives in the outing service and writes a row that belongs to messaging, as outing creation already does for the conversation row.
+The accept is one SQL statement in the outing store (`AcceptIfCapacity`), so capacity cannot be oversold. The marker is written inside that same statement: the `UPDATE` is wrapped as `WITH accepted AS (… RETURNING outing_id, hiker_id, updated_at)`, a second block inserts the marker from `accepted`, and the statement still returns `updated_at`. If the update accepts nothing, no marker is written. The Go code around it did not change.
 
 **Marking read**
 
 `POST /api/conversations/{id}/read` with `{"seq": <n>}` → 204.
 
+- A negative `seq`, a bad conversation id or broken JSON → 400, and the service is never called.
 - Members only; anyone else → 403 and nothing is written.
-- The server clamps `seq` to the conversation's highest `seq`, so a marker cannot point past what exists.
-- The marker only moves forward: the stored value becomes the greater of the old marker and the clamped `seq`. A late or repeated call cannot move it back.
+- The service clamps `seq` to the conversation's highest `seq` (`min(maxSeq, seq)`), so a marker cannot point past what exists.
+- The store's upsert only moves the marker forward: the stored value becomes `GREATEST(stored, incoming)`. A late or repeated call cannot move it back. In short: the service handles beyond, the store handles below.
 - No event is broadcast. Reading is private.
 
 **When the client calls it** (D7's rule: reading is an explicit signal, never a side effect of a `GET`)
 
-- When the conversation page is open and the tab is visible, it reports the highest `seq` it is showing: on load, and again whenever a new message arrives.
+- `useMarkReadWhenSeen(cid, lastSeq)`, called from `Chat`. When the conversation is open and the tab is visible, it reports the highest `seq` it is showing: on load, and again whenever a new message arrives.
 - A tab in the background does not report. When it becomes visible again, it reports then.
-- On success the client invalidates `['conversations']`, so the row count and the header total drop.
+- On success the client refetches `['conversations']` through `invalidateFresh`, so the row count and the header total drop.
 
 **Reading the counts**
 
 - `ConversationSummary` gains `unread_count`. The header total is the sum over the same `['conversations']` data; there is no second endpoint.
-- The header subscribes to `message.created`, `message.deleted` and the four `dm.*` events and invalidates `['conversations']`, so the total moves on any page. The inbox page's own subscriptions then become redundant and are removed, leaving one home.
+- `InboxEvents`, mounted once in the logged-in header, subscribes to the six events that can change the inbox (`message.created`, `message.deleted` and the four `dm.*`) and refetches `['conversations']`, so the total moves on any page. The inbox page has no subscriptions of its own.
 - No new event types.
 
-**Rules to test (red first)**
+**The first-load race, and `invalidateFresh`**
 
-Service:
+Invalidating a query while it is on its very first fetch does not start a new request: TanStack Query reuses the request in flight, and that request may have been answered before the change. On a freshly loaded page this left the inbox count stale about 4 times in 100 runs, and it was the cause of earlier flakes in the delete-message and join-request specs.
+
+`invalidateFresh(qc, filters)` in `src/queries.ts` checks whether a matching query is on its first fetch, invalidates, and if so invalidates once more after that fetch has finished. It is used by the stream's `onopen`, by `InboxEvents`, and by mark-read's `onSuccess`. With it, "validate inbox counts" passed 100 of 100 runs.
+
+**Rules tested**
+
+Service (`MarkRead`, against the fake store):
 - marking read as a non-member → 403, no marker written
 - a lower `seq` after a higher one leaves the marker unchanged
 - a `seq` beyond the conversation's highest is clamped
-- my own messages never count as unread
-- accept sets the marker: messages before it are not counted, messages after it are
-- accept after a withdrawal moves the marker forward
+- a normal mark stores the `seq` that was sent
 
-Store (psql, then the API suite): `unread_count` per inbox row with no marker, with a marker mid-thread, and after an unread message is deleted.
+Store (psql): the upsert with 479, then 600, then 100 left the marker at 600; `MaxSeq` matched the last message and returned 0 for an empty conversation; the backfill inserted 2,843 rows against 2,843 expected locally; the count expression gave 0 at the marker and 1 after lowering it.
 
-Playwright (one spec): hiker parked off the inbox; host posts; the header's Inbox count shows 1 with no reload; hiker opens the conversation; the count clears.
+Handler (`Test_HandleMarkRead`, fake service): 204 with the right arguments passed on; 400 for a negative `seq`, a bad id and broken JSON, with the service never reached; a service 403 passed through.
+
+API suite (`message.spec.ts`): member marks read → 204; stranger → 403; "unread counts" (3 unread, own message does not count, mark read → 0, the other member sees 1); "unread count on accept" (history not counted, the next message is).
+
+Playwright (`message.spec.ts`, "validate inbox counts"): hiker parked off the inbox; host posts; the header's Inbox count shows 1 with no reload; hiker opens the conversation; the count clears. Runs on both projects with no waits.
 
 Not covered by a test: a background tab not marking read. Check it by hand.
 
@@ -349,7 +359,9 @@ Not covered by a test: a background tab not marking read. Check it by hand.
 - Once-a-day digest email of unread messages for people who are away — maybe, undecided.
 - Pagination — v2, triggered by D5's N.
 - Multi-instance fan-out — v2+.
-- A test for the refetch on stream reopen.
+- Move the remaining event-driven invalidations (conversation page, bell, outing page) to `invalidateFresh`.
+- Accept after a withdrawal moving the marker forward has no test of its own.
+- A cancelled request (client gone) is logged as a warning with a 500; log it quietly instead.
 - Name the unnamed declined-by CHECK on `conversations` (new migration; the table is in prod).
 - The chat still shows a delete button on a pending DM's message; the server refuses it.
 - Bell entry per message — not planned; unread counts (§8) cover it.

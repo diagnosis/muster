@@ -1128,3 +1128,89 @@ func Test_GetConv(t *testing.T) {
 	}
 
 }
+
+func Test_MarkRead_Stranger(t *testing.T) {
+	f, _, _, svc, c, _, _, _ := newOutingConv(t)
+	stranger := uuid.New()
+	err := svc.MarkRead(context.Background(), c.ID, stranger, 5)
+	wantStatus(t, err, apperr.CodeForbidden)
+	_, ok := f.conversationReads[readsKey{hikerID: stranger, convID: c.ID}]
+	if ok {
+		t.Fatalf("expected no entry for this hiker: %v got entry", stranger)
+	}
+}
+
+func Test_MarkRead_Happy(t *testing.T) {
+	f, _, _, svc, c, _, m1, m2 := newOutingConv(t)
+	_, err := svc.PostMessage(context.Background(), c.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	message2, err := svc.PostMessage(context.Background(), c.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.PostMessage(context.Background(), c.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if err = svc.MarkRead(context.Background(), c.ID, m2, message2.Seq); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	got := f.conversationReads[readsKey{
+		convID:  c.ID,
+		hikerID: m2,
+	}]
+	if message2.Seq != got {
+		t.Errorf("expected %d got %d", message2.Seq, got)
+	}
+}
+
+func Test_MarkRead_NeverMovesBack(t *testing.T) {
+	f, _, _, svc, c, _, m1, m2 := newOutingConv(t)
+	message1, err := svc.PostMessage(context.Background(), c.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.PostMessage(context.Background(), c.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	message3, err := svc.PostMessage(context.Background(), c.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if err = svc.MarkRead(context.Background(), c.ID, m2, message3.Seq); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if err = svc.MarkRead(context.Background(), c.ID, m2, message1.Seq); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	got := f.conversationReads[readsKey{
+		convID:  c.ID,
+		hikerID: m2,
+	}]
+	if message3.Seq != got {
+		t.Fatalf("expected seq %d got %d", message3.Seq, got)
+	}
+}
+
+func Test_MarkRead_NotMarkBeyond(t *testing.T) {
+	f, _, _, svc, c, _, m1, m2 := newOutingConv(t)
+	_, err := svc.PostMessage(context.Background(), c.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	message2, err := svc.PostMessage(context.Background(), c.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	err = svc.MarkRead(context.Background(), c.ID, m2, message2.Seq+100)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	got := f.conversationReads[readsKey{convID: c.ID, hikerID: m2}]
+	if got != message2.Seq {
+		t.Errorf("marker: got %d, want %d (clamped to the highest seq)", got, message2.Seq)
+	}
+}

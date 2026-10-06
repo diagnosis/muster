@@ -138,6 +138,9 @@
 
 @media (max-width: 39.99em){
     /* who you are comes first */
+    .inboxText{
+        display: none;
+    }
     .panelOpen .profileLink{
         order: -1;
         padding-block: var(--space-2);
@@ -163,8 +166,55 @@
         text-decoration: underline;
     }
 }
+.unread{
+    flex: none;
+    min-width: 22px;
+    padding: 0 7px;
+    border-radius: var(--radius-pill);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-size: var(--text-meta);
+    font-weight: 600;
+    line-height: 22px;
+    text-align: center;
+    margin-left: var(--space-2)
+}
 
+.inboxIcon{
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-control);
+    color: var(--color-text);
+}
+.iconBadge{
+    position: absolute;
+    top: 4px;
+    right: 2px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-pill);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+}
+.srOnly{
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
 /* ---- 640px and up ---- */
+
 
 @media (min-width: 40em){
     .toggle{
@@ -235,4 +285,7 @@
     .panel .bell{ display: inline-flex; }
     .desktopBell { display: inline-flex; }
     .mobileBell  { display: none; }
+
 }
+
+

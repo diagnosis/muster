@@ -18,6 +18,7 @@ type fakeMessageService struct {
 	gotOtherID            uuid.UUID
 	gotMsgID              uuid.UUID
 	gotBody               string
+	gotSeq                int64
 	err                   error
 }
 
@@ -62,6 +63,12 @@ func (f *fakeMessageService) ListConversations(ctx context.Context, hikerID uuid
 func (f *fakeMessageService) GetConversation(ctx context.Context, convID, hikerID uuid.UUID) (*message.ConversationView, error) {
 	f.gotConvID, f.gotHikerID = convID, hikerID
 	return f.conversationView, f.err
+}
+func (f *fakeMessageService) MarkRead(ctx context.Context, convID, hikerID uuid.UUID, seq int64) error {
+	f.gotConvID = convID
+	f.gotHikerID = hikerID
+	f.gotSeq = seq
+	return f.err
 }
 
 func newFakeMessageService() *fakeMessageService {

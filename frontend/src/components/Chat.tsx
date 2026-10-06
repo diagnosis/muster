@@ -6,6 +6,7 @@ import {useState} from "react";
 import styles from '@/components/Chat.module.css'
 import {TrashIcon} from "@/components/Icons.tsx";
 import {messageTime} from "@/utils/date.ts";
+import {useMarkReadWhenSeen} from "@/events/useMarkReadWhenSeen.ts";
 
 interface ChatProps {
     cid: string
@@ -26,7 +27,7 @@ export function Chat({cid, me, canPost,canModerate, nameFor, showAuthors, disabl
     const deleteMessage = useDeleteMessage(cid)
 
     const list = messages.data?.messages ?? []
-
+    useMarkReadWhenSeen(cid, list.at(-1)?.seq)
     function send() {
         if (!canPost || !body.trim() || postMessage.isPending) return
         postMessage.mutate({body}, {onSuccess: () => setBody("")})

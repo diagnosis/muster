@@ -217,6 +217,7 @@ export interface ConversationSummary{
     dm_declined_by: string | null
     last_message_at: string | null
     last_preview: string
+    unread_count: number
 }
 
 

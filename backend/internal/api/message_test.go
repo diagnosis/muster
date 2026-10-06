@@ -664,3 +664,93 @@ func Test_HandleGetConversation(t *testing.T) {
 		})
 	}
 }
+
+func Test_HandleMarkRead(t *testing.T) {
+
+	convID := uuid.New()
+	hikerID := uuid.New()
+
+	cases := []struct {
+		name       string
+		pathID     string
+		body       string
+		svcErr     error
+		wantStatus int
+		wantCalled bool
+		wantSeq    int64
+		hikerID    uuid.UUID
+	}{
+		{
+			name:       "valid",
+			pathID:     convID.String(),
+			body:       `{"seq": 5}`,
+			wantStatus: http.StatusNoContent,
+			wantCalled: true,
+			wantSeq:    5,
+			hikerID:    hikerID,
+		},
+		{
+			name:       "negative seq",
+			pathID:     convID.String(),
+			body:       `{"seq": -1}`,
+			wantStatus: http.StatusBadRequest,
+			hikerID:    hikerID,
+		},
+		{
+			name:       "bad conversation id",
+			pathID:     "not-a-uuid",
+			body:       `{"seq": 5}`,
+			wantStatus: http.StatusBadRequest,
+			hikerID:    hikerID,
+		},
+		{
+			name:       "broken json",
+			pathID:     convID.String(),
+			body:       `{"seq":`,
+			wantStatus: http.StatusBadRequest,
+			hikerID:    hikerID,
+		},
+		{
+			name:       "service forbids",
+			pathID:     convID.String(),
+			body:       `{"seq": 5}`,
+			svcErr:     apperr.Forbidden("you're not part of this conversation", "test"),
+			wantStatus: http.StatusForbidden,
+			wantCalled: true,
+			wantSeq:    5,
+			hikerID:    hikerID,
+		},
+	}
+
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodPost, "/api/conversations/{id}", strings.NewReader(cc.body))
+			r.SetPathValue("id", cc.pathID)
+			r = r.WithContext(middleware.SetUserID(r.Context(), cc.hikerID.String()))
+
+			f := newFakeMessageService()
+			f.err = cc.svcErr
+			s := &Server{messages: f}
+			s.handleMarkRead(w, r)
+			if cc.wantStatus != w.Code {
+				t.Errorf("expected status %d got status %d", cc.wantStatus, w.Code)
+			}
+			if cc.wantCalled {
+				if f.gotSeq != cc.wantSeq {
+					t.Errorf("expected seq %d got %d", cc.wantSeq, f.gotSeq)
+				}
+				if f.gotHikerID != hikerID {
+					t.Errorf("expected hikerID %v got %v", hikerID, f.gotHikerID)
+				}
+				if f.gotConvID != convID {
+					t.Errorf("expected convID %v got %v", convID, f.gotConvID)
+				}
+			} else if f.gotConvID != uuid.Nil || f.gotHikerID != uuid.Nil {
+				t.Error("expected no call")
+			}
+
+		})
+	}
+}

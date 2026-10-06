@@ -99,6 +99,7 @@ type ConversationSummary struct {
 	LastMessageAt *time.Time       `json:"last_message_at"`
 	LastPreview   string           `json:"last_preview"`
 	CreatedAt     time.Time        `json:"created_at"`
+	UnreadCount   int64            `json:"unread_count"`
 }
 
 // Message is one row of messages. Seq is the DB-assigned ordering (D6);

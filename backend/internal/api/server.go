@@ -54,6 +54,7 @@ type messageService interface {
 	ReopenDM(ctx context.Context, convID, actor uuid.UUID) error
 	ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*message.ConversationSummary, error)
 	GetConversation(ctx context.Context, convID, hikerID uuid.UUID) (*message.ConversationView, error)
+	MarkRead(ctx context.Context, convID, hikerID uuid.UUID, seq int64) error
 }
 
 // Routes returns the fully wired HTTP handler.
@@ -115,6 +116,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/conversations/{id}/messages", requireAuth(http.HandlerFunc(s.handlePostMessage)))
 	mux.Handle("DELETE /api/messages/{id}", requireAuth(http.HandlerFunc(s.handleDeleteMessage)))
 	mux.Handle("GET /api/conversations/{id}/messages", requireAuth(http.HandlerFunc(s.handleListMessages)))
+	mux.Handle("POST /api/conversations/{id}/read", requireAuth(http.HandlerFunc(s.handleMarkRead)))
 
 	// dms
 	mux.Handle("POST /api/dms", requireAuth(http.HandlerFunc(s.handleStartDM)))

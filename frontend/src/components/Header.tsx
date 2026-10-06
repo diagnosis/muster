@@ -1,12 +1,15 @@
 
-import {useMeQuery} from "@/queries.ts";
+import {invalidateFresh, useMeQuery} from "@/queries.ts";
 import {Link, useNavigate} from "@tanstack/react-router";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import styles from  "@/components/Header.module.css"
 import {useEffect, useRef, useState} from "react";
 import {NotificationBell} from "@/components/NotificationBell.tsx";
-import {MenuIcon} from "@/components/Icons.tsx";
+import {MenuIcon, MessageIcon} from "@/components/Icons.tsx";
+import {useConversations} from "@/queries/conversation.ts";
+import {useEvents} from "@/events/EventProvider.tsx";
+
 
 
 export function Header(){
@@ -15,6 +18,7 @@ export function Header(){
     const queryClient = useQueryClient()
     const navigate = useNavigate()
     const headerRef = useRef<HTMLDivElement>(null)
+
     const logout = useMutation({
         mutationFn: async () => {
             const res = await apiClient.post("/api/auth/logout")
@@ -52,12 +56,15 @@ export function Header(){
             </div>
         </header>
     )
+
     return (
         <header className={styles.nav} ref={headerRef}>
             <div className={styles.inner}>
             <Link className={styles.logo} to={'/'} onClick={()=>setOpen(false)}>Muster</Link>
                 {data ? (
                     <div className={styles.headerActions}>
+                        <InboxEvents/>
+                        <InboxIconLink/>
                         <span className={styles.mobileBell}><NotificationBell/></span>
                         <button
                             aria-label={'Menu'}
@@ -74,7 +81,7 @@ export function Header(){
                 {data ? (
                         <div className={styles.userOutings}>
                             <Link className={styles.navLink} to="/me/outings" onClick={()=> setOpen(false)}>My outings</Link>
-                            <Link className={styles.navLink} to="/inbox" onClick={() => setOpen(false)}>Inbox</Link>
+                            <InboxLink onNavigate={()=>setOpen(false)}/>
                             <Link className={`btn btn-primary ${styles.navCta}`} to="/outings/new" onClick={() => setOpen(false)}>Create outing</Link>
                             <span className={styles.desktopBell}><NotificationBell/></span>
                             <Link className={`${styles.navLink} ${styles.profileLink}`} onClick={() => setOpen(false)} to={"/me/profile"}>
@@ -97,5 +104,49 @@ export function Header(){
             </div>
             </div>
         </header>
+    )
+}
+
+const INBOX_EVENTS = [
+    'message.created', 'message.deleted',
+    'dm.requested', 'dm.accepted', 'dm.declined', 'dm.reopened',
+]
+// Renders nothing. Keeps the inbox data fresh on every page while logged in.
+function InboxEvents() {
+    const qc = useQueryClient()
+    const {subscribe} = useEvents()
+    useEffect(() => {
+        const onPoke = () => { invalidateFresh(qc, {queryKey: ['conversations']}) }
+        const offs = INBOX_EVENTS.map(type => subscribe(type, onPoke))
+        return () => offs.forEach(off => off())
+    }, [subscribe, qc])
+    return null
+}
+
+function useUnreadTotal() {
+    const {data} = useConversations()
+    return data?.conversations.reduce((sum, c) => sum + c.unread_count, 0) ?? 0
+}
+
+// the text link, in the desktop bar and inside the phone menu
+function InboxLink({onNavigate}: {onNavigate: () => void}) {
+    const unread = useUnreadTotal()
+    return (
+        <Link className={`${styles.navLink} ${styles.inboxText}`} to="/inbox" onClick={onNavigate}>
+            Inbox
+            {unread > 0 && <span className={styles.unread}>{unread}</span>}
+        </Link>
+    )
+}
+
+// the icon, in the phone's top bar next to the bell
+function InboxIconLink() {
+    const unread = useUnreadTotal()
+    return (
+        <Link className={styles.inboxIcon} to="/inbox">
+            <MessageIcon size={22}/>
+            <span className={styles.srOnly}>Inbox</span>
+            {unread > 0 && <span className={styles.iconBadge}>{unread}</span>}
+        </Link>
     )
 }

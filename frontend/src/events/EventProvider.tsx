@@ -1,6 +1,7 @@
 import {createContext, type ReactNode, useCallback, useContext, useEffect, useRef} from "react";
 import {refreshSession} from "@/lib/api.ts";
 import {useQueryClient} from "@tanstack/react-query";
+import {invalidateFresh} from "@/queries.ts";
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 type Handler = (data:string) => void
 
@@ -18,7 +19,7 @@ export function EventsProvider({children, enabled}:{children: ReactNode, enabled
         let es: EventSource | null = null
         let stopped = false
         let delay = 1000
-        let opened = false
+
         let timer: ReturnType<typeof setTimeout> | null = null
 
         const reconnect = async () => {
@@ -41,8 +42,8 @@ export function EventsProvider({children, enabled}:{children: ReactNode, enabled
             }
             es.onopen = () => {
                 delay = 1000
-                if (opened) qc.invalidateQueries()
-                opened = true
+                invalidateFresh(qc)
+
             }
             es.onerror = reconnect
         }

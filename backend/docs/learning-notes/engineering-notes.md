@@ -1,0 +1,221 @@
+# Muster engineering notes
+
+Oct 6, 2026 · @safa demirkan
+
+## The first-load refetch race
+
+Invalidating a query during its very first fetch does not start a new request, so the page can keep an answer that is older than the change. This caused every flaky live-update test in Muster.
+
+**What happens**
+
+1. A page loads and a query sends its first request. It has no data yet.
+2. Something changes on the server (a message is posted, a marker moves).
+3. The app calls `invalidateQueries` because of a poke, a stream open, or a mutation's success.
+4. TanStack Query sees the query is already fetching and has no data, so it reuses the request in flight.
+5. That request was answered before the change. The page shows the old value and nothing fetches again.
+
+When the query already has data, the same call cancels and restarts the fetch. The gap only exists during the first load.
+
+**How it showed up**
+
+- The inbox count did not arrive, or did not clear, about 4 times in 100 runs.
+- The delete-message test and the join-request test flaked the same way earlier.
+- It never happened by hand, because a person is slower than a test.
+
+**How it was found**
+
+The test logged every request and response for one page, tagged with the run number. In a failing run there was no `GET /api/conversations` after the `204` from mark-read. In every passing run there was one.
+
+**The fix**
+
+`invalidateFresh` in `src/queries.ts`. It checks whether a matching query is on its first fetch, invalidates, and if so invalidates once more after that fetch has finished.
+
+```ts
+export async function invalidateFresh(qc: QueryClient, filters?: InvalidateQueryFilters) {
+    const firstLoad = qc.getQueryCache().findAll(filters)
+        .some(q => q.state.fetchStatus === 'fetching' && q.state.data === undefined)
+    await qc.invalidateQueries(filters)
+    if (firstLoad) await qc.invalidateQueries(filters)
+}
+```
+
+Used in the event stream's `onopen`, the header's inbox events, and mark-read's `onSuccess`. Result: 100 of 100 runs passed.
+
+**Rule to keep:** any code that invalidates because the server told it something changed should use `invalidateFresh`, not `invalidateQueries`. The conversation page, the bell and the outing page still use the plain call.
+
+## Live updates: pokes and the stream
+
+The server never sends data over the event stream. It sends a poke that says something changed, and the page refetches. A poke is delivered at most once, with no replay.
+
+- **A poke sent while nobody is connected is lost.** That includes the first moments after a page loads, before the stream has opened.
+- **So the page refetches every time the stream opens**, the first open included. An earlier version skipped the first open to save one round of requests, and that left a gap.
+- **The server registers the client before it sends the response headers.** Once the browser sees the stream open, pokes will be delivered.
+- **Subscriptions that every page needs live in the header.** The inbox count is one example: `InboxEvents` is mounted once, and the inbox page has no copy.
+- **A new event type must be added to `EVENT_TYPES`** in `EventProvider.tsx`, or the browser ignores it silently.
+
+Full contract: `backend/docs/messaging/message.md`, sections 3 and 8.
+
+## Read markers: two guards
+
+The service handles beyond, the store handles below.
+
+| Guard | Layer | How | Stops |
+| --- | --- | --- | --- |
+| Beyond | Service, `MarkRead` | `min(maxSeq, seq)` | a marker pointing past the last message, which would hide future messages |
+| Below | Store, `MarkRead` | `GREATEST(stored, incoming)` in the upsert | a late or stale request moving the marker backward |
+
+- Unread is counted at query time: messages after my marker that I did not write. Nothing stores a count.
+- No marker means zero, which means from the beginning. That is right for hosts and for both people in a DM.
+- A hiker's marker is created when they are accepted, at the conversation's highest `seq` at that moment.
+- The browser reports what it has seen only while the tab is visible. A background tab does not mark anything read.
+
+## SQL patterns used
+
+The question to ask of any query: where does each value come from?
+
+| Function | What it does | Example | Result |
+| --- | --- | --- | --- |
+| `MAX(col)` | highest value of a column across rows | `MAX(seq)` over 3, 7, 5 | 7 |
+| `COALESCE(a, b)` | first argument that is not NULL; a fallback, not a comparison | `COALESCE(NULL, 0)` | 0 |
+| `GREATEST(a, b)` | larger of two values in one row | `GREATEST(8, 5)` | 8 |
+| `<>` | not equal; never use it with NULL, use `IS NULL` | `hiker_id <> $1` | someone else's rows |
+
+**Highest seq, or 0 when empty**
+
+```sql
+SELECT COALESCE(MAX(seq), 0) FROM messages WHERE conversation_id = $1
+```
+
+**Upsert that never goes backward**
+
+```sql
+INSERT INTO conversation_reads (conversation_id, hiker_id, last_read_seq)
+VALUES ($1, $2, $3)
+ON CONFLICT (conversation_id, hiker_id) DO UPDATE
+SET last_read_seq = GREATEST(conversation_reads.last_read_seq, EXCLUDED.last_read_seq),
+    updated_at    = now()
+```
+
+`EXCLUDED` is the row the insert tried to add and was refused. It exists only inside `DO UPDATE`. The table name refers to the row already stored.
+
+**Why one statement and not select-then-write:** two requests at once can both read the old value and then both write. One statement lets the database do the check and the write together.
+
+**Filling a table from other tables**
+
+```sql
+INSERT INTO conversation_reads (conversation_id, hiker_id, last_read_seq)
+SELECT c.id, jr.hiker_id,
+       COALESCE((SELECT MAX(m.seq) FROM messages m WHERE m.conversation_id = c.id), 0)
+FROM conversations c
+JOIN join_requests jr ON c.outing_id = jr.outing_id
+WHERE c.kind = 'outing' AND jr.status = 'accepted'
+ON CONFLICT DO NOTHING;
+```
+
+Check it with counts: rows inserted against rows expected. Muster's backfill gave 2,843 and 2,843.
+
+**Unread count per inbox row**
+
+```sql
+( SELECT count(*) FROM messages m
+  WHERE m.conversation_id = x.id
+    AND m.hiker_id <> $1
+    AND m.seq > COALESCE(
+          (SELECT r.last_read_seq FROM conversation_reads r
+           WHERE r.conversation_id = x.id AND r.hiker_id = $1),
+          0)
+) AS unread_count
+```
+
+The viewer's id does two jobs: it removes their own messages, and it finds their marker. It sits on the outer query so both union arms get it from one place.
+
+**Two writes in one statement**
+
+```sql
+WITH accepted AS (
+    UPDATE join_requests r SET status = 'accepted' ...
+    RETURNING r.outing_id, r.hiker_id, r.updated_at
+),
+marker AS (
+    INSERT INTO conversation_reads (...)
+    SELECT c.id, a.hiker_id, ...
+    FROM accepted a JOIN conversations c ON c.outing_id = a.outing_id
+    ON CONFLICT (conversation_id, hiker_id) DO UPDATE SET ...
+)
+SELECT updated_at FROM accepted;
+```
+
+`marker` reads from `accepted`. If the update changes nothing, `accepted` is empty and nothing is inserted. No semicolon inside a `WITH` block.
+
+**Small traps met**
+
+- Double quotes mean a column or table name. Strings take single quotes: `'dm'`.
+- An alias used in a subquery must be declared: `FROM conversations c`.
+- `ON CONFLICT` goes at the end of the insert, after `WHERE`.
+- A query that reads fine can still be wrong. Run it in psql before it goes into Go.
+
+## React and CSS rules that caused bugs
+
+- **Hooks run on every render, in the same order.** A hook after an early `return`, or inside an `if`, crashes when the condition changes. When a hook should only run sometimes (only when logged in, once per list row), put it in a small child component that is only rendered then. `InboxRow` and `InboxLink` both exist for this reason.
+- **`??` falls back only on null and undefined. `||` falls back on anything falsy, the empty string included.** Use `||` when the server can send `""`.
+- **Negating an "and" gives an "or".** `!canAccept(c)` is true for outing chats too, so a DM filter needs its own `c.kind === "dm"` in front.
+- **In a CSS module, a bare class name is renamed.** `.panelOpen .btn` never matches the global `btn` class. Write `.panelOpen :global(.btn)`.
+- **Menu state is not screen size.** Hiding something with `!open` breaks when the window is resized. Use a media query when the rule is about width.
+- **Two media queries must not share a boundary.** `max-width: 40em` and `min-width: 40em` both apply at exactly 640px. Use `39.99em` for the lower one.
+- **A `useEffect` with no dependency array runs after every render.**
+- **One home per fact.** A click handler copied to three places, or an event subscription in two components, will drift.
+
+## Testing habits
+
+A test proves something only if it can fail. Each habit below came from a test that could not.
+
+- **Break the code on purpose once.** If the test still passes, it is not testing that code. Skipping the Accept click showed an assertion that passed either way.
+- **Assert the side effect did not happen, not only the error.** A refused delete must leave the message in the store and send no poke. A rejected request must never reach the service.
+- **Check the real thing, not a local copy.** The struct a call returned does not change when the database row does. Ask the store.
+- **An absence check passes on a page that has not loaded.** Wait for something that proves the page rendered before asserting that something is missing.
+- **Read failure messages for swapped values.** "expected X got Y" with the two reversed sends you the wrong way on the day it fails.
+- **Locators match part of a name.** A button named after a person collides with a "Message" button for the same person. Scope to a region (`getByRole('banner')`) or use a more specific name.
+- **Prefer `expect(locator).toContainText(...)` to reading text out.** The `expect` form waits and retries.
+- **Handler tests use a fake service** and check input parsing and status codes. Rules about members and conversations belong in service tests. Real accounts hitting the real server belong in the API suite.
+- **Count messages, not seq.** `seq` is a position in a global sequence, not a count.
+
+**Commands**
+
+```bash
+# one test by title, one project, visible browser
+npx playwright test -c e2e/playwright.config.ts -g "validate inbox counts" --project=chromium --headed
+
+# find a flake: many repeats, failures count as failures
+npx playwright test -c e2e/playwright.config.ts -g "validate inbox counts" --repeat-each=50 --retries=0
+
+# through npm, arguments for the script go after --
+CI=1 npm run e2e -- --repeat-each=2 --retries=0
+```
+
+`actionTimeout` in the Playwright config caps how long one click waits. The test timeout is a different setting; leave it longer.
+
+## Debugging method and server logs
+
+The flake was solved by one log, after three guesses did not solve it.
+
+1. **Say what the output shows before saying why.** "Element not found" and "text did not match" are different failures with different causes.
+2. **State a hypothesis and the experiment that would disprove it.** A one-second wait confirmed a timing problem. It was a diagnostic, not a fix.
+3. **When a prediction fails, stop guessing and collect facts.** Log requests and responses for the one page under test.
+4. **Tag the lines when tests run in parallel.** Without a tag, two tests' lines mix and cannot be read.
+
+```ts
+const tag = test.info().repeatEachIndex
+const interesting = (u: string) => u.includes('/api/conversations') || u.includes('/api/events')
+page.on('request',  r => { if (interesting(r.url())) console.log(tag, Date.now(), '->', r.method(), r.url()) })
+page.on('response', r => { if (interesting(r.url())) console.log(tag, Date.now(), '<-', r.status(), r.url()) })
+```
+
+5. **Compare a failing run with a passing one.** The missing line is the finding.
+
+**Server log: "context canceled"**
+
+The browser hung up before the server answered: a tab closed, a page reloaded, a navigation, or a test ending. The handler and the query are fine. It is currently logged as a warning with a 500, which is wrong for a client that left. Open item: detect a cancelled request context and log it quietly.
+
+**Chat app error: `duplicate_human_message_uuid`**
+
+Not from Muster. The chat interface received the same message twice. Refresh and resend.

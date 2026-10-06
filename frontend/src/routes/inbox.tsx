@@ -1,9 +1,8 @@
 import {createFileRoute, Link, redirect} from '@tanstack/react-router'
 import {meQueryOptions} from "@/queries.ts";
 import {conversationsQueryOptions} from "@/queries/conversation.ts";
-import {useQueryClient, useSuspenseQuery} from "@tanstack/react-query";
-import {useEffect} from "react";
-import {useEvents} from "@/events/EventProvider.tsx";
+import {useSuspenseQuery} from "@tanstack/react-query";
+
 import type {ConversationSummary} from "@/types.ts";
 import styles from "@/routes/inbox.module.css"
 import {relativeTime} from "@/utils/date.ts";
@@ -19,7 +18,6 @@ export const Route = createFileRoute('/inbox')({
 })
 
 function InboxPage() {
-    const qc = useQueryClient()
     const {data:me} = useSuspenseQuery(meQueryOptions())
     const {data:conversations} = useSuspenseQuery(conversationsQueryOptions())
     const canAccept = (c:ConversationSummary) => c.kind ==="dm"&&c.dm_status==="pending"&&c.dm_initiator !== me?.id
@@ -27,23 +25,7 @@ function InboxPage() {
     const dm = conversations.conversations.filter(c => c.kind === "dm" && !canAccept(c))
     const outing = conversations.conversations.filter(c => c.kind === "outing")
 
-    const { subscribe } = useEvents()
-    useEffect(() => {
 
-        const onPoke = () => {
-            qc.invalidateQueries({queryKey:['conversations']})
-        }
-
-        const offs = [
-            subscribe('message.created', onPoke),
-            subscribe('message.deleted', onPoke),
-            subscribe('dm.requested', onPoke),
-            subscribe('dm.accepted', onPoke),
-            subscribe('dm.declined', onPoke),
-            subscribe('dm.reopened', onPoke),
-        ]
-        return () => offs.forEach(off => off())
-    },  [subscribe, qc])
    if (!me) return
     return (
         <div className={styles.page}>
@@ -85,6 +67,7 @@ function InboxRow({ cv, meId }: { cv: ConversationSummary; meId: string }) {
     const when = cv.last_message_at ?? cv.created_at
     const status = statusOf(cv, meId)
     const preview = cv.last_preview || status?.preview || 'No messages yet'
+
     return (
         <Link to="/conversations/$id" params={{ id: cv.id }} className={styles.row}>
             <span className={`${styles.avatar} ${cv.kind === 'outing' ? styles.avatarOuting : ''}`} aria-hidden>
@@ -93,6 +76,7 @@ function InboxRow({ cv, meId }: { cv: ConversationSummary; meId: string }) {
             <span className={styles.body}>
                 <span className={styles.top}>
                     <span className={styles.title}>{cv.title}</span>
+                    {cv.unread_count > 0 && <span className={styles.unread}>{cv.unread_count}</span>}
                     {when && <time className={styles.time} dateTime={when}>{relativeTime(when)}</time>}
                 </span>
                 <span className={styles.bottom}>

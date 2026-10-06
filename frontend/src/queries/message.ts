@@ -4,6 +4,7 @@
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import type {ListMessagesResponse, Message, MessageInput} from "@/types.ts";
 import {queryOptions, useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {invalidateFresh} from "@/queries.ts";
 
 export async function listMessages(cid: string){
     const res = await apiClient.get<ListMessagesResponse>(`/api/conversations/${cid}/messages`)
@@ -52,5 +53,19 @@ export function usePostMessage(cid:string){
             throw new ApiRequestError(res.error, res.httpStatus)
         },
         onSuccess : () => qc.invalidateQueries({ queryKey: ['messages', cid]})
+    })
+}
+
+export function useMarkRead(cid:string) {
+    const qc = useQueryClient()
+    return useMutation({
+        mutationFn: async (input:{seq:number})=> {
+            const res = await apiClient.post(`/api/conversations/${cid}/read`, input)
+            if (res.ok){
+                return
+            }
+            throw new ApiRequestError(res.error, res.httpStatus)
+        },
+        onSuccess: () => invalidateFresh(qc, {queryKey: ['conversations']})
     })
 }

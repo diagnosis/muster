@@ -160,3 +160,5 @@ export const reopenDM = (ctx:APIRequestContext, cid:string) =>
     ctx.post(`/api/conversations/${cid}/reopen`)
 export const listConversations = (ctx: APIRequestContext) =>
     ctx.get('/api/conversations')
+export const markRead = (ctx: APIRequestContext, cid: string, input:{seq:number}) =>
+    ctx.post(`/api/conversations/${cid}/read`, {data:input})
