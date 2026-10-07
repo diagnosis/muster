@@ -133,7 +133,7 @@ type Outing struct {
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`
 	ConversationID   *uuid.UUID `json:"conversation_id"`
-	EndsAt *time.Time `json:"ends_at"`
+	EndsAt           *time.Time `json:"ends_at"`
 }
 
 // JoinRequest links a hiker to an outing. It only exists as that link;

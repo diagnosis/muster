@@ -48,6 +48,9 @@ type Storage interface {
 	UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error
 }
 
+// MAX_OUTING_DURATION is limit host can set hiking duration endsAt - startsAt < 14 days
+const MAX_OUTING_DURATION = 14 * 24 * time.Hour
+
 // Service implements outing business rules over a Storage.
 type Service struct {
 	store         Storage
@@ -85,6 +88,7 @@ type CreateInput struct {
 	Difficulty       Difficulty `json:"difficulty"`
 	Pace             Pace       `json:"pace"`
 	Notes            *string    `json:"notes,omitempty"`
+	EndsAt           *time.Time `json:"ends_at"`
 }
 
 // UpdateInput carries a partial patch for an outing; nil fields are left unchanged.
@@ -101,6 +105,7 @@ type UpdateInput struct {
 	Difficulty       *Difficulty `json:"difficulty"`
 	Pace             *Pace       `json:"pace"`
 	Notes            *string     `json:"notes"`
+	EndsAt           *time.Time  `json:"ends_at"`
 }
 
 // validateOuting checks the row-shape rules shared by Create and Update:
@@ -117,6 +122,12 @@ func validateOuting(o *Outing) error {
 	if time.Until(o.StartsAt) < minLeadTime-leadGrace {
 		return apperr.BadRequest("outing has to be at least 24 hours in advance", "under 24h lead time")
 	}
+	if o.EndsAt != nil && !o.EndsAt.After(o.StartsAt) {
+		return apperr.BadRequest("ends at cannot be before or equal starts at", "endsAt <= startsAt")
+	}
+	if o.EndsAt != nil && o.EndsAt.After(o.StartsAt.Add(MAX_OUTING_DURATION)) {
+		return apperr.BadRequest("max outing duration is 14 days", "max duration violation")
+	}
 	if o.MaxSize < 2 {
 		return apperr.BadRequest("outing size has to be at least 2", "min members violation")
 	}
@@ -132,6 +143,7 @@ func validateOuting(o *Outing) error {
 	if o.CostPerSeatCents < 0 {
 		return apperr.BadRequest("invalid cost per seat input", "invalid seat cost")
 	}
+
 	return nil
 }
 
@@ -160,6 +172,7 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 		Pace:             in.Pace,
 		Notes:            in.Notes,
 		Status:           StatusOpen,
+		EndsAt:           in.EndsAt,
 	}
 
 	err := validateOuting(o)
@@ -208,6 +221,9 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 	}
 	if in.StartsAt != nil {
 		o.StartsAt = *in.StartsAt
+	}
+	if in.EndsAt != nil {
+		o.EndsAt = in.EndsAt
 	}
 	if in.MaxSize != nil {
 		o.MaxSize = *in.MaxSize
