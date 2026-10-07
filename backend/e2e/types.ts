@@ -88,6 +88,7 @@ export interface UpdateInput {
     pace?: 'relaxed' | 'moderate' | 'fast'
     notes?: string
     ends_at?: string
+    clear_ends_at?: boolean
 }
 
 export interface RegisterRequest{

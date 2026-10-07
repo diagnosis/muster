@@ -48,8 +48,8 @@ type Storage interface {
 	UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error
 }
 
-// MAX_OUTING_DURATION is limit host can set hiking duration endsAt - startsAt < 14 days
-const MAX_OUTING_DURATION = 14 * 24 * time.Hour
+
+const maxOutingDuration = 14 * 24 * time.Hour
 
 // Service implements outing business rules over a Storage.
 type Service struct {
@@ -106,6 +106,7 @@ type UpdateInput struct {
 	Pace             *Pace       `json:"pace"`
 	Notes            *string     `json:"notes"`
 	EndsAt           *time.Time  `json:"ends_at"`
+	ClearEndsAt bool `json:"clear_ends_at"`
 }
 
 // validateOuting checks the row-shape rules shared by Create and Update:
@@ -125,7 +126,7 @@ func validateOuting(o *Outing) error {
 	if o.EndsAt != nil && !o.EndsAt.After(o.StartsAt) {
 		return apperr.BadRequest("ends at cannot be before or equal starts at", "endsAt <= startsAt")
 	}
-	if o.EndsAt != nil && o.EndsAt.After(o.StartsAt.Add(MAX_OUTING_DURATION)) {
+	if o.EndsAt != nil && o.EndsAt.After(o.StartsAt.Add(maxOutingDuration)) {
 		return apperr.BadRequest("max outing duration is 14 days", "max duration violation")
 	}
 	if o.MaxSize < 2 {
@@ -222,7 +223,10 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 	if in.StartsAt != nil {
 		o.StartsAt = *in.StartsAt
 	}
-	if in.EndsAt != nil {
+
+	if in.ClearEndsAt{
+		o.EndsAt = nil
+	} else if in.EndsAt != nil {
 		o.EndsAt = in.EndsAt
 	}
 	if in.MaxSize != nil {

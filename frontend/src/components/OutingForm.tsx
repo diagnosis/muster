@@ -30,7 +30,9 @@ export function OutingForm(props: OutingFormProps){
     const [difficulty, setDifficulty] = useState<Difficulty|null>(props.initial?.difficulty ?? null)
     const [pace, setPace] = useState<Pace|null>(props.initial?.pace ?? null)
     const [notes, setNotes] = useState<string>(props.initial?.notes ?? "")
+    const [endsAt, setEndsAt] = useState(props.initial?.ends_at ? isoToLocalInput(props.initial.ends_at) : "")
     const [formError, setFormError] = useState<string|null>(null)
+    const [hasEnd, setHasEnd] = useState(props.initial ? !!props.initial.ends_at : true)
 
     function handleSubmit(e: React.SubmitEvent){
         e.preventDefault()
@@ -41,11 +43,16 @@ export function OutingForm(props: OutingFormProps){
             setFormError("Check the number fields — something is invalid.")
             return;
         }
+        if (endsAt && endsAt <= startsAt) {
+            setFormError("The end time must be after the start time.")
+            return
+        }
 
         setFormError(null)
         props.onSubmit({
             title, destination, meet_label,
             starts_at: new Date(startsAt).toISOString(),
+            ends_at: hasEnd && endsAt ? new Date(endsAt).toISOString() : undefined,
             max_size:parsedMaxSize, host_seats:parsedHostSeats, cost_per_seat_cents: Math.round(parsedCostDollar*100),
             difficulty, pace,
             notes: notes || undefined,
@@ -84,8 +91,34 @@ export function OutingForm(props: OutingFormProps){
                             <input
                                 type="datetime-local"
                                 value={startsAt}
-                                onChange={e => setStartsAt(e.target.value)}
+                                onChange={e => {
+                                    const v = e.target.value
+                                    setStartsAt(v)
+                                    if (endsAt && endsAt <= v) setEndsAt("")
+                                }
+                            }
                             />
+                        </label>
+                        <label className={styles.checkRow}>
+                            <input
+                                type="checkbox"
+                                checked={hasEnd}
+                                onChange={e => {
+                                    setHasEnd(e.target.checked)
+                                    if (!e.target.checked) setEndsAt("")
+                                }}
+                            />
+                            Set an end time
+                        </label>
+                        <label className={styles.label}>Ends at
+                            <input
+                                type="datetime-local"
+                                min={startsAt}
+                                value={endsAt}
+                                disabled={!hasEnd}
+                                onChange={e => setEndsAt(e.target.value)}
+                            />
+
                         </label>
                     </div>
                 </div>

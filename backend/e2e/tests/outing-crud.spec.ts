@@ -265,9 +265,24 @@ test.describe("outing-crud actions", ()=> {
     test("host adds an end time to an outing that had none", async () => {
         const host = await asUser(BASE)
         const o = await unwrap<OutingResponse>(createOuting(host.ctx, {starts_at: at(3, 6)}), 201)
+        const detail  = await unwrap<DetailResponse>(getDetail(host.ctx, o.id), 200)
+        expect(detail.outing.ends_at).toBeNull()
         const end = at(3, 18)
-        const updated = await unwrap<OutingResponse>(updateOuting(host.ctx, o.id, {ends_at: end}), 200)
+        const updated = await unwrap<OutingResponse>(updateOuting(host.ctx, o.id, {ends_at: end, clear_ends_at:false}), 200)
         expect(new Date(updated.ends_at!).getTime()).toBe(new Date(end).getTime())
+    })
+    test("outing with an end, check wins", async()=> {
+        const host = await asUser(BASE)
+        const o =
+            await unwrap<OutingResponse>(createOuting(host.ctx, {starts_at: at(3, 6), ends_at:at(3, 22)}), 201)
+        await unwrap(updateOuting(host.ctx, o.id, {clear_ends_at: true, ends_at: at(3, 20)}), 200)
+        const detail = await unwrap<DetailResponse>(getDetail(host.ctx, o.id), 200)
+        expect(detail.outing.ends_at).toBeNull()
+
+    })
+    test("create with clear_ends_at returns 400", async ()=> {
+        const host = await asUser(BASE)
+        await unwrap(createOuting(host.ctx, {clear_ends_at:true}), 400)
     })
 
 })
