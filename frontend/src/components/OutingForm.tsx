@@ -33,6 +33,7 @@ export function OutingForm(props: OutingFormProps){
     const [endsAt, setEndsAt] = useState(props.initial?.ends_at ? isoToLocalInput(props.initial.ends_at) : "")
     const [formError, setFormError] = useState<string|null>(null)
     const [hasEnd, setHasEnd] = useState(props.initial ? !!props.initial.ends_at : true)
+    const hadEnd = !!props.initial?.ends_at
 
     function handleSubmit(e: React.SubmitEvent){
         e.preventDefault()
@@ -49,10 +50,12 @@ export function OutingForm(props: OutingFormProps){
         }
 
         setFormError(null)
+        const endIso = hasEnd && endsAt ? new Date(endsAt).toISOString() : undefined
         props.onSubmit({
             title, destination, meet_label,
             starts_at: new Date(startsAt).toISOString(),
-            ends_at: hasEnd && endsAt ? new Date(endsAt).toISOString() : undefined,
+            ends_at: endIso,
+            ...(hadEnd && !endIso ? {clear_ends_at: true} : {}),
             max_size:parsedMaxSize, host_seats:parsedHostSeats, cost_per_seat_cents: Math.round(parsedCostDollar*100),
             difficulty, pace,
             notes: notes || undefined,

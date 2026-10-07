@@ -134,7 +134,7 @@ export function OutingDetailPage() {
     // Handle loading and error states before rendering
     if (isPending) return <div>Loading...</div>
     if (error) return <div>Error: {error.message}</div>
-    
+
     const effectiveCap = Math.min(detail.seat_capacity, detail.outing.max_size)
     const isFull = detail.people_count >= detail.outing.max_size
     const canSeeComments = !!me && (

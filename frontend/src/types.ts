@@ -130,6 +130,7 @@ export interface CreateOutingInput {
     pace: Pace
     notes?: string
     ends_at?: string
+    clear_ends_at?: boolean
 }
 
 export interface VerifyEmailResponse {
