@@ -7,7 +7,7 @@ export function tag(): string {
     return W + (seq++ % 1296).toString(36).padStart(2, '0') + Math.random().toString(36).slice(2, 5)
 }
 
-export async function fillCreateForm(page: Page, outing:CreateOutingInput){
+export async function fillCreateForm(page: Page, outing:CreateOutingInput, withEndAt:boolean){
     await expect(page.getByRole('heading', { name: 'Create outing' })).toBeVisible()
 
     await expect(page.getByRole('button', {name:'Create outing'})).toBeDisabled()
@@ -18,6 +18,11 @@ export async function fillCreateForm(page: Page, outing:CreateOutingInput){
     await page.getByRole('textbox', { name: 'Meet label' }).fill(outing.meet_label)
     await expect(page.getByRole('button', {name:'Create outing'})).toBeDisabled()
     await page.getByRole('textbox', { name: 'Starts at' }).fill(datetimeLocal(48))
+    if (withEndAt){
+        await page.getByRole('textbox', {name: "Ends at"}).fill(datetimeLocal(60))
+    }else{
+        await page.getByRole('checkbox', {name: 'Set an end time'}).click()
+    }
     await expect(page.getByRole('button', {name:'Create outing'})).toBeDisabled()
     await page.getByRole('spinbutton', { name: 'Max size' }).fill(outing.max_size.toString())
     await expect(page.getByRole('button', {name:'Create outing'})).toBeDisabled()
