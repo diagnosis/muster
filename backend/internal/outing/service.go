@@ -48,7 +48,6 @@ type Storage interface {
 	UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error
 }
 
-
 const maxOutingDuration = 14 * 24 * time.Hour
 
 // Service implements outing business rules over a Storage.
@@ -106,7 +105,7 @@ type UpdateInput struct {
 	Pace             *Pace       `json:"pace"`
 	Notes            *string     `json:"notes"`
 	EndsAt           *time.Time  `json:"ends_at"`
-	ClearEndsAt bool `json:"clear_ends_at"`
+	ClearEndsAt      bool        `json:"clear_ends_at"`
 }
 
 // validateOuting checks the row-shape rules shared by Create and Update:
@@ -224,7 +223,7 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 		o.StartsAt = *in.StartsAt
 	}
 
-	if in.ClearEndsAt{
+	if in.ClearEndsAt {
 		o.EndsAt = nil
 	} else if in.EndsAt != nil {
 		o.EndsAt = in.EndsAt
