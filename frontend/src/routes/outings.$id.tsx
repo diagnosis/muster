@@ -14,6 +14,7 @@ import {Comments} from "@/components/Comments.tsx";
 import {useEvents} from "@/events/EventProvider.tsx";
 import {useStartDM} from "@/queries/conversation.ts";
 import {CalendarIcon, FlagIcon, MessageIcon, PinIcon, TrashIcon} from "@/components/Icons.tsx";
+import {outingRange} from "@/utils/date.ts";
 
 
 export const Route = createFileRoute('/outings/$id')({
@@ -133,18 +134,6 @@ export function OutingDetailPage() {
     // Handle loading and error states before rendering
     if (isPending) return <div>Loading...</div>
     if (error) return <div>Error: {error.message}</div>
-    const date = new Date(detail.outing.starts_at)
-    const starts_at_date =
-        date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month:'short',
-            day:'numeric'
-        })
-    const starts_at_time=
-        date.toLocaleTimeString('en-US', {
-            hour:'numeric',
-            minute:'2-digit'
-        })
 
     const effectiveCap = Math.min(detail.seat_capacity, detail.outing.max_size)
     const isFull = detail.people_count >= detail.outing.max_size
@@ -179,7 +168,7 @@ export function OutingDetailPage() {
             <section className={styles.section}>
                 <h1 className={styles.heading}>{detail.outing.title}</h1>
                 <ul className={styles.meta}>
-                    <li className={`${styles.metaItem} ${styles.metaStrong}`}><CalendarIcon/> {starts_at_date} · {starts_at_time}</li>
+                    <li className={`${styles.metaItem} ${styles.metaStrong}`}><CalendarIcon/> {outingRange(detail.outing.starts_at, detail.outing.ends_at)}</li>
                     <li className={styles.metaItem}><PinIcon/> {detail.outing.destination}</li>
                     <li className={styles.metaItem}><FlagIcon/> {detail.outing.meet_label}</li>
                 </ul>

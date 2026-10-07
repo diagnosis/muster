@@ -43,6 +43,7 @@ export interface Outing{
     created_at: string
     updated_at: string
     conversation_id:string
+    ends_at: string | null
 }
 
 export interface Detail{
@@ -128,6 +129,8 @@ export interface CreateOutingInput {
     difficulty: Difficulty
     pace: Pace
     notes?: string
+    ends_at?: string
+    clear_ends_at?: boolean
 }
 
 export interface VerifyEmailResponse {

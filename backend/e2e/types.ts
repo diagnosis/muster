@@ -29,6 +29,7 @@ export interface CreateOutingInput{
     difficulty: Difficulty
     pace: Pace
     notes?: string
+    ends_at?:string
 }
 export interface OutingResponse {
     id: string
@@ -43,6 +44,7 @@ export interface OutingResponse {
     difficulty: 'hard'|'easy'|'moderate'
     pace: 'relaxed' | 'fast' | 'moderate'
     conversation_id: string
+    ends_at?: string
 }
 
 export interface JoinRequestResponse {
@@ -85,6 +87,8 @@ export interface UpdateInput {
     difficulty?: 'easy' | 'moderate' | 'hard'
     pace?: 'relaxed' | 'moderate' | 'fast'
     notes?: string
+    ends_at?: string
+    clear_ends_at?: boolean
 }
 
 export interface RegisterRequest{

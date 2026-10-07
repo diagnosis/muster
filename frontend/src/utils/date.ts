@@ -36,3 +36,17 @@ export function outingWhen(iso: string): string {
     const time = d.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'})
     return `${date} · ${time}`
 }
+
+// "Sat, Oct 10 · 6:00 AM"                           no end time
+// "Sat, Oct 10 · 6:00 AM – 6:00 PM"                 ends the same day
+// "Sat, Oct 10 · 6:00 AM – Sun, Oct 11 · 4:00 PM"   ends another day
+export function outingRange(startIso: string, endIso?: string | null): string {
+    const start = outingWhen(startIso)
+    if (!endIso) return start
+    const s = new Date(startIso)
+    const e = new Date(endIso)
+    if (s.toDateString() === e.toDateString()) {
+        return `${start} – ${e.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'})}`
+    }
+    return `${start} – ${outingWhen(endIso)}`
+}

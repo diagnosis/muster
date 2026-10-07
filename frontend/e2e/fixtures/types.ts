@@ -23,6 +23,8 @@ export interface CreateOutingInput{
     difficulty: Difficulty
     pace: Pace
     notes?: string
+    ends_at?: string
+    clear_ends_at?: boolean
 }
 
 export type OutingStatus = 'open' | 'cancelled'

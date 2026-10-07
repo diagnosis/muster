@@ -1,9 +1,11 @@
 import {expect, test} from '@playwright/test'
 import {asUser,BASE} from "../fixtures";
-import {accept, cancelOuting, createOuting, requestJoin, updateOuting} from "../api";
-import {JoinRequestResponse, OutingResponse} from "../types";
+import {accept, cancelOuting, createOuting, getDetail, requestJoin, updateOuting} from "../api";
+import {DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
 import {unwrap, unwrapError} from "../envelope";
 import {getNotificationsFor} from "../db";
+import {hostname} from "node:os";
+import {at, plusHours, sameTime} from "../utils/date";
 
 
 test.describe("outing-crud actions", ()=> {
@@ -169,5 +171,119 @@ test.describe("outing-crud actions", ()=> {
         expect(notification4[0].kind).toBe('outing_updated')
         expect(notification4[0].payload["outing_title"]).toBe(updated.title)
 
+    });
+    test("host creates outing with end before start date", async () => {
+        const host = await asUser(BASE)
+        await unwrap<OutingResponse>(createOuting(host.ctx, {starts_at:at(3,6), ends_at:at(2, 18)}), 400)
     })
+    test("host creates outing with ends and starts date same", async ()=>{
+        const host = await asUser(BASE)
+        await unwrap<OutingResponse>(createOuting(host.ctx, {starts_at:at(3,6), ends_at:at(3, 6)}), 400)
+    })
+    test("host creates outing with longer than 14 days", async()=> {
+        const host = await asUser(BASE)
+        await unwrap(createOuting(host.ctx,{starts_at:at(3,6), ends_at:at(17,8)}), 400)
+    })
+    test("host creates outing and updates starts and ends date to validate backend codes", async() => {
+        const host = await asUser(BASE)
+        let o =
+            await unwrap<OutingResponse>(createOuting(host.ctx, {starts_at:at(3,6), ends_at:at(3, 18)}), 201)
+
+        // starts moves pass existing end
+        await unwrap(updateOuting(host.ctx, o.id,{starts_at:at(4,8)}), 400)
+        // ends moves before existing starts date
+        await unwrap(updateOuting(host.ctx, o.id, {ends_at:at(2, 18)}), 400)
+        // end pushed passed the 14 days limit
+        await unwrap(updateOuting(host.ctx, o.id, {ends_at:at(17, 8)}), 400)
+        // valid end
+        await unwrap(updateOuting(host.ctx, o.id, {ends_at:at(10, 9)}), 200)
+        // end date no mention
+        await unwrap(updateOuting(host.ctx, o.id, {title:"updated"}), 200)
+        // valid start and end update
+        o = await unwrap<OutingResponse>(createOuting(host.ctx, {starts_at:at(3,6), ends_at:at(3, 18)}), 201)
+        const newEnd = at(10, 9)
+        let updated = await unwrap<OutingResponse>(updateOuting(host.ctx, o.id, {ends_at: newEnd}), 200)
+        expect(new Date(updated.ends_at!).getTime()).toBe(new Date(newEnd).getTime())
+
+        updated = await unwrap<OutingResponse>(updateOuting(host.ctx, o.id, {title: "updated"}), 200)
+        expect(updated.title).toBe("updated")
+        expect(sameTime(updated.ends_at!, newEnd)).toBe(true)
+    })
+    test("host updates both start and end date", async () => {
+        const host = await asUser(BASE)
+        let o = await unwrap<OutingResponse>
+        (createOuting(host.ctx, {starts_at:at(3,6), ends_at:at(3, 18)}), 201)
+        // small shift
+        let newEnd = at(3, 20)
+        let newStart = at(3, 10)
+        let updated = await unwrap<OutingResponse>(updateOuting(host.ctx, o.id, {starts_at:newStart, ends_at:newEnd}), 200)
+        expect(new Date(updated.ends_at!).getTime()).toBe(new Date(newEnd).getTime())
+        expect(new Date(updated.starts_at!).getTime()).toBe(new Date(newStart).getTime())
+        // big shift
+        o = await unwrap<OutingResponse>
+        (createOuting(host.ctx, {starts_at:at(3,6), ends_at:at(3, 18)}), 201)
+        newEnd = at(25, 20)
+        newStart = at(25, 8)
+        updated = await unwrap<OutingResponse>(updateOuting(host.ctx, o.id, {starts_at:newStart, ends_at:newEnd}), 200)
+        expect(new Date(updated.ends_at!).getTime()).toBe(new Date(newEnd).getTime())
+        expect(new Date(updated.starts_at!).getTime()).toBe(new Date(newStart).getTime())
+        //start after end
+        const originalStart = at(3, 6)
+        const originalEnd = at(3, 28)
+        o = await unwrap<OutingResponse>
+        (createOuting(host.ctx, {starts_at:originalStart, ends_at:originalEnd}), 201)
+        newEnd = at(23, 20)
+        newStart= at(24, 6)
+        await unwrap(updateOuting(host.ctx, o.id, {starts_at:newStart, ends_at:newEnd}), 400)
+        const after = await unwrap<DetailResponse>(getDetail(host.ctx, o.id), 200)
+        expect(new Date(after.outing.starts_at).getTime()).toBe(new Date(originalStart).getTime())
+        expect(new Date(after.outing.ends_at!).getTime()).toBe(new Date(originalEnd).getTime())
+
+        // exactly 14 days: accepted
+        const s = at(5, 6)
+        updated = await unwrap<OutingResponse>(
+            updateOuting(host.ctx, o.id, {starts_at: s, ends_at: plusHours(s, 14 * 24)}), 200)
+
+// one hour over: rejected
+        await unwrap(updateOuting(host.ctx, o.id, {starts_at: s, ends_at: plusHours(s, 14 * 24 + 1)}), 400)
+
+    })
+
+    test("host creates outing with no end time", async () => {
+        const host = await asUser(BASE)
+        const o = await unwrap<OutingResponse>(createOuting(host.ctx, {starts_at: at(3, 6)}), 201)
+        expect(o.ends_at).toBeNull()
+    })
+
+    test("host creates outing with an end time", async () => {
+        const host = await asUser(BASE)
+        const end = at(3, 18)
+        const o = await unwrap<OutingResponse>(createOuting(host.ctx, {starts_at: at(3, 6), ends_at: end}), 201)
+        expect(new Date(o.ends_at!).getTime()).toBe(new Date(end).getTime())
+    })
+
+    test("host adds an end time to an outing that had none", async () => {
+        const host = await asUser(BASE)
+        const o = await unwrap<OutingResponse>(createOuting(host.ctx, {starts_at: at(3, 6)}), 201)
+        const detail  = await unwrap<DetailResponse>(getDetail(host.ctx, o.id), 200)
+        expect(detail.outing.ends_at).toBeNull()
+        const end = at(3, 18)
+        const updated = await unwrap<OutingResponse>(updateOuting(host.ctx, o.id, {ends_at: end, clear_ends_at:false}), 200)
+        expect(new Date(updated.ends_at!).getTime()).toBe(new Date(end).getTime())
+    })
+    test("outing with an end, check wins", async()=> {
+        const host = await asUser(BASE)
+        const o =
+            await unwrap<OutingResponse>(createOuting(host.ctx, {starts_at: at(3, 6), ends_at:at(3, 22)}), 201)
+        await unwrap(updateOuting(host.ctx, o.id, {clear_ends_at: true, ends_at: at(3, 20)}), 200)
+        const detail = await unwrap<DetailResponse>(getDetail(host.ctx, o.id), 200)
+        expect(detail.outing.ends_at).toBeNull()
+
+    })
+    test("create with clear_ends_at returns 400", async ()=> {
+        const host = await asUser(BASE)
+        await unwrap(createOuting(host.ctx, {clear_ends_at:true}), 400)
+    })
+
 })
+

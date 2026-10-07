@@ -132,8 +132,8 @@ func (s *OutingStore) CreateOuting(ctx context.Context, o *outing.Outing) error 
 	INSERT INTO outings
 		(id, host_id, title, destination, meet_label, meet_lat,
 		 meet_lng, starts_at, max_size, host_seats, cost_per_seat_cents,
-		 difficulty, pace, notes, status)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+		 difficulty, pace, notes, status, ends_at)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
 	RETURNING id, created_at, updated_at),
 	c AS (	
 	INSERT INTO conversations (kind, outing_id) SELECT 'outing', id FROM o
@@ -145,7 +145,7 @@ func (s *OutingStore) CreateOuting(ctx context.Context, o *outing.Outing) error 
 	err := s.pool.QueryRow(ctx, q,
 		o.ID, o.HostID, o.Title, o.Destination, o.MeetLabel,
 		o.MeetLat, o.MeetLng, o.StartsAt, o.MaxSize, o.HostSeats,
-		o.CostPerSeatCents, o.Difficulty, o.Pace, o.Notes, o.Status,
+		o.CostPerSeatCents, o.Difficulty, o.Pace, o.Notes, o.Status, o.EndsAt,
 	).Scan(&o.CreatedAt, &o.UpdatedAt, &o.ConversationID)
 	if err != nil {
 		return apperr.Database("could not create outing", "insert outings failed", err)
@@ -185,7 +185,7 @@ func (s *OutingStore) GetOuting(ctx context.Context, id uuid.UUID) (*outing.Outi
 	q := `
 		SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
 			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
-			o.created_at, o.updated_at, c.id AS conversation_id
+			o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at
 		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 		WHERE o.id = $1
 `
@@ -218,8 +218,9 @@ func (s *OutingStore) UpdateOuting(ctx context.Context, o *outing.Outing) error 
 			difficulty = $10, 
 			pace = $11, 
 			notes = $12,
-			updated_at = NOW()
-		WHERE id = $13
+			updated_at = NOW(),
+			ends_at = $13
+		WHERE id = $14
 	`
 
 	cmdTag, err := s.pool.Exec(ctx, q,
@@ -235,6 +236,7 @@ func (s *OutingStore) UpdateOuting(ctx context.Context, o *outing.Outing) error 
 		o.Difficulty,
 		o.Pace,
 		o.Notes,
+		o.EndsAt,
 		o.ID,
 	)
 	if err != nil {
@@ -253,7 +255,7 @@ func (s *OutingStore) ListUpcoming(ctx context.Context, now time.Time) ([]outing
 	q := `
 	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
 			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
-			o.created_at, o.updated_at, c.id AS conversation_id
+			o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at
 		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 	WHERE status = 'open' AND starts_at > $1
 	ORDER BY starts_at
@@ -498,7 +500,7 @@ func (s *OutingStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*out
 	hostingQuery := `
 	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
 			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
-			o.created_at, o.updated_at, c.id AS conversation_id
+			o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at
 		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 		WHERE host_id = $1 
 		ORDER BY starts_at
@@ -506,7 +508,7 @@ func (s *OutingStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*out
 	joinedQuery := `
 	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
 			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
-			o.created_at, o.updated_at, c.id AS conversation_id
+			o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at
 		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 		JOIN join_requests jr ON jr.outing_id = o.id
 		WHERE jr.hiker_id = $1 AND jr.status = 'accepted'
@@ -638,6 +640,7 @@ func scanOuting(row pgx.Row) (*outing.Outing, error) {
 		&o.CreatedAt,
 		&o.UpdatedAt,
 		&o.ConversationID,
+		&o.EndsAt,
 	)
 	return o, err
 }
