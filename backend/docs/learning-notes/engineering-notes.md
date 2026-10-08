@@ -219,3 +219,14 @@ The browser hung up before the server answered: a tab closed, a page reloaded, a
 **Chat app error: `duplicate_human_message_uuid`**
 
 Not from Muster. The chat interface received the same message twice. Refresh and resend.
+
+## Lessons from adding the end time
+
+- **`= NULL` is never true.** In a `CHECK`, `ends_at = NULL OR ends_at > starts_at` accepts every row, because a check only rejects when the result is definitely false, and "unknown or false" is unknown. Use `IS NULL`.
+- **`&&` binds tighter than `||`.** `a != nil && a.Before(b) || a.Equal(b)` still calls `a.Equal` when `a` is nil. Prefer one comparison: "before or equal" is `!a.After(b)`.
+- **Validate after applying every field.** A check that compared the new start with the old end rejected a valid move of the whole outing. One rule, in one place, run on the outing as it will be saved.
+- **"Not sent" and "sent as null" look the same to a pointer.** A patch can't remove a value by omitting it. Removal needs its own explicit flag (`clear_ends_at`).
+- **Column lists and scans must agree.** A select with `ends_at` before `conversation_id` and a scan in the other order swapped the two silently. `make check` can't see this; only the API suite runs the real SQL.
+- **Compare times as numbers in tests,** not strings: Go and JavaScript format the same instant differently. Print both values, never a bare true or false.
+- **Build boundary times by adding hours,** not by naming two clock times. Fourteen days between two local 6 AMs is an hour longer across a daylight-saving change.
+- **Test both directions of a rule.** The cases that must be accepted matter as much as the ones that must be rejected.

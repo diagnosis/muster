@@ -66,8 +66,9 @@ func NewService(store Storage, notifications notification.Storage, broadcaster e
 // people need time to muster. leadGrace absorbs clock skew and
 // form-filling time.
 const (
-	minLeadTime = 24 * time.Hour
-	leadGrace   = 5 * time.Minute
+	minLeadTime       = 24 * time.Hour
+	minUpdateLeadTime = 12 * time.Hour
+	leadGrace         = 5 * time.Minute
 )
 
 // maxGuests caps the unregistered +1s one member may bring.
@@ -110,7 +111,7 @@ type UpdateInput struct {
 
 // validateOuting checks the row-shape rules shared by Create and Update:
 // required text fields, 24h lead time, size/seat/cost bounds, enum validity.
-func validateOuting(o *Outing) error {
+func validateOuting(o *Outing, isUpdate bool) error {
 
 	v := validator.New()
 	v.Required("title", o.Title)
@@ -119,9 +120,18 @@ func validateOuting(o *Outing) error {
 	if verr := v.Errors(); verr != nil {
 		return verr
 	}
-	if time.Until(o.StartsAt) < minLeadTime-leadGrace {
-		return apperr.BadRequest("outing has to be at least 24 hours in advance", "under 24h lead time")
+	if isUpdate {
+		if time.Until(o.StartsAt) < minUpdateLeadTime-leadGrace {
+			return apperr.BadRequest("too late to update! try cancel and recreate", "under 12h update lead time")
+		}
+
+	} else {
+		if time.Until(o.StartsAt) < minLeadTime-leadGrace {
+			return apperr.BadRequest("outing has to be at least 24 hours in advance", "under 24h lead time")
+		}
+
 	}
+
 	if o.EndsAt != nil && !o.EndsAt.After(o.StartsAt) {
 		return apperr.BadRequest("ends at cannot be before or equal starts at", "endsAt <= startsAt")
 	}
@@ -175,7 +185,7 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 		EndsAt:           in.EndsAt,
 	}
 
-	err := validateOuting(o)
+	err := validateOuting(o, false)
 	if err != nil {
 		return nil, err
 	}
@@ -200,8 +210,8 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 	if o.Status == StatusCancelled {
 		return nil, apperr.Conflict("outing is cancelled", "update on cancelled outing")
 	}
-	if o.StartsAt.Before(time.Now()) {
-		return nil, apperr.BadRequest("cannot update a past outing", "outing already started")
+	if time.Until(o.StartsAt) < minUpdateLeadTime {
+		return nil, apperr.BadRequest("it's too late to edit this outing; you can still cancel it", "under 12h edit cutoff")
 	}
 
 	if in.Title != nil {
@@ -263,7 +273,7 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 		)
 	}
 
-	if verr := validateOuting(o); verr != nil {
+	if verr := validateOuting(o, true); verr != nil {
 		return nil, verr
 	}
 	if err = s.store.UpdateOuting(ctx, o); err != nil {
@@ -482,7 +492,15 @@ func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID)
 // first. The service owns the clock; the store just filters against
 // the time it's given.
 func (s *Service) ListUpcoming(ctx context.Context) ([]Outing, error) {
-	return s.store.ListUpcoming(ctx, time.Now())
+	now := time.Now()
+	outings, err := s.store.ListUpcoming(ctx, now)
+	if err != nil {
+		return nil, err
+	}
+	for i := range outings {
+		outings[i].Phase = outings[i].PhaseAt(now)
+	}
+	return outings, nil
 }
 
 // PendingRequests returns the outing's pending join requests, oldest
@@ -532,6 +550,9 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 			myReq = nil // no request — normal, page renders without it
 		}
 	}
+
+	o.Phase = o.PhaseAt(time.Now())
+
 	peopleCount := 1
 	seatCapacity := o.HostSeats
 	for _, r := range acceptedRequests {

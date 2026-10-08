@@ -134,6 +134,45 @@ type Outing struct {
 	UpdatedAt        time.Time  `json:"updated_at"`
 	ConversationID   *uuid.UUID `json:"conversation_id"`
 	EndsAt           *time.Time `json:"ends_at"`
+	Phase            Phase      `json:"phase"`
+}
+
+// Phase is where an outing sits in time: before it starts, under way, or over.
+type Phase string
+
+// Phases status
+const (
+	PhaseUpcoming   Phase = "upcoming"
+	PhaseInProgress Phase = "in_progress"
+	PhasePast       Phase = "past"
+)
+
+// Valid reports whether p is a known outing phase.
+func (p Phase) Valid() bool {
+	switch p {
+	case PhaseInProgress, PhasePast, PhaseUpcoming:
+		return true
+	}
+	return false
+}
+
+const dayHikeLimit = 12 * time.Hour
+
+// PhaseAt reports the outing's phase at the given time. An outing is in
+// progress from its start up to, but not including, its end. With no end
+// time, the end is taken to be dayHikeLimit after the start.
+func (o *Outing) PhaseAt(now time.Time) Phase {
+	end := o.StartsAt.Add(dayHikeLimit)
+	if o.EndsAt != nil {
+		end = *o.EndsAt
+	}
+	if now.Before(o.StartsAt) {
+		return PhaseUpcoming
+	}
+	if now.Before(end) {
+		return PhaseInProgress
+	}
+	return PhasePast
 }
 
 // JoinRequest links a hiker to an outing. It only exists as that link;

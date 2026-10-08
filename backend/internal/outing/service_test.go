@@ -34,6 +34,19 @@ func seedOutingWithStartTime(maxSize, hostSeats int, status Status, hostID uuid.
 	f.outings[o.ID] = o
 	return o
 }
+func seedOutingWithStartAndEndTime(maxSize, hostSeats int, status Status, hostID uuid.UUID, f *fakeStore, startTime time.Time, endTime *time.Time) *Outing {
+	o := &Outing{
+		ID: uuid.New(), HostID: hostID,
+		Title: "seeded outing", Destination: "seeded dest", MeetLabel: "seeded meet",
+		StartsAt: startTime,
+		MaxSize:  maxSize, HostSeats: hostSeats,
+		Difficulty: DifficultyModerate, Pace: PaceRelaxed,
+		Status: status,
+		EndsAt: endTime,
+	}
+	f.outings[o.ID] = o
+	return o
+}
 func seedMember(hikerID uuid.UUID, name, experience string, f *fakeStore) *Member {
 	m := &Member{HikerID: hikerID, Name: name, Experience: experience}
 	f.hikers[hikerID] = m
@@ -958,4 +971,161 @@ func Test_Update_SizeShrinkNotAllowedLessThenPeopleCount(t *testing.T) {
 	if err != nil {
 		t.Errorf("exact-fit capacity should be allowed, got %v", err)
 	}
+}
+
+func Test_Outing_Phase(t *testing.T) {
+	start := time.Date(2026, 10, 10, 6, 0, 0, 0, time.UTC)
+	end := start.Add(30 * time.Hour)
+
+	cases := []struct {
+		name   string
+		endsAt *time.Time
+		now    time.Time
+		want   Phase
+	}{
+		{name: "before the start", now: start.Add(-time.Hour), want: PhaseUpcoming},
+		{name: "exactly at the start", now: start, want: PhaseInProgress},
+		{name: "no end, 6 hours in", now: start.Add(6 * time.Hour), want: PhaseInProgress},
+		{name: "no end, exactly 12 hours in", now: start.Add(12 * time.Hour), want: PhasePast},
+		{name: "no end, 13 hours in", now: start.Add(13 * time.Hour), want: PhasePast},
+		{name: "has end, before it", endsAt: &end, now: start.Add(20 * time.Hour), want: PhaseInProgress},
+		{name: "has end, exactly at it", endsAt: &end, now: end, want: PhasePast},
+		{name: "has end, after it", endsAt: &end, now: end.Add(time.Hour), want: PhasePast},
+		{name: "has end, before the start", endsAt: &end, now: start.Add(-time.Hour), want: PhaseUpcoming},
+	}
+
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			o := &Outing{StartsAt: start, EndsAt: cc.endsAt}
+			if got := o.PhaseAt(cc.now); got != cc.want {
+				t.Errorf("got %q, want %q", got, cc.want)
+			}
+		})
+	}
+}
+
+func Test_Outing_WithPhase_Upcoming(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	end := time.Now().Add(50 * time.Hour)
+	o := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(30*time.Hour), &end)
+	seedMember(host, "cafer", "beginner", f)
+	detail, err := svc.Detail(context.Background(), o.ID, &host)
+	if err != nil {
+		t.Fatalf("expected no error got error %v", err)
+	}
+	if detail.Outing.Phase != PhaseUpcoming {
+		t.Fatalf("phase: got %q, want %q", detail.Outing.Phase, PhaseUpcoming)
+	}
+}
+
+func Test_Outing_WithPhase_Detail_Past(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	end := time.Now().Add(-20 * time.Hour)
+	o := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(-30*time.Hour), &end)
+	seedMember(host, "cafer", "beginner", f)
+	detail, err := svc.Detail(context.Background(), o.ID, &host)
+	if err != nil {
+		t.Fatalf("expected no error got error %v", err)
+	}
+	if detail.Outing.Phase != PhasePast {
+		t.Fatalf("phase: got %q, want %q", detail.Outing.Phase, PhasePast)
+	}
+}
+func Test_Outing_WithPhase_Detail_InProgress(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	end := time.Now().Add(10 * time.Hour)
+	o := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(-10*time.Hour), &end)
+	seedMember(host, "cafer", "beginner", f)
+	detail, err := svc.Detail(context.Background(), o.ID, &host)
+	if err != nil {
+		t.Fatalf("expected no error got error %v", err)
+	}
+	if detail.Outing.Phase != PhaseInProgress {
+		t.Fatalf("phase: got %q, want %q", detail.Outing.Phase, PhaseInProgress)
+	}
+}
+
+func Test_ListOuting_Phase(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	inProgressEnd := time.Now().Add(10 * time.Hour)
+	upComingEnd := time.Now().Add(50 * time.Hour)
+	pastEnd := time.Now().Add(-10 * time.Hour)
+	seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(30*time.Hour), &upComingEnd)
+	seedOutingWithStartAndEndTime(8, 4, StatusOpen, host, f, time.Now().Add(10*time.Hour), &upComingEnd)
+	seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(-30*time.Hour), &pastEnd)
+	seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(-10*time.Hour), &inProgressEnd)
+	outings, err := svc.ListUpcoming(context.Background())
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(outings) != 2 {
+		t.Fatalf("expected 2 got %d", len(outings))
+	}
+	for _, o := range outings {
+		if o.Phase != PhaseUpcoming {
+			t.Errorf("expected phase: %v got %v", PhaseUpcoming, o.Phase)
+		}
+	}
+}
+
+func Test_UpdateOuting_Deadlines_Rejections(t *testing.T) {
+	host := uuid.New()
+	svc, f, _, _ := newTestService(t)
+
+	title := "renamed"
+	in3Days := time.Now().Add(72 * time.Hour)
+	in1Hour := time.Now().Add(1 * time.Hour)
+
+	cases := []struct {
+		name     string
+		startsAt time.Time
+		in       UpdateInput
+	}{
+		{name: "outing in 6 hours, start moved 3 days out", startsAt: time.Now().Add(6 * time.Hour), in: UpdateInput{StartsAt: &in3Days}},
+		{name: "outing in 6 hours, edit title", startsAt: time.Now().Add(6 * time.Hour), in: UpdateInput{Title: &title}},
+		{name: "outing in 3 days, start moved to 1 hour from now", startsAt: time.Now().Add(72 * time.Hour), in: UpdateInput{StartsAt: &in1Hour}},
+	}
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			o := seedOutingWithStartTime(6, 4, StatusOpen, host, f, cc.startsAt)
+			_, err := svc.Update(context.Background(), host, o.ID, cc.in)
+			wantStatus(t, err, apperr.CodeBadRequest)
+		})
+	}
+}
+
+func Test_UpdateOuting_DeadLine_Pass(t *testing.T) {
+	host := uuid.New()
+	svc, f, _, _ := newTestService(t)
+	o := seedOutingWithStartTime(6, 4, StatusOpen, host, f, time.Now().Add(18*time.Hour))
+	title := "Poo Poo Point"
+	u, err := svc.Update(context.Background(), host, o.ID, UpdateInput{Title: &title})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if u.Title != title {
+		t.Fatalf("expected %s got %s", title, u.Title)
+	}
+}
+
+func Test_CreateOuting_StartsLessThan24Hours(t *testing.T) {
+	host := uuid.New()
+	svc, _, _, _ := newTestService(t)
+
+	in := CreateInput{
+		Title:       "Rattlesnake Ledge",
+		Destination: "North Bend",
+		MeetLabel:   "Trailhead lot",
+		StartsAt:    time.Now().Add(18 * time.Hour),
+		MaxSize:     6,
+		HostSeats:   4,
+		Difficulty:  DifficultyEasy,
+		Pace:        PaceRelaxed,
+	}
+	_, err := svc.Create(context.Background(), host, in)
+	wantStatus(t, err, apperr.CodeBadRequest)
 }
