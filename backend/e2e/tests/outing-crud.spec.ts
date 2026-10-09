@@ -267,9 +267,11 @@ test.describe("outing-crud actions", ()=> {
         const o = await unwrap<OutingResponse>(createOuting(host.ctx, {starts_at: at(3, 6)}), 201)
         const detail  = await unwrap<DetailResponse>(getDetail(host.ctx, o.id), 200)
         expect(detail.outing.ends_at).toBeNull()
+        expect(detail.outing.phase).toBe("upcoming")
         const end = at(3, 18)
         const updated = await unwrap<OutingResponse>(updateOuting(host.ctx, o.id, {ends_at: end, clear_ends_at:false}), 200)
         expect(new Date(updated.ends_at!).getTime()).toBe(new Date(end).getTime())
+        expect(updated.phase).toBe("upcoming")
     })
     test("outing with an end, check wins", async()=> {
         const host = await asUser(BASE)

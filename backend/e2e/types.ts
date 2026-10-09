@@ -45,6 +45,7 @@ export interface OutingResponse {
     pace: 'relaxed' | 'fast' | 'moderate'
     conversation_id: string
     ends_at?: string
+    phase: string
 }
 
 export interface JoinRequestResponse {

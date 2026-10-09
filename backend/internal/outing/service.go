@@ -189,8 +189,12 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 	if err != nil {
 		return nil, err
 	}
+	o.Phase = o.PhaseAt(time.Now())
 
-	return o, s.store.CreateOuting(ctx, o)
+	if err = s.store.CreateOuting(ctx, o); err != nil {
+		return nil, err
+	}
+	return o, nil
 }
 
 // Update patches the host's open, future outing. Nil fields are left
@@ -280,6 +284,7 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 		return nil, err
 	}
 
+	o.Phase = o.PhaseAt(time.Now())
 	s.notifyOutingAudience(ctx, o, notification.KindOutingUpdated)
 
 	return o, nil
@@ -497,9 +502,7 @@ func (s *Service) ListUpcoming(ctx context.Context) ([]Outing, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i := range outings {
-		outings[i].Phase = outings[i].PhaseAt(now)
-	}
+	stampPhases(outings, now)
 	return outings, nil
 }
 
@@ -519,7 +522,21 @@ func (s *Service) PendingRequests(ctx context.Context, hostID, outingID uuid.UUI
 
 // MyOutings returns the outings the hiker hosts and the ones they've joined (accepted only), each soonest first.
 func (s *Service) MyOutings(ctx context.Context, hikerID uuid.UUID) (*MyOutings, error) {
-	return s.store.ListForHiker(ctx, hikerID)
+	mine, err := s.store.ListForHiker(ctx, hikerID)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	stampPhases(mine.Hosting, now)
+	stampPhases(mine.Joined, now)
+	return mine, nil
+}
+
+// stampPhases sets each outing's phase as of now.
+func stampPhases(outings []Outing, now time.Time) {
+	for i := range outings {
+		outings[i].Phase = outings[i].PhaseAt(now)
+	}
 }
 
 // Detail assembles the full view of one outing for one viewer: outing, host card, accepted roster, derived seat math, and — when viewerID is non-nil — the viewer's own request if any.

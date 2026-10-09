@@ -1129,3 +1129,104 @@ func Test_CreateOuting_StartsLessThan24Hours(t *testing.T) {
 	_, err := svc.Create(context.Background(), host, in)
 	wantStatus(t, err, apperr.CodeBadRequest)
 }
+
+func Test_MyOutings_Phase(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	member := uuid.New()
+	seedMember(member, "jale", "beginner", f)
+
+	now := time.Now()
+	endIn10h := now.Add(10 * time.Hour)
+	ended20hAgo := now.Add(-20 * time.Hour)
+
+	cases := []struct {
+		name   string
+		start  time.Time
+		endsAt *time.Time
+		want   Phase
+	}{
+		{name: "starts in 30h", start: now.Add(30 * time.Hour), want: PhaseUpcoming},
+		{name: "started 2h ago, no end", start: now.Add(-2 * time.Hour), want: PhaseInProgress},
+		{name: "started 20h ago, ends in 10h", start: now.Add(-20 * time.Hour), endsAt: &endIn10h, want: PhaseInProgress},
+		{name: "started 13h ago, no end", start: now.Add(-13 * time.Hour), want: PhasePast},
+		{name: "started 30h ago, ended 20h ago", start: now.Add(-30 * time.Hour), endsAt: &ended20hAgo, want: PhasePast},
+	}
+
+	want := map[uuid.UUID]Phase{}
+	names := map[uuid.UUID]string{}
+	for _, cc := range cases {
+		o := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, cc.start, cc.endsAt)
+		seedJoinRequest(o.ID, member, RequestStatusAccepted, "rider", f, 0)
+		want[o.ID] = cc.want
+		names[o.ID] = cc.name
+	}
+
+	check := func(t *testing.T, list []Outing) {
+		t.Helper()
+		if len(list) != len(cases) {
+			t.Fatalf("got %d outings, want %d", len(list), len(cases))
+		}
+		for _, o := range list {
+			if o.Phase != want[o.ID] {
+				t.Errorf("%s: got %q, want %q", names[o.ID], o.Phase, want[o.ID])
+			}
+		}
+	}
+
+	t.Run("hosting", func(t *testing.T) {
+		mine, err := svc.MyOutings(context.Background(), host)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		check(t, mine.Hosting)
+	})
+	t.Run("joined", func(t *testing.T) {
+		mine, err := svc.MyOutings(context.Background(), member)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		check(t, mine.Joined)
+	})
+}
+
+func Test_CreateAndUpdate_Phase(t *testing.T) {
+	svc, _, _, _ := newTestService(t)
+	host := uuid.New()
+	starts := time.Now().Add(25 * time.Hour)
+	ends := starts.Add(10 * time.Hour)
+	in := CreateInput{
+		Title:            "test",
+		Destination:      "test",
+		MeetLabel:        "test",
+		HostSeats:        2,
+		CostPerSeatCents: 20,
+		MeetLat:          nil,
+		MeetLng:          nil,
+		StartsAt:         starts,
+		MaxSize:          10,
+		Difficulty:       DifficultyHard,
+		Pace:             PaceRelaxed,
+		Notes:            nil,
+		EndsAt:           &ends,
+	}
+	o, err := svc.Create(context.Background(), host, in)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if o.Phase != PhaseUpcoming {
+		t.Fatalf("expected %s got %s", PhaseUpcoming, o.Phase)
+	}
+
+	title := "updated"
+	startsAt := time.Now().Add(48 * time.Hour)
+	endsAt := time.Now().Add(60 * time.Hour)
+	maxCount := 16
+	u, err := svc.Update(context.Background(), host, o.ID, UpdateInput{StartsAt: &startsAt, EndsAt: &endsAt, MaxSize: &maxCount, Title: &title})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if u.Phase != PhaseUpcoming {
+		t.Fatalf("expected %s got %s", PhaseUpcoming, u.Phase)
+	}
+}

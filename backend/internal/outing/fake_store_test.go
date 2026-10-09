@@ -38,6 +38,7 @@ func (f *fakeStore) GetOuting(ctx context.Context, id uuid.UUID) (*Outing, error
 		return nil, apperr.NotFound("outing not found", "fake: no outing")
 	}
 	cp := *o
+	cp.Phase = ""
 	return &cp, nil
 }
 func (f *fakeStore) CreateOuting(ctx context.Context, o *Outing) error {
@@ -207,7 +208,9 @@ func (f *fakeStore) UpdateOuting(ctx context.Context, o *Outing) error {
 	if _, ok := f.outings[o.ID]; !ok {
 		return apperr.NotFound("outing not found", "fake: no outing to update")
 	}
-	f.outings[o.ID] = o
+	cp := *o
+	cp.Phase = ""
+	f.outings[o.ID] = &cp
 	return nil
 }
 
