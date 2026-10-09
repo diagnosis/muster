@@ -122,7 +122,7 @@ func validateOuting(o *Outing, isUpdate bool) error {
 	}
 	if isUpdate {
 		if time.Until(o.StartsAt) < minUpdateLeadTime-leadGrace {
-			return apperr.BadRequest("too late to update! try cancel and recreate", "under 12h update lead time")
+			return apperr.BadRequest("the new start time is too close", "under 12h update lead time")
 		}
 
 	} else {
@@ -213,6 +213,9 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 	}
 	if o.Status == StatusCancelled {
 		return nil, apperr.Conflict("outing is cancelled", "update on cancelled outing")
+	}
+	if o.StartsAt.Before(time.Now()) {
+		return nil, apperr.BadRequest("cannot update a past outing", "outing already started")
 	}
 	if time.Until(o.StartsAt) < minUpdateLeadTime {
 		return nil, apperr.BadRequest("it's too late to edit this outing; you can still cancel it", "under 12h edit cutoff")
