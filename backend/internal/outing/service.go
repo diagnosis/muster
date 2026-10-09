@@ -418,6 +418,11 @@ func (s *Service) loadForHostAction(ctx context.Context, hostID, requestID uuid.
 	if o.Status != StatusOpen {
 		return nil, nil, apperr.Conflict("event is closed", "event is closed")
 	}
+
+	if o.PhaseAt(time.Now()) != PhaseUpcoming {
+		return nil, nil, apperr.Conflict("outing is not upcoming", "outing is not upcoming")
+	}
+
 	return joinRequest, o, nil
 }
 
@@ -459,8 +464,8 @@ func (s *Service) Decline(ctx context.Context, hostID, requestID uuid.UUID) erro
 }
 
 // Withdraw pulls the caller's own request, whether pending or already
-// accepted. A withdrawing driver takes their seats — the shortage
-// shows in Detail; the host resolves it.
+// accepted, as long as the outing has not started. A withdrawing driver
+// takes their seats — the shortage shows in Detail; the host resolves it.
 func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) error {
 	outing, err := s.store.GetOuting(ctx, outingID)
 	if err != nil {
@@ -472,6 +477,9 @@ func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) err
 	}
 	if joinRequest.Status != RequestStatusRequested && joinRequest.Status != RequestStatusAccepted {
 		return apperr.Conflict("nothing to withdraw", "withdraw requires requested or accepted")
+	}
+	if outing.PhaseAt(time.Now()) != PhaseUpcoming {
+		return apperr.Conflict("this outing has already started", "withdraw on started outing")
 	}
 	if err = s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusWithdrawn); err != nil {
 		return err

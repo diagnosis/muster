@@ -1230,3 +1230,97 @@ func Test_CreateAndUpdate_Phase(t *testing.T) {
 		t.Fatalf("expected %s got %s", PhaseUpcoming, u.Phase)
 	}
 }
+
+func Test_HostActions_Rejections_Conflict(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	member := uuid.New()
+	// in progress outing
+	now := time.Now()
+	startUpcoming := now.Add(48 * time.Hour)
+	endUpcoming := now.Add(56 * time.Hour)
+	startInProgress := now.Add(-6 * time.Hour)
+	endInProgress := now.Add(4 * time.Hour)
+	startPast := now.Add(-48 * time.Hour)
+	endPast := now.Add(-38 * time.Hour)
+	phases := []struct {
+		name    string
+		startAt time.Time
+		endsAt  *time.Time
+		wantErr bool
+	}{
+		{name: "upcoming", startAt: startUpcoming, wantErr: false},
+		{name: "upcoming with end", startAt: startUpcoming, endsAt: &endUpcoming, wantErr: false},
+		{name: "in progress no end", startAt: startInProgress, wantErr: true},
+		{name: "in progress with end", startAt: startInProgress, endsAt: &endInProgress, wantErr: true},
+		{name: "past no end", startAt: startPast, wantErr: true},
+		{name: "past with end", startAt: startPast, endsAt: &endPast, wantErr: true},
+	}
+	actions := []struct {
+		name   string
+		status RequestStatus
+		do     func(ctx context.Context, host, req uuid.UUID) error
+	}{
+		{name: "accept", status: RequestStatusRequested, do: svc.Accept},
+		{name: "decline", status: RequestStatusRequested, do: svc.Decline},
+		{name: "remove", status: RequestStatusAccepted, do: svc.RemoveMember},
+	}
+
+	for _, pp := range phases {
+		for _, aa := range actions {
+			t.Run(pp.name+" - "+aa.name, func(t *testing.T) {
+				outing := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, pp.startAt, pp.endsAt)
+				jr := seedJoinRequest(outing.ID, member, aa.status, "rider", f, 0)
+				err := aa.do(context.Background(), host, jr.ID)
+				if pp.wantErr {
+					wantStatus(t, err, apperr.CodeConflict)
+				} else if err != nil {
+					t.Errorf("expected no error got %v", err)
+				}
+
+			})
+		}
+	}
+
+}
+
+func Test_Withdraw_Phase(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	member := uuid.New()
+	now := time.Now()
+	startUpcoming := now.Add(48 * time.Hour)
+	endUpcoming := now.Add(56 * time.Hour)
+	startInProgress := now.Add(-6 * time.Hour)
+	endInProgress := now.Add(4 * time.Hour)
+	startPast := now.Add(-48 * time.Hour)
+	endPast := now.Add(-38 * time.Hour)
+
+	phases := []struct {
+		name    string
+		startAt time.Time
+		endsAt  *time.Time
+		wantErr bool
+	}{
+		{name: "upcoming", startAt: startUpcoming, wantErr: false},
+		{name: "upcoming with end", startAt: startUpcoming, endsAt: &endUpcoming, wantErr: false},
+		{name: "in progress no end", startAt: startInProgress, wantErr: true},
+		{name: "in progress with end", startAt: startInProgress, endsAt: &endInProgress, wantErr: true},
+		{name: "past no end", startAt: startPast, wantErr: true},
+		{name: "past with end", startAt: startPast, endsAt: &endPast, wantErr: true},
+	}
+	for _, status := range []RequestStatus{RequestStatusAccepted, RequestStatusRequested} {
+		for _, pp := range phases {
+			t.Run(string(status)+" - "+pp.name, func(t *testing.T) {
+				outing := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, pp.startAt, pp.endsAt)
+				_ = seedJoinRequest(outing.ID, member, status, "rider", f, 0)
+				err := svc.Withdraw(context.Background(), member, outing.ID)
+				if pp.wantErr {
+					wantStatus(t, err, apperr.CodeConflict)
+				} else if err != nil {
+					t.Errorf("expected no error got %v", err)
+				}
+			})
+		}
+	}
+}

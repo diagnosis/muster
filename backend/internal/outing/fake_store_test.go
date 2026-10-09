@@ -43,8 +43,8 @@ func (f *fakeStore) GetOuting(ctx context.Context, id uuid.UUID) (*Outing, error
 }
 func (f *fakeStore) CreateOuting(ctx context.Context, o *Outing) error {
 	cp := *o
-	f.outings[o.ID] = &cp
 	cp.Phase = ""
+	f.outings[o.ID] = &cp
 	return nil
 }
 func (f *fakeStore) CreateJoinRequest(ctx context.Context, r *JoinRequest) error {
