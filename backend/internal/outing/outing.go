@@ -157,22 +157,35 @@ func (p Phase) Valid() bool {
 }
 
 const dayHikeLimit = 12 * time.Hour
+const discussionWindow = 7 * 24 * time.Hour
 
 // PhaseAt reports the outing's phase at the given time. An outing is in
 // progress from its start up to, but not including, its end. With no end
 // time, the end is taken to be dayHikeLimit after the start.
 func (o *Outing) PhaseAt(now time.Time) Phase {
-	end := o.StartsAt.Add(dayHikeLimit)
-	if o.EndsAt != nil {
-		end = *o.EndsAt
-	}
+
 	if now.Before(o.StartsAt) {
 		return PhaseUpcoming
 	}
-	if now.Before(end) {
+	if now.Before(o.effectiveEnd()) {
 		return PhaseInProgress
 	}
 	return PhasePast
+}
+
+// effectiveEnd is when the outing is over: its end time if set,
+// otherwise dayHikeLimit after the start.
+func (o *Outing) effectiveEnd() time.Time {
+	if o.EndsAt != nil {
+		return *o.EndsAt
+	}
+	return o.StartsAt.Add(dayHikeLimit)
+}
+
+// DiscussionOpen reports whether comments can still be added at the
+// given time: until discussionWindow after the outing ends.
+func (o *Outing) DiscussionOpen(now time.Time) bool {
+	return now.Before(o.effectiveEnd().Add(discussionWindow))
 }
 
 // JoinRequest links a hiker to an outing. It only exists as that link;
