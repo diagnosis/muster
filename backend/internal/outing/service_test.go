@@ -34,6 +34,19 @@ func seedOutingWithStartTime(maxSize, hostSeats int, status Status, hostID uuid.
 	f.outings[o.ID] = o
 	return o
 }
+func seedOutingWithStartAndEndTime(maxSize, hostSeats int, status Status, hostID uuid.UUID, f *fakeStore, startTime time.Time, endTime *time.Time) *Outing {
+	o := &Outing{
+		ID: uuid.New(), HostID: hostID,
+		Title: "seeded outing", Destination: "seeded dest", MeetLabel: "seeded meet",
+		StartsAt: startTime,
+		MaxSize:  maxSize, HostSeats: hostSeats,
+		Difficulty: DifficultyModerate, Pace: PaceRelaxed,
+		Status: status,
+		EndsAt: endTime,
+	}
+	f.outings[o.ID] = o
+	return o
+}
 func seedMember(hikerID uuid.UUID, name, experience string, f *fakeStore) *Member {
 	m := &Member{HikerID: hikerID, Name: name, Experience: experience}
 	f.hikers[hikerID] = m
@@ -957,5 +970,363 @@ func Test_Update_SizeShrinkNotAllowedLessThenPeopleCount(t *testing.T) {
 	_, err = svc.Update(context.Background(), host, o.ID, UpdateInput{MaxSize: &okSize})
 	if err != nil {
 		t.Errorf("exact-fit capacity should be allowed, got %v", err)
+	}
+}
+
+func Test_Outing_Phase(t *testing.T) {
+	start := time.Date(2026, 10, 10, 6, 0, 0, 0, time.UTC)
+	end := start.Add(30 * time.Hour)
+
+	cases := []struct {
+		name   string
+		endsAt *time.Time
+		now    time.Time
+		want   Phase
+	}{
+		{name: "before the start", now: start.Add(-time.Hour), want: PhaseUpcoming},
+		{name: "exactly at the start", now: start, want: PhaseInProgress},
+		{name: "no end, 6 hours in", now: start.Add(6 * time.Hour), want: PhaseInProgress},
+		{name: "no end, exactly 12 hours in", now: start.Add(12 * time.Hour), want: PhasePast},
+		{name: "no end, 13 hours in", now: start.Add(13 * time.Hour), want: PhasePast},
+		{name: "has end, before it", endsAt: &end, now: start.Add(20 * time.Hour), want: PhaseInProgress},
+		{name: "has end, exactly at it", endsAt: &end, now: end, want: PhasePast},
+		{name: "has end, after it", endsAt: &end, now: end.Add(time.Hour), want: PhasePast},
+		{name: "has end, before the start", endsAt: &end, now: start.Add(-time.Hour), want: PhaseUpcoming},
+	}
+
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			o := &Outing{StartsAt: start, EndsAt: cc.endsAt}
+			if got := o.PhaseAt(cc.now); got != cc.want {
+				t.Errorf("got %q, want %q", got, cc.want)
+			}
+		})
+	}
+}
+
+func Test_Outing_WithPhase_Upcoming(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	end := time.Now().Add(50 * time.Hour)
+	o := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(30*time.Hour), &end)
+	seedMember(host, "cafer", "beginner", f)
+	detail, err := svc.Detail(context.Background(), o.ID, &host)
+	if err != nil {
+		t.Fatalf("expected no error got error %v", err)
+	}
+	if detail.Outing.Phase != PhaseUpcoming {
+		t.Fatalf("phase: got %q, want %q", detail.Outing.Phase, PhaseUpcoming)
+	}
+}
+
+func Test_Outing_WithPhase_Detail_Past(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	end := time.Now().Add(-20 * time.Hour)
+	o := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(-30*time.Hour), &end)
+	seedMember(host, "cafer", "beginner", f)
+	detail, err := svc.Detail(context.Background(), o.ID, &host)
+	if err != nil {
+		t.Fatalf("expected no error got error %v", err)
+	}
+	if detail.Outing.Phase != PhasePast {
+		t.Fatalf("phase: got %q, want %q", detail.Outing.Phase, PhasePast)
+	}
+}
+func Test_Outing_WithPhase_Detail_InProgress(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	end := time.Now().Add(10 * time.Hour)
+	o := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(-10*time.Hour), &end)
+	seedMember(host, "cafer", "beginner", f)
+	detail, err := svc.Detail(context.Background(), o.ID, &host)
+	if err != nil {
+		t.Fatalf("expected no error got error %v", err)
+	}
+	if detail.Outing.Phase != PhaseInProgress {
+		t.Fatalf("phase: got %q, want %q", detail.Outing.Phase, PhaseInProgress)
+	}
+}
+
+func Test_ListOuting_Phase(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	inProgressEnd := time.Now().Add(10 * time.Hour)
+	upComingEnd := time.Now().Add(50 * time.Hour)
+	pastEnd := time.Now().Add(-10 * time.Hour)
+	seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(30*time.Hour), &upComingEnd)
+	seedOutingWithStartAndEndTime(8, 4, StatusOpen, host, f, time.Now().Add(10*time.Hour), &upComingEnd)
+	seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(-30*time.Hour), &pastEnd)
+	seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, time.Now().Add(-10*time.Hour), &inProgressEnd)
+	outings, err := svc.ListUpcoming(context.Background())
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(outings) != 2 {
+		t.Fatalf("expected 2 got %d", len(outings))
+	}
+	for _, o := range outings {
+		if o.Phase != PhaseUpcoming {
+			t.Errorf("expected phase: %v got %v", PhaseUpcoming, o.Phase)
+		}
+	}
+}
+
+func Test_UpdateOuting_Deadlines_Rejections(t *testing.T) {
+	host := uuid.New()
+	svc, f, _, _ := newTestService(t)
+
+	title := "renamed"
+	in3Days := time.Now().Add(72 * time.Hour)
+	in1Hour := time.Now().Add(1 * time.Hour)
+
+	cases := []struct {
+		name     string
+		startsAt time.Time
+		in       UpdateInput
+	}{
+		{name: "outing in 6 hours, start moved 3 days out", startsAt: time.Now().Add(6 * time.Hour), in: UpdateInput{StartsAt: &in3Days}},
+		{name: "outing in 6 hours, edit title", startsAt: time.Now().Add(6 * time.Hour), in: UpdateInput{Title: &title}},
+		{name: "outing in 3 days, start moved to 1 hour from now", startsAt: time.Now().Add(72 * time.Hour), in: UpdateInput{StartsAt: &in1Hour}},
+	}
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			o := seedOutingWithStartTime(6, 4, StatusOpen, host, f, cc.startsAt)
+			_, err := svc.Update(context.Background(), host, o.ID, cc.in)
+			wantStatus(t, err, apperr.CodeBadRequest)
+		})
+	}
+}
+
+func Test_UpdateOuting_DeadLine_Pass(t *testing.T) {
+	host := uuid.New()
+	svc, f, _, _ := newTestService(t)
+	o := seedOutingWithStartTime(6, 4, StatusOpen, host, f, time.Now().Add(18*time.Hour))
+	title := "Poo Poo Point"
+	u, err := svc.Update(context.Background(), host, o.ID, UpdateInput{Title: &title})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if u.Title != title {
+		t.Fatalf("expected %s got %s", title, u.Title)
+	}
+}
+
+func Test_CreateOuting_StartsLessThan24Hours(t *testing.T) {
+	host := uuid.New()
+	svc, _, _, _ := newTestService(t)
+
+	in := CreateInput{
+		Title:       "Rattlesnake Ledge",
+		Destination: "North Bend",
+		MeetLabel:   "Trailhead lot",
+		StartsAt:    time.Now().Add(18 * time.Hour),
+		MaxSize:     6,
+		HostSeats:   4,
+		Difficulty:  DifficultyEasy,
+		Pace:        PaceRelaxed,
+	}
+	_, err := svc.Create(context.Background(), host, in)
+	wantStatus(t, err, apperr.CodeBadRequest)
+}
+
+func Test_MyOutings_Phase(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	member := uuid.New()
+	seedMember(member, "jale", "beginner", f)
+
+	now := time.Now()
+	endIn10h := now.Add(10 * time.Hour)
+	ended200hAgo := now.Add(-200 * time.Hour)
+
+	cases := []struct {
+		name             string
+		start            time.Time
+		endsAt           *time.Time
+		want             Phase
+		isDiscussionOpen bool
+	}{
+		{name: "starts in 30h", start: now.Add(30 * time.Hour), want: PhaseUpcoming, isDiscussionOpen: true},
+		{name: "started 2h ago, no end", start: now.Add(-2 * time.Hour), want: PhaseInProgress, isDiscussionOpen: true},
+		{name: "started 20h ago, ends in 10h", start: now.Add(-20 * time.Hour), endsAt: &endIn10h, want: PhaseInProgress, isDiscussionOpen: true},
+		{name: "started 13h ago, no end", start: now.Add(-13 * time.Hour), want: PhasePast, isDiscussionOpen: true},
+		{name: "started 210h ago, ended 200h ago", start: now.Add(-210 * time.Hour), endsAt: &ended200hAgo, want: PhasePast, isDiscussionOpen: false},
+	}
+
+	want := map[uuid.UUID]Phase{}
+	names := map[uuid.UUID]string{}
+	discussionOpen := map[uuid.UUID]bool{}
+	for _, cc := range cases {
+		o := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, cc.start, cc.endsAt)
+		seedJoinRequest(o.ID, member, RequestStatusAccepted, "rider", f, 0)
+		want[o.ID] = cc.want
+		names[o.ID] = cc.name
+		discussionOpen[o.ID] = cc.isDiscussionOpen
+	}
+
+	check := func(t *testing.T, list []Outing) {
+		t.Helper()
+		if len(list) != len(cases) {
+			t.Fatalf("got %d outings, want %d", len(list), len(cases))
+		}
+		for _, o := range list {
+			if o.Phase != want[o.ID] {
+				t.Errorf("%s: got %q, want %q", names[o.ID], o.Phase, want[o.ID])
+			}
+			if o.IsDiscussionOpen != discussionOpen[o.ID] {
+				t.Errorf("%s: got %t, want %t", names[o.ID], o.IsDiscussionOpen, discussionOpen[o.ID])
+			}
+		}
+	}
+
+	t.Run("hosting", func(t *testing.T) {
+		mine, err := svc.MyOutings(context.Background(), host)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		check(t, mine.Hosting)
+	})
+	t.Run("joined", func(t *testing.T) {
+		mine, err := svc.MyOutings(context.Background(), member)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		check(t, mine.Joined)
+	})
+}
+
+func Test_CreateAndUpdate_Phase(t *testing.T) {
+	svc, _, _, _ := newTestService(t)
+	host := uuid.New()
+	starts := time.Now().Add(25 * time.Hour)
+	ends := starts.Add(10 * time.Hour)
+	in := CreateInput{
+		Title:            "test",
+		Destination:      "test",
+		MeetLabel:        "test",
+		HostSeats:        2,
+		CostPerSeatCents: 20,
+		MeetLat:          nil,
+		MeetLng:          nil,
+		StartsAt:         starts,
+		MaxSize:          10,
+		Difficulty:       DifficultyHard,
+		Pace:             PaceRelaxed,
+		Notes:            nil,
+		EndsAt:           &ends,
+	}
+	o, err := svc.Create(context.Background(), host, in)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if o.Phase != PhaseUpcoming {
+		t.Fatalf("expected %s got %s", PhaseUpcoming, o.Phase)
+	}
+
+	title := "updated"
+	startsAt := time.Now().Add(48 * time.Hour)
+	endsAt := time.Now().Add(60 * time.Hour)
+	maxCount := 16
+	u, err := svc.Update(context.Background(), host, o.ID, UpdateInput{StartsAt: &startsAt, EndsAt: &endsAt, MaxSize: &maxCount, Title: &title})
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if u.Phase != PhaseUpcoming {
+		t.Fatalf("expected %s got %s", PhaseUpcoming, u.Phase)
+	}
+}
+
+func Test_HostActions_Rejections_Conflict(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	member := uuid.New()
+	// in progress outing
+	now := time.Now()
+	startUpcoming := now.Add(48 * time.Hour)
+	endUpcoming := now.Add(56 * time.Hour)
+	startInProgress := now.Add(-6 * time.Hour)
+	endInProgress := now.Add(4 * time.Hour)
+	startPast := now.Add(-48 * time.Hour)
+	endPast := now.Add(-38 * time.Hour)
+	phases := []struct {
+		name    string
+		startAt time.Time
+		endsAt  *time.Time
+		wantErr bool
+	}{
+		{name: "upcoming", startAt: startUpcoming, wantErr: false},
+		{name: "upcoming with end", startAt: startUpcoming, endsAt: &endUpcoming, wantErr: false},
+		{name: "in progress no end", startAt: startInProgress, wantErr: true},
+		{name: "in progress with end", startAt: startInProgress, endsAt: &endInProgress, wantErr: true},
+		{name: "past no end", startAt: startPast, wantErr: true},
+		{name: "past with end", startAt: startPast, endsAt: &endPast, wantErr: true},
+	}
+	actions := []struct {
+		name   string
+		status RequestStatus
+		do     func(ctx context.Context, host, req uuid.UUID) error
+	}{
+		{name: "accept", status: RequestStatusRequested, do: svc.Accept},
+		{name: "decline", status: RequestStatusRequested, do: svc.Decline},
+		{name: "remove", status: RequestStatusAccepted, do: svc.RemoveMember},
+	}
+
+	for _, pp := range phases {
+		for _, aa := range actions {
+			t.Run(pp.name+" - "+aa.name, func(t *testing.T) {
+				outing := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, pp.startAt, pp.endsAt)
+				jr := seedJoinRequest(outing.ID, member, aa.status, "rider", f, 0)
+				err := aa.do(context.Background(), host, jr.ID)
+				if pp.wantErr {
+					wantStatus(t, err, apperr.CodeConflict)
+				} else if err != nil {
+					t.Errorf("expected no error got %v", err)
+				}
+
+			})
+		}
+	}
+
+}
+
+func Test_Withdraw_Phase(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	member := uuid.New()
+	now := time.Now()
+	startUpcoming := now.Add(48 * time.Hour)
+	endUpcoming := now.Add(56 * time.Hour)
+	startInProgress := now.Add(-6 * time.Hour)
+	endInProgress := now.Add(4 * time.Hour)
+	startPast := now.Add(-48 * time.Hour)
+	endPast := now.Add(-38 * time.Hour)
+
+	phases := []struct {
+		name    string
+		startAt time.Time
+		endsAt  *time.Time
+		wantErr bool
+	}{
+		{name: "upcoming", startAt: startUpcoming, wantErr: false},
+		{name: "upcoming with end", startAt: startUpcoming, endsAt: &endUpcoming, wantErr: false},
+		{name: "in progress no end", startAt: startInProgress, wantErr: true},
+		{name: "in progress with end", startAt: startInProgress, endsAt: &endInProgress, wantErr: true},
+		{name: "past no end", startAt: startPast, wantErr: true},
+		{name: "past with end", startAt: startPast, endsAt: &endPast, wantErr: true},
+	}
+	for _, status := range []RequestStatus{RequestStatusAccepted, RequestStatusRequested} {
+		for _, pp := range phases {
+			t.Run(string(status)+" - "+pp.name, func(t *testing.T) {
+				outing := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, pp.startAt, pp.endsAt)
+				_ = seedJoinRequest(outing.ID, member, status, "rider", f, 0)
+				err := svc.Withdraw(context.Background(), member, outing.ID)
+				if pp.wantErr {
+					wantStatus(t, err, apperr.CodeConflict)
+				} else if err != nil {
+					t.Errorf("expected no error got %v", err)
+				}
+			})
+		}
 	}
 }

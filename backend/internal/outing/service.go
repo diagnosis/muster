@@ -66,8 +66,9 @@ func NewService(store Storage, notifications notification.Storage, broadcaster e
 // people need time to muster. leadGrace absorbs clock skew and
 // form-filling time.
 const (
-	minLeadTime = 24 * time.Hour
-	leadGrace   = 5 * time.Minute
+	minLeadTime       = 24 * time.Hour
+	minUpdateLeadTime = 12 * time.Hour
+	leadGrace         = 5 * time.Minute
 )
 
 // maxGuests caps the unregistered +1s one member may bring.
@@ -109,8 +110,9 @@ type UpdateInput struct {
 }
 
 // validateOuting checks the row-shape rules shared by Create and Update:
-// required text fields, 24h lead time, size/seat/cost bounds, enum validity.
-func validateOuting(o *Outing) error {
+// required text fields, lead time (24h for a new outing, 12h for an
+// edited start), end-time bounds, size/seat/cost bounds, enum validity.
+func validateOuting(o *Outing, isUpdate bool) error {
 
 	v := validator.New()
 	v.Required("title", o.Title)
@@ -119,11 +121,20 @@ func validateOuting(o *Outing) error {
 	if verr := v.Errors(); verr != nil {
 		return verr
 	}
-	if time.Until(o.StartsAt) < minLeadTime-leadGrace {
-		return apperr.BadRequest("outing has to be at least 24 hours in advance", "under 24h lead time")
+	if isUpdate {
+		if time.Until(o.StartsAt) < minUpdateLeadTime-leadGrace {
+			return apperr.BadRequest("the new start time has to be at least 12 hours from now", "under 12h update lead time")
+		}
+
+	} else {
+		if time.Until(o.StartsAt) < minLeadTime-leadGrace {
+			return apperr.BadRequest("outing has to be at least 24 hours in advance", "under 24h lead time")
+		}
+
 	}
+
 	if o.EndsAt != nil && !o.EndsAt.After(o.StartsAt) {
-		return apperr.BadRequest("ends at cannot be before or equal starts at", "endsAt <= startsAt")
+		return apperr.BadRequest("the end time has to be after the start time", "endsAt <= startsAt")
 	}
 	if o.EndsAt != nil && o.EndsAt.After(o.StartsAt.Add(maxOutingDuration)) {
 		return apperr.BadRequest("max outing duration is 14 days", "max duration violation")
@@ -175,15 +186,19 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 		EndsAt:           in.EndsAt,
 	}
 
-	err := validateOuting(o)
+	err := validateOuting(o, false)
 	if err != nil {
 		return nil, err
 	}
+	o.stamp(time.Now())
 
-	return o, s.store.CreateOuting(ctx, o)
+	if err = s.store.CreateOuting(ctx, o); err != nil {
+		return nil, err
+	}
+	return o, nil
 }
 
-// Update patches the host's open, future outing. Nil fields are left
+// Update patches the host's open outing, up to 12 hours before it starts.
 // unchanged; a "notes": null cannot clear notes in v0 (indistinguishable
 // from omission). MaxSize is re-checked post-apply against committed
 // people (host + accepted + guests): shrinking below that count is
@@ -201,7 +216,10 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 		return nil, apperr.Conflict("outing is cancelled", "update on cancelled outing")
 	}
 	if o.StartsAt.Before(time.Now()) {
-		return nil, apperr.BadRequest("cannot update a past outing", "outing already started")
+		return nil, apperr.BadRequest("this outing has already started, so it can't be edited", "outing already started")
+	}
+	if time.Until(o.StartsAt) < minUpdateLeadTime {
+		return nil, apperr.BadRequest("it's too late to edit this outing; you can still cancel it", "under 12h edit cutoff")
 	}
 
 	if in.Title != nil {
@@ -263,13 +281,14 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 		)
 	}
 
-	if verr := validateOuting(o); verr != nil {
+	if verr := validateOuting(o, true); verr != nil {
 		return nil, verr
 	}
 	if err = s.store.UpdateOuting(ctx, o); err != nil {
 		return nil, err
 	}
 
+	o.stamp(time.Now())
 	s.notifyOutingAudience(ctx, o, notification.KindOutingUpdated)
 
 	return o, nil
@@ -289,7 +308,7 @@ func (s *Service) Cancel(ctx context.Context, hostID, outingID uuid.UUID) error 
 		return apperr.Conflict("outing is already cancelled", "already cancelled")
 	}
 	if o.StartsAt.Before(time.Now()) {
-		return apperr.BadRequest("cannot cancel a past outing", "outing already started")
+		return apperr.BadRequest("this outing has already started, so it can't be cancelled", "outing already started")
 	}
 	if err = s.store.SetOutingStatus(ctx, outingID, StatusCancelled); err != nil {
 		return err
@@ -336,7 +355,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 		return nil, apperr.Conflict("outing already started", "past outing")
 	}
 	if o.HostID == hikerID {
-		return nil, apperr.BadRequest("cannot join the event you created", "host self-join")
+		return nil, apperr.BadRequest("you can't join your own outing", "host self-join")
 	}
 
 	joinRequest, err := s.store.GetJoinRequestByHiker(ctx, o.ID, hikerID)
@@ -384,7 +403,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 }
 
 // loadForHostAction fetches a request and its outing, verifying the
-// caller is the host and the outing is open.
+// caller is the host, the outing is open, and it has not started yet.
 func (s *Service) loadForHostAction(ctx context.Context, hostID, requestID uuid.UUID) (*JoinRequest, *Outing, error) {
 	joinRequest, err := s.store.GetJoinRequest(ctx, requestID)
 	if err != nil {
@@ -395,11 +414,16 @@ func (s *Service) loadForHostAction(ctx context.Context, hostID, requestID uuid.
 		return nil, nil, err
 	}
 	if hostID != o.HostID {
-		return nil, nil, apperr.Forbidden("only the event host can do this", "forbidden: host required")
+		return nil, nil, apperr.Forbidden("only the host can do this", "forbidden: host required")
 	}
 	if o.Status != StatusOpen {
-		return nil, nil, apperr.Conflict("event is closed", "event is closed")
+		return nil, nil, apperr.Conflict("this outing is closed", "event is closed")
 	}
+
+	if o.PhaseAt(time.Now()) != PhaseUpcoming {
+		return nil, nil, apperr.Conflict("this outing has already started", "host action on started outing")
+	}
+
 	return joinRequest, o, nil
 }
 
@@ -441,8 +465,8 @@ func (s *Service) Decline(ctx context.Context, hostID, requestID uuid.UUID) erro
 }
 
 // Withdraw pulls the caller's own request, whether pending or already
-// accepted. A withdrawing driver takes their seats — the shortage
-// shows in Detail; the host resolves it.
+// accepted, as long as the outing has not started. A withdrawing driver
+// takes their seats — the shortage shows in Detail; the host resolves it.
 func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) error {
 	outing, err := s.store.GetOuting(ctx, outingID)
 	if err != nil {
@@ -455,6 +479,9 @@ func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) err
 	if joinRequest.Status != RequestStatusRequested && joinRequest.Status != RequestStatusAccepted {
 		return apperr.Conflict("nothing to withdraw", "withdraw requires requested or accepted")
 	}
+	if outing.PhaseAt(time.Now()) != PhaseUpcoming {
+		return apperr.Conflict("this outing has already started", "withdraw on started outing")
+	}
 	if err = s.store.SetJoinRequestStatus(ctx, joinRequest.ID, RequestStatusWithdrawn); err != nil {
 		return err
 	}
@@ -462,7 +489,8 @@ func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) err
 	return nil
 }
 
-// RemoveMember removes an accepted member from the roster. Host-only.
+// RemoveMember removes an accepted member from the roster. Host-only,
+// and only before the outing starts.
 func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID) error {
 	joinRequest, o, err := s.loadForHostAction(ctx, hostID, requestID)
 	if err != nil {
@@ -482,7 +510,13 @@ func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID)
 // first. The service owns the clock; the store just filters against
 // the time it's given.
 func (s *Service) ListUpcoming(ctx context.Context) ([]Outing, error) {
-	return s.store.ListUpcoming(ctx, time.Now())
+	now := time.Now()
+	outings, err := s.store.ListUpcoming(ctx, now)
+	if err != nil {
+		return nil, err
+	}
+	stampAll(outings, now)
+	return outings, nil
 }
 
 // PendingRequests returns the outing's pending join requests, oldest
@@ -501,7 +535,28 @@ func (s *Service) PendingRequests(ctx context.Context, hostID, outingID uuid.UUI
 
 // MyOutings returns the outings the hiker hosts and the ones they've joined (accepted only), each soonest first.
 func (s *Service) MyOutings(ctx context.Context, hikerID uuid.UUID) (*MyOutings, error) {
-	return s.store.ListForHiker(ctx, hikerID)
+	mine, err := s.store.ListForHiker(ctx, hikerID)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	stampAll(mine.Joined, now)
+	stampAll(mine.Hosting, now)
+	return mine, nil
+}
+
+// stamp fills the fields computed for the client as of now. They are
+// never stored; every service method that returns an outing calls this.
+func (o *Outing) stamp(now time.Time) {
+	o.Phase = o.PhaseAt(now)
+	o.IsDiscussionOpen = o.DiscussionOpen(now)
+}
+
+// stampAll stamps each outing as of now.
+func stampAll(outings []Outing, now time.Time) {
+	for i := range outings {
+		outings[i].stamp(now)
+	}
 }
 
 // Detail assembles the full view of one outing for one viewer: outing, host card, accepted roster, derived seat math, and — when viewerID is non-nil — the viewer's own request if any.
@@ -532,6 +587,8 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 			myReq = nil // no request — normal, page renders without it
 		}
 	}
+
+	o.stamp(time.Now())
 	peopleCount := 1
 	seatCapacity := o.HostSeats
 	for _, r := range acceptedRequests {
@@ -557,15 +614,20 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 	return detail, nil
 }
 
-// AddComment creates a comment for an outing. Only audiences(roster, host, pending users) can write comments.
-// outing must be open and not yet started. max 2000 chars per comment. comment can have 1 depth max
+// AddComment creates a comment on an outing. Only the audience (host,
+// roster, pending requesters) can comment. The outing must not be
+// cancelled, and comments close discussionWindow after it ends.
+// Max 2000 chars; replies go one level deep.
 func (s *Service) AddComment(ctx context.Context, hikerID, outingID uuid.UUID, body string, parentID *uuid.UUID) (*Comment, error) {
 	o, err := s.store.GetOuting(ctx, outingID)
 	if err != nil {
 		return nil, err
 	}
-	if o.Status == StatusCancelled || o.StartsAt.Before(time.Now()) {
-		return nil, apperr.Conflict("outing has been cancelled or already started", "failed to add comment on cancelled or started outing")
+	if o.Status == StatusCancelled {
+		return nil, apperr.Conflict("outing has been cancelled", "failed to add comment on cancelled")
+	}
+	if !o.DiscussionOpen(time.Now()) {
+		return nil, apperr.Conflict("comments closed 7 days after this outing ended", "comment after discussion window")
 	}
 
 	audience, err := s.isAudience(ctx, o, hikerID)
@@ -573,7 +635,7 @@ func (s *Service) AddComment(ctx context.Context, hikerID, outingID uuid.UUID, b
 		return nil, err
 	}
 	if !audience {
-		return nil, apperr.Forbidden("only audiences can comment", "only audiences can comment")
+		return nil, apperr.Forbidden("only the host and people who joined or asked to join can comment", "only audiences can comment")
 	}
 	v := validator.New()
 	v.Required("body", body)
@@ -582,6 +644,7 @@ func (s *Service) AddComment(ctx context.Context, hikerID, outingID uuid.UUID, b
 	if verr != nil {
 		return nil, verr
 	}
+
 	var parent *Comment
 	if parentID != nil {
 		parent, err = s.store.GetComment(ctx, *parentID)
@@ -592,7 +655,7 @@ func (s *Service) AddComment(ctx context.Context, hikerID, outingID uuid.UUID, b
 			return nil, apperr.BadRequest("invalid parent comment", "parent comment is not part of this outing")
 		}
 		if parent.ParentID != nil {
-			return nil, apperr.Conflict("cannot reply on reply", "reply to a reply rejected: one level max")
+			return nil, apperr.Conflict("you can't reply to a reply", "reply to a reply rejected: one level max")
 		}
 		if parent.DeletedAt != nil {
 			return nil, apperr.Conflict("comment was removed", "parent comment was deleted")
@@ -614,7 +677,7 @@ func (s *Service) AddComment(ctx context.Context, hikerID, outingID uuid.UUID, b
 }
 
 // DeleteComment marks deleted_at. Only owner or host can delete a comment. deleted_at must be nil.
-// cancelled or passed outing comments can be deleted.
+// cancelled or past outing comments can be deleted.
 func (s *Service) DeleteComment(ctx context.Context, outingID, commentID, hikerID uuid.UUID) error {
 	o, err := s.store.GetOuting(ctx, outingID)
 	if err != nil {
@@ -628,7 +691,7 @@ func (s *Service) DeleteComment(ctx context.Context, outingID, commentID, hikerI
 		return apperr.Conflict("comment does not belong to this outing", "cannot delete comment from different outing")
 	}
 	if c.HikerID != hikerID && hikerID != o.HostID {
-		return apperr.Forbidden("only outing host or owner can delete", "stranger cannot delete the comment")
+		return apperr.Forbidden("only the host or the comment's author can delete it", "stranger cannot delete the comment")
 	}
 	if err = s.store.SoftDeleteComment(ctx, commentID); err != nil {
 		return err
@@ -638,7 +701,7 @@ func (s *Service) DeleteComment(ctx context.Context, outingID, commentID, hikerI
 }
 
 // LikeComment increases like count. Soft deleted comment cannot be liked.
-// Comments of passed and cancelled events can be liked.
+// Comments of past and cancelled events can be liked.
 // Only Audiences can like. (roster, host, pending)
 func (s *Service) LikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error {
 	c, err := s.store.GetComment(ctx, commentID)
@@ -646,7 +709,7 @@ func (s *Service) LikeComment(ctx context.Context, commentID, hikerID uuid.UUID)
 		return err
 	}
 	if c.DeletedAt != nil {
-		return apperr.Conflict("comment was deleted.", "failed to like deleted comment")
+		return apperr.Conflict("comment was deleted", "failed to like deleted comment")
 	}
 
 	o, err := s.store.GetOuting(ctx, c.OutingID)
@@ -659,7 +722,7 @@ func (s *Service) LikeComment(ctx context.Context, commentID, hikerID uuid.UUID)
 		return err
 	}
 	if !audience {
-		return apperr.Forbidden("only audiences can like", "only audiences can like")
+		return apperr.Forbidden("only the host and people who joined or asked to join can like comments", "only audiences can like")
 	}
 	if err = s.store.LikeComment(ctx, commentID, hikerID); err != nil {
 		return err
@@ -667,7 +730,7 @@ func (s *Service) LikeComment(ctx context.Context, commentID, hikerID uuid.UUID)
 	return nil
 }
 
-// UnlikeComment decreases like count. Also need to check if audience
+// UnlikeComment removes the caller's like. Audience-only, same as liking.
 func (s *Service) UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error {
 	c, err := s.store.GetComment(ctx, commentID)
 	if err != nil {
@@ -682,7 +745,7 @@ func (s *Service) UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUI
 		return err
 	}
 	if !audience {
-		return apperr.Forbidden("only audiences can like", "only audiences can like")
+		return apperr.Forbidden("only the host and people who joined or asked to join can like comments", "only audiences can like")
 	}
 
 	if err = s.store.UnlikeComment(ctx, commentID, hikerID); err != nil {
@@ -692,7 +755,8 @@ func (s *Service) UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUI
 
 }
 
-// ListComments lists CommentView for outing. Only authed users can view.
+// ListComments returns the outing's comments for the viewer. Only the
+// audience (host, roster, pending requesters) can read them.
 func (s *Service) ListComments(ctx context.Context, outingID, hikerID uuid.UUID) ([]*CommentView, error) {
 	o, err := s.store.GetOuting(ctx, outingID)
 	if err != nil {

@@ -128,3 +128,22 @@
 .decision > button{
     flex: 1;
 }
+
+.lockedNote{
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-card);
+    background: var(--surface-sunken);
+}
+.lockedTitle{
+    font-weight: 600;
+    line-height: var(--leading-label);
+}
+.lockedText{
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
+    color: var(--color-text-muted);
+}

@@ -134,6 +134,59 @@ type Outing struct {
 	UpdatedAt        time.Time  `json:"updated_at"`
 	ConversationID   *uuid.UUID `json:"conversation_id"`
 	EndsAt           *time.Time `json:"ends_at"`
+	Phase            Phase      `json:"phase"`
+	IsDiscussionOpen bool       `json:"is_discussion_open"`
+}
+
+// Phase is where an outing sits in time: before it starts, under way, or over.
+type Phase string
+
+// Phases status
+const (
+	PhaseUpcoming   Phase = "upcoming"
+	PhaseInProgress Phase = "in_progress"
+	PhasePast       Phase = "past"
+)
+
+// Valid reports whether p is a known outing phase.
+func (p Phase) Valid() bool {
+	switch p {
+	case PhaseInProgress, PhasePast, PhaseUpcoming:
+		return true
+	}
+	return false
+}
+
+const dayHikeLimit = 12 * time.Hour
+const discussionWindow = 7 * 24 * time.Hour
+
+// PhaseAt reports the outing's phase at the given time. An outing is in
+// progress from its start up to, but not including, its end. With no end
+// time, the end is taken to be dayHikeLimit after the start.
+func (o *Outing) PhaseAt(now time.Time) Phase {
+
+	if now.Before(o.StartsAt) {
+		return PhaseUpcoming
+	}
+	if now.Before(o.effectiveEnd()) {
+		return PhaseInProgress
+	}
+	return PhasePast
+}
+
+// effectiveEnd is when the outing is over: its end time if set,
+// otherwise dayHikeLimit after the start.
+func (o *Outing) effectiveEnd() time.Time {
+	if o.EndsAt != nil {
+		return *o.EndsAt
+	}
+	return o.StartsAt.Add(dayHikeLimit)
+}
+
+// DiscussionOpen reports whether comments can still be added at the
+// given time: until discussionWindow after the outing ends.
+func (o *Outing) DiscussionOpen(now time.Time) bool {
+	return now.Before(o.effectiveEnd().Add(discussionWindow))
 }
 
 // JoinRequest links a hiker to an outing. It only exists as that link;

@@ -109,7 +109,7 @@ _:
 func Test_AddComment_CancelledAndPassedOutingReturnConflict(t *testing.T) {
 	svc, f, _, _ := newTestService(t)
 	host1ID, host2ID, hikerID := uuid.New(), uuid.New(), uuid.New()
-	o1 := seedOutingWithStartTime(5, 3, StatusOpen, host1ID, f, time.Now().Add(-6*time.Hour))
+	o1 := seedOutingWithStartTime(5, 3, StatusOpen, host1ID, f, time.Now().Add(-8*24*time.Hour))
 	o2 := seedOuting(7, 3, StatusCancelled, host2ID, f)
 
 	_ = seedJoinRequest(o1.ID, hikerID, RequestStatusAccepted, "rider", f, 0)
@@ -479,4 +479,99 @@ func Test_Comment_ListComments_Stranger(t *testing.T) {
 
 	_, err = svc.ListComments(context.Background(), o.ID, stranger)
 	wantStatus(t, err, apperr.CodeForbidden)
+}
+
+func Test_Comment_WithinEffectiveEnd(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	hostID, hikerID := uuid.New(), uuid.New()
+	endsAt := time.Now().Add(-68 * time.Hour)
+	o := seedOutingWithStartAndEndTime(8, 4, StatusOpen, hostID, f, time.Now().Add(-78*time.Hour), &endsAt)
+
+	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "driver", f, 0)
+	seedMember(hikerID, "mane", "beginner", f)
+	_, err := svc.AddComment(context.Background(), hikerID, o.ID, "hello", nil)
+	if err != nil {
+		t.Errorf("expected no error got %v", err)
+	}
+}
+
+func Test_AddComment_DiscussionWindow(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	hostID, hikerID := uuid.New(), uuid.New()
+	seedMember(hostID, "cafer", "beginner", f)
+	seedMember(hikerID, "Salih", "beginner", f)
+	start := func(duration time.Duration) time.Time {
+		return time.Now().Add(duration)
+	}
+	end := func(duration time.Duration) *time.Time {
+		e := time.Now().Add(duration)
+		return &e
+	}
+
+	cases := []struct {
+		name      string
+		starts    time.Time
+		ends      *time.Time
+		wantError bool
+	}{
+		{"comment before outing starts", start(20 * time.Hour), end(30 * time.Hour), false},
+		{"comment in progress", start(-5 * time.Hour), end(10 * time.Hour), false},
+		{"comment after outing", start(-24 * time.Hour), end(-12 * time.Hour), false},
+		{"comment after 7 days", start(-8 * 24 * time.Hour), nil, true},
+	}
+
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			o := seedOutingWithStartAndEndTime(8, 4, StatusOpen, hostID, f, cc.starts, cc.ends)
+			seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "rider", f, 0)
+
+			c, err := svc.AddComment(context.Background(), hikerID, o.ID, "hello", nil)
+			if cc.wantError {
+				wantStatus(t, err, apperr.CodeConflict)
+			} else {
+				if err != nil {
+					t.Fatalf("expected no err, got %v", err)
+				}
+				if c.Body != "hello" {
+					t.Errorf("expected body hello got %s", c.Body)
+				}
+			}
+			detail, derr := svc.Detail(context.Background(), o.ID, &hikerID)
+			if derr != nil {
+				t.Fatalf("expected no error got %v", derr)
+			}
+			if detail.Outing.IsDiscussionOpen != !cc.wantError {
+				t.Errorf("IsDiscussionOpen: got %v, want %v", detail.Outing.IsDiscussionOpen, !cc.wantError)
+			}
+
+		})
+	}
+}
+
+func Test_Outing_DiscussionOpen(t *testing.T) {
+	start := time.Date(2026, 10, 10, 6, 0, 0, 0, time.UTC)
+	end := start.Add(30 * time.Hour)
+	week := 7 * 24 * time.Hour
+
+	cases := []struct {
+		name   string
+		endsAt *time.Time
+		now    time.Time
+		want   bool
+	}{
+		{name: "before the start", now: start.Add(-time.Hour), want: true},
+		{name: "has end, 1 second before the window closes", endsAt: &end, now: end.Add(week - time.Second), want: true},
+		{name: "has end, exactly when the window closes", endsAt: &end, now: end.Add(week), want: false},
+		{name: "no end, 1 second before the window closes", now: start.Add(12*time.Hour + week - time.Second), want: true},
+		{name: "no end, exactly when the window closes", now: start.Add(12*time.Hour + week), want: false},
+	}
+
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			o := &Outing{StartsAt: start, EndsAt: cc.endsAt}
+			if got := o.DiscussionOpen(cc.now); got != cc.want {
+				t.Errorf("got %v, want %v", got, cc.want)
+			}
+		})
+	}
 }

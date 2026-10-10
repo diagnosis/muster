@@ -58,7 +58,5 @@ test.describe('create outing', ()=>{
         await expect(page.getByText(/ – /)).toHaveCount(0)
     })
 
-
-
 })
 

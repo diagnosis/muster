@@ -20,7 +20,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
     const qc= useQueryClient()
     const [selectedRequest, setSelectedRequest] = useState<PendingRequestResponse | null>(null)
     const { data: requests, isPending: requestsPending, error:requestsError} = useOutingJoinRequests(outingId)
-
+    const rosterLocked = detail.outing.phase !== 'upcoming'
 
     const cancelMutation = useMutation({
         mutationFn: async  () => {
@@ -83,25 +83,37 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
     return <div className={styles.host}>
         {requestsError && <p className={styles.error}>{requestsError.message}</p>}
         {requestsPending && <p>requests loading...</p>}
-        <h2 className={styles.subheading}>Requests ({requestLen ?? 0})</h2>
-        {requests && requests.length > 0 &&
-            <div className={styles.requestList}>
-                {requests.map(r => (
-                    <div key={r.id} className={styles.requestItem}>
-                        <button className={styles.requestRow} onClick={() => setSelectedRequest(r)}>
-                            <span className={styles.reqName}>{r.hiker_name}</span>{' '}requests as {r.role}
-                            {r.guests > 0 && ` and brings ${r.guests} guest${r.guests > 1 ? 's' : ''}`}
-                        </button>
-                        <button className="icon-btn"
-                                aria-label={`Message ${r.hiker_name}`}
-                                onClick={() => {
-                                    startDM.mutate(r.hiker_id, {
-                                        onSuccess: (conv) => navigate({to: '/conversations/$id', params: {id: conv.id}})
-                                    })
-                                }}><MessageIcon/></button>
-                    </div>
-                ))}
-            </div>}
+        {rosterLocked
+            ? requests && requests.length > 0 &&
+            <div className={styles.lockedNote}>
+                <p className={styles.lockedTitle}>
+                    {requests.length} request{requests.length > 1 ? 's were' : ' was'} still waiting when this started
+                </p>
+                <p className={styles.lockedText}>They can't be accepted or declined any more.</p>
+            </div>
+            : <>
+                <h2 className={styles.subheading}>Requests ({requestLen ?? 0})</h2>
+                {requests && requests.length > 0 &&
+                    <div className={styles.requestList}>
+                        {requests.map(r => (
+                            <div key={r.id} className={styles.requestItem}>
+                                <button className={styles.requestRow} onClick={() => setSelectedRequest(r)}>
+                                    <span className={styles.reqName}>{r.hiker_name}</span>{' '}requests as {r.role}
+                                    {r.guests > 0 && ` and brings ${r.guests} guest${r.guests > 1 ? 's' : ''}`}
+                                </button>
+                                <button className="icon-btn"
+                                        aria-label={`Message ${r.hiker_name}`}
+                                        onClick={() => {
+                                            startDM.mutate(r.hiker_id, {
+                                                onSuccess: (conv) => navigate({to: '/conversations/$id', params: {id: conv.id}})
+                                            })
+                                        }}><MessageIcon/></button>
+                            </div>
+                        ))}
+
+                    </div>}
+            </>
+        }
         {selectedRequest&&(
             <Modal title={selectedRequest.hiker_name} onClose={() => setSelectedRequest(null)}>
                 <dl className={styles.facts}>
@@ -132,10 +144,10 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
             </Modal>
         )}
 
-        <div className={styles.manage}>
+        {!rosterLocked && <div className={styles.manage}>
             <Link className={'btn'} to="/outings/$id/edit" params={{id: outingId}}>Edit outing</Link>
             <button className={'btn-danger'} onClick={handleCancel}>Cancel outing</button>
-        </div>
+        </div>}
         </div>
 
 
