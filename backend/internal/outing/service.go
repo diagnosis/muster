@@ -703,7 +703,7 @@ func (s *Service) LikeComment(ctx context.Context, commentID, hikerID uuid.UUID)
 		return err
 	}
 	if c.DeletedAt != nil {
-		return apperr.Conflict("comment was deleted (drop the full stop; no other message has one)", "failed to like deleted comment")
+		return apperr.Conflict("comment was deleted", "failed to like deleted comment")
 	}
 
 	o, err := s.store.GetOuting(ctx, c.OutingID)
@@ -716,7 +716,7 @@ func (s *Service) LikeComment(ctx context.Context, commentID, hikerID uuid.UUID)
 		return err
 	}
 	if !audience {
-		return apperr.Forbidden("\tonly the host and people who joined or asked to join can like comments", "only audiences can like")
+		return apperr.Forbidden("only the host and people who joined or asked to join can like comments", "only audiences can like")
 	}
 	if err = s.store.LikeComment(ctx, commentID, hikerID); err != nil {
 		return err
