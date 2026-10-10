@@ -1138,28 +1138,31 @@ func Test_MyOutings_Phase(t *testing.T) {
 
 	now := time.Now()
 	endIn10h := now.Add(10 * time.Hour)
-	ended20hAgo := now.Add(-20 * time.Hour)
+	ended200hAgo := now.Add(-200 * time.Hour)
 
 	cases := []struct {
-		name   string
-		start  time.Time
-		endsAt *time.Time
-		want   Phase
+		name             string
+		start            time.Time
+		endsAt           *time.Time
+		want             Phase
+		isDiscussionOpen bool
 	}{
-		{name: "starts in 30h", start: now.Add(30 * time.Hour), want: PhaseUpcoming},
-		{name: "started 2h ago, no end", start: now.Add(-2 * time.Hour), want: PhaseInProgress},
-		{name: "started 20h ago, ends in 10h", start: now.Add(-20 * time.Hour), endsAt: &endIn10h, want: PhaseInProgress},
-		{name: "started 13h ago, no end", start: now.Add(-13 * time.Hour), want: PhasePast},
-		{name: "started 30h ago, ended 20h ago", start: now.Add(-30 * time.Hour), endsAt: &ended20hAgo, want: PhasePast},
+		{name: "starts in 30h", start: now.Add(30 * time.Hour), want: PhaseUpcoming, isDiscussionOpen: true},
+		{name: "started 2h ago, no end", start: now.Add(-2 * time.Hour), want: PhaseInProgress, isDiscussionOpen: true},
+		{name: "started 20h ago, ends in 10h", start: now.Add(-20 * time.Hour), endsAt: &endIn10h, want: PhaseInProgress, isDiscussionOpen: true},
+		{name: "started 13h ago, no end", start: now.Add(-13 * time.Hour), want: PhasePast, isDiscussionOpen: true},
+		{name: "started 210h ago, ended 180h ago", start: now.Add(-210 * time.Hour), endsAt: &ended200hAgo, want: PhasePast, isDiscussionOpen: false},
 	}
 
 	want := map[uuid.UUID]Phase{}
 	names := map[uuid.UUID]string{}
+	discussionOpen := map[uuid.UUID]bool{}
 	for _, cc := range cases {
 		o := seedOutingWithStartAndEndTime(6, 4, StatusOpen, host, f, cc.start, cc.endsAt)
 		seedJoinRequest(o.ID, member, RequestStatusAccepted, "rider", f, 0)
 		want[o.ID] = cc.want
 		names[o.ID] = cc.name
+		discussionOpen[o.ID] = cc.isDiscussionOpen
 	}
 
 	check := func(t *testing.T, list []Outing) {
@@ -1170,6 +1173,9 @@ func Test_MyOutings_Phase(t *testing.T) {
 		for _, o := range list {
 			if o.Phase != want[o.ID] {
 				t.Errorf("%s: got %q, want %q", names[o.ID], o.Phase, want[o.ID])
+			}
+			if o.IsDiscussionOpen != discussionOpen[o.ID] {
+				t.Errorf("%s: got %t, want %t", names[o.ID], o.IsDiscussionOpen, discussionOpen[o.ID])
 			}
 		}
 	}

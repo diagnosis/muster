@@ -135,6 +135,7 @@ type Outing struct {
 	ConversationID   *uuid.UUID `json:"conversation_id"`
 	EndsAt           *time.Time `json:"ends_at"`
 	Phase            Phase      `json:"phase"`
+	IsDiscussionOpen bool       `json:"is_discussion_open"`
 }
 
 // Phase is where an outing sits in time: before it starts, under way, or over.

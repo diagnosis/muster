@@ -24,6 +24,7 @@ export interface ApiError{
 export type Difficulty = 'easy' | 'moderate' | 'hard'
 export type Pace = 'relaxed' | 'moderate' | 'fast'
 export type OutingStatus = 'open' | 'cancelled'
+export type Phase = 'upcoming' | 'in_progress' | 'past'
 export interface Outing{
     id: string
     host_id: string
@@ -44,6 +45,7 @@ export interface Outing{
     updated_at: string
     conversation_id:string
     ends_at: string | null
+    phase: Phase
 }
 
 export interface Detail{
@@ -256,4 +258,5 @@ export interface ConversationSummary{
     created_at: string
     unread_count: number
 }
+
 

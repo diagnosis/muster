@@ -498,6 +498,8 @@ func Test_Comment_WithinEffectiveEnd(t *testing.T) {
 func Test_AddComment_DiscussionWindow(t *testing.T) {
 	svc, f, _, _ := newTestService(t)
 	hostID, hikerID := uuid.New(), uuid.New()
+	seedMember(hostID, "cafer", "beginner", f)
+	seedMember(hikerID, "Salih", "beginner", f)
 	start := func(duration time.Duration) time.Time {
 		return time.Now().Add(duration)
 	}
@@ -522,7 +524,7 @@ func Test_AddComment_DiscussionWindow(t *testing.T) {
 		t.Run(cc.name, func(t *testing.T) {
 			o := seedOutingWithStartAndEndTime(8, 4, StatusOpen, hostID, f, cc.starts, cc.ends)
 			seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "rider", f, 0)
-			seedMember(hikerID, "Salih", "beginner", f)
+
 			c, err := svc.AddComment(context.Background(), hikerID, o.ID, "hello", nil)
 			if cc.wantError {
 				wantStatus(t, err, apperr.CodeConflict)
@@ -533,6 +535,13 @@ func Test_AddComment_DiscussionWindow(t *testing.T) {
 				if c.Body != "hello" {
 					t.Errorf("expected body hello got %s", c.Body)
 				}
+			}
+			detail, derr := svc.Detail(context.Background(), o.ID, &hikerID)
+			if derr != nil {
+				t.Fatalf("expected no error got %v", derr)
+			}
+			if detail.Outing.IsDiscussionOpen != !cc.wantError {
+				t.Errorf("IsDiscussionOpen: got %v, want %v", detail.Outing.IsDiscussionOpen, !cc.wantError)
 			}
 
 		})

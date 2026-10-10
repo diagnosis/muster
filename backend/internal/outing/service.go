@@ -191,6 +191,7 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 		return nil, err
 	}
 	o.Phase = o.PhaseAt(time.Now())
+	o.stampDiscussionOpen(time.Now())
 
 	if err = s.store.CreateOuting(ctx, o); err != nil {
 		return nil, err
@@ -289,6 +290,7 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 	}
 
 	o.Phase = o.PhaseAt(time.Now())
+	o.stampDiscussionOpen(time.Now())
 	s.notifyOutingAudience(ctx, o, notification.KindOutingUpdated)
 
 	return o, nil
@@ -308,7 +310,7 @@ func (s *Service) Cancel(ctx context.Context, hostID, outingID uuid.UUID) error 
 		return apperr.Conflict("outing is already cancelled", "already cancelled")
 	}
 	if o.StartsAt.Before(time.Now()) {
-		return apperr.BadRequest("cannot cancel a past outing", "outing already started")
+		return apperr.BadRequest("this outing has already started, so it can't be cancelled", "outing already started")
 	}
 	if err = s.store.SetOutingStatus(ctx, outingID, StatusCancelled); err != nil {
 		return err
@@ -355,7 +357,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 		return nil, apperr.Conflict("outing already started", "past outing")
 	}
 	if o.HostID == hikerID {
-		return nil, apperr.BadRequest("you can’t join your own outing", "host self-join")
+		return nil, apperr.BadRequest("you can't join your own outing", "host self-join")
 	}
 
 	joinRequest, err := s.store.GetJoinRequestByHiker(ctx, o.ID, hikerID)
@@ -515,7 +517,7 @@ func (s *Service) ListUpcoming(ctx context.Context) ([]Outing, error) {
 	if err != nil {
 		return nil, err
 	}
-	stampPhases(outings, now)
+	stampAll(outings, now)
 	return outings, nil
 }
 
@@ -540,13 +542,23 @@ func (s *Service) MyOutings(ctx context.Context, hikerID uuid.UUID) (*MyOutings,
 		return nil, err
 	}
 	now := time.Now()
-	stampPhases(mine.Hosting, now)
-	stampPhases(mine.Joined, now)
+	stampAll(mine.Joined, now)
+	stampAll(mine.Hosting, now)
 	return mine, nil
 }
 
-// stampPhases sets each outing's phase as of now.
-func stampPhases(outings []Outing, now time.Time) {
+// stampDiscussionOpen fills the fields computed for the client as of now. They are
+// never stored; every service method that returns an outing calls this.
+func (o *Outing) stampDiscussionOpen(now time.Time) {
+	o.Phase = o.PhaseAt(now)
+	o.IsDiscussionOpen = o.DiscussionOpen(now)
+}
+
+// stampAll stamps each outing as of now.
+func stampAll(outings []Outing, now time.Time) {
+	for i := range outings {
+		outings[i].stampDiscussionOpen(now)
+	}
 	for i := range outings {
 		outings[i].Phase = outings[i].PhaseAt(now)
 	}
@@ -582,7 +594,7 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 	}
 
 	o.Phase = o.PhaseAt(time.Now())
-
+	o.stampDiscussionOpen(time.Now())
 	peopleCount := 1
 	seatCapacity := o.HostSeats
 	for _, r := range acceptedRequests {
@@ -608,7 +620,7 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 	return detail, nil
 }
 
-// AddComment creates a comment on an outing. Only the audience (host,
+// AddComment create a comment on an outing. Only the audience (host,
 // roster, pending requesters) can comment. The outing must not be
 // cancelled, and comments close discussionWindow after it ends.
 // Max 2000 chars; replies go one level deep.
@@ -649,7 +661,7 @@ func (s *Service) AddComment(ctx context.Context, hikerID, outingID uuid.UUID, b
 			return nil, apperr.BadRequest("invalid parent comment", "parent comment is not part of this outing")
 		}
 		if parent.ParentID != nil {
-			return nil, apperr.Conflict("you can’t reply to a reply", "reply to a reply rejected: one level max")
+			return nil, apperr.Conflict("you can't reply to a reply", "reply to a reply rejected: one level max")
 		}
 		if parent.DeletedAt != nil {
 			return nil, apperr.Conflict("comment was removed", "parent comment was deleted")
