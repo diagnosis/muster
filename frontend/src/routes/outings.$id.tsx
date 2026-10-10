@@ -142,7 +142,7 @@ export function OutingDetailPage() {
             detail.my_request?.status === 'accepted' ||
             detail.my_request?.status === 'requested'
     )
-    const isReadOnly = detail.outing.status === 'cancelled' || new Date(detail.outing.starts_at) < new Date()
+    const canComment = detail.outing.status !== 'cancelled' && detail.outing.is_discussion_open
     const canSeeStartDmBtn = me && (me.id === detail.host.hiker_id || detail.roster.some(r => r.hiker_id === me.id))
     const canSeeChat =canSeeStartDmBtn && !!detail.outing.conversation_id
     const isHost = me?.id === detail.outing.host_id
@@ -230,7 +230,7 @@ export function OutingDetailPage() {
             </section>}
 
             {canSeeComments && (
-                <Comments outingId={id} hostId={detail.outing.host_id} readOnly={isReadOnly}/>
+                <Comments outingId={id} hostId={detail.outing.host_id} canComment={canComment}/>
             )}
         </div>
     )

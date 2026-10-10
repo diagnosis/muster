@@ -12,9 +12,9 @@ import {HeartIcon} from "@/components/Icons.tsx";
 interface CommentsProp{
     outingId: string
     hostId: string
-    readOnly: boolean
+    canComment: boolean
 }
-export function Comments({outingId, hostId, readOnly}:CommentsProp){
+export function Comments({outingId, hostId, canComment}:CommentsProp){
     const { data, error, isError, isPending } = useListComments(outingId)
     const [replyingTo, setReplyingTo] = useState<string | null>(null)
     if (isPending) return <p>Loading comments…</p>
@@ -31,7 +31,7 @@ export function Comments({outingId, hostId, readOnly}:CommentsProp){
             {topLevel.length >0 && topLevel.map(c => (
                 <div key={c.id}>
                     <CommentRow c={c} outingId={outingId} hostId={hostId} onReply={() => setReplyingTo(c.id)} />
-                    {replyingTo === c.id && (
+                    {canComment && replyingTo === c.id && (
                         <CommentForm outingID={outingId} parentID={c.id} onDone={() => setReplyingTo(null)} />
                     )}
                     <div className={styles.replies}>
@@ -40,7 +40,7 @@ export function Comments({outingId, hostId, readOnly}:CommentsProp){
                 </div>
             ))}
             </div>
-            {!readOnly && <CommentForm outingID={outingId} parentID={null}/>}
+            {canComment && <CommentForm outingID={outingId} parentID={null}/>}
         </section>
     )
 }

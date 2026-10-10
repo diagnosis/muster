@@ -190,8 +190,7 @@ func (s *Service) Create(ctx context.Context, hostID uuid.UUID, in CreateInput) 
 	if err != nil {
 		return nil, err
 	}
-	o.Phase = o.PhaseAt(time.Now())
-	o.stampDiscussionOpen(time.Now())
+	o.stamp(time.Now())
 
 	if err = s.store.CreateOuting(ctx, o); err != nil {
 		return nil, err
@@ -289,8 +288,7 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 		return nil, err
 	}
 
-	o.Phase = o.PhaseAt(time.Now())
-	o.stampDiscussionOpen(time.Now())
+	o.stamp(time.Now())
 	s.notifyOutingAudience(ctx, o, notification.KindOutingUpdated)
 
 	return o, nil
@@ -547,9 +545,9 @@ func (s *Service) MyOutings(ctx context.Context, hikerID uuid.UUID) (*MyOutings,
 	return mine, nil
 }
 
-// stampDiscussionOpen fills the fields computed for the client as of now. They are
+// stamp fills the fields computed for the client as of now. They are
 // never stored; every service method that returns an outing calls this.
-func (o *Outing) stampDiscussionOpen(now time.Time) {
+func (o *Outing) stamp(now time.Time) {
 	o.Phase = o.PhaseAt(now)
 	o.IsDiscussionOpen = o.DiscussionOpen(now)
 }
@@ -557,7 +555,7 @@ func (o *Outing) stampDiscussionOpen(now time.Time) {
 // stampAll stamps each outing as of now.
 func stampAll(outings []Outing, now time.Time) {
 	for i := range outings {
-		outings[i].stampDiscussionOpen(now)
+		outings[i].stamp(now)
 	}
 	for i := range outings {
 		outings[i].Phase = outings[i].PhaseAt(now)
@@ -593,8 +591,7 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 		}
 	}
 
-	o.Phase = o.PhaseAt(time.Now())
-	o.stampDiscussionOpen(time.Now())
+	o.stamp(time.Now())
 	peopleCount := 1
 	seatCapacity := o.HostSeats
 	for _, r := range acceptedRequests {
@@ -620,7 +617,7 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 	return detail, nil
 }
 
-// AddComment create a comment on an outing. Only the audience (host,
+// AddComment creates a comment on an outing. Only the audience (host,
 // roster, pending requesters) can comment. The outing must not be
 // cancelled, and comments close discussionWindow after it ends.
 // Max 2000 chars; replies go one level deep.
@@ -697,7 +694,7 @@ func (s *Service) DeleteComment(ctx context.Context, outingID, commentID, hikerI
 		return apperr.Conflict("comment does not belong to this outing", "cannot delete comment from different outing")
 	}
 	if c.HikerID != hikerID && hikerID != o.HostID {
-		return apperr.Forbidden("only the host or the comment’s author can delete it", "stranger cannot delete the comment")
+		return apperr.Forbidden("only the host or the comment's author can delete it", "stranger cannot delete the comment")
 	}
 	if err = s.store.SoftDeleteComment(ctx, commentID); err != nil {
 		return err

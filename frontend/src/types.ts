@@ -46,6 +46,7 @@ export interface Outing{
     conversation_id:string
     ends_at: string | null
     phase: Phase
+    is_discussion_open: boolean
 }
 
 export interface Detail{

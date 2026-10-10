@@ -2,7 +2,7 @@ import {createFileRoute, Link} from '@tanstack/react-router'
 import {requireAuth, useMyOutings} from "@/queries.ts";
 import {OutingCard} from "@/components/OutingCard.tsx";
 import styles from "@/routes/me.outings.module.css"
-import type {Outing} from "@/types.ts";
+import type {Phase} from "@/types.ts";
 import {useState} from "react";
 
 
@@ -25,14 +25,14 @@ export function MeOutingsPage() {
         ...data.hosting.map(outing => ({outing, hosting: true})),
         ...data.joined.map(outing => ({outing, hosting: false})),
     ]
-
-    const counts: Record<Phase, number> = {upcoming: 0, in_progress: 0, past: 0}
     const visible = all
         .filter(item => item.outing.phase === tab)
         .sort((a, b) => {
             const diff = new Date(a.outing.starts_at).getTime() - new Date(b.outing.starts_at).getTime()
             return tab === "past" ? -diff : diff
         })
+    const counts: Record<Phase, number> = {upcoming: 0, in_progress: 0, past: 0}
+
     for (const item of all) counts[item.outing.phase]++
     return <div className={styles.page}>
         <h1 className={styles.heading}>My outings</h1>
@@ -69,7 +69,7 @@ export function MeOutingsPage() {
 
 }
 
-type Phase = Outing["phase"]
+
 
 const TABS: {phase: Phase, label: string}[] = [
     {phase: "upcoming", label: "Upcoming"},

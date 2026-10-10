@@ -39,11 +39,13 @@ func (f *fakeStore) GetOuting(ctx context.Context, id uuid.UUID) (*Outing, error
 	}
 	cp := *o
 	cp.Phase = ""
+	cp.IsDiscussionOpen = false
 	return &cp, nil
 }
 func (f *fakeStore) CreateOuting(ctx context.Context, o *Outing) error {
 	cp := *o
 	cp.Phase = ""
+	cp.IsDiscussionOpen = false
 	f.outings[o.ID] = &cp
 	return nil
 }
@@ -212,6 +214,7 @@ func (f *fakeStore) UpdateOuting(ctx context.Context, o *Outing) error {
 	}
 	cp := *o
 	cp.Phase = ""
+	cp.IsDiscussionOpen = false
 	f.outings[o.ID] = &cp
 	return nil
 }

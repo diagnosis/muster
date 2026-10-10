@@ -1151,7 +1151,7 @@ func Test_MyOutings_Phase(t *testing.T) {
 		{name: "started 2h ago, no end", start: now.Add(-2 * time.Hour), want: PhaseInProgress, isDiscussionOpen: true},
 		{name: "started 20h ago, ends in 10h", start: now.Add(-20 * time.Hour), endsAt: &endIn10h, want: PhaseInProgress, isDiscussionOpen: true},
 		{name: "started 13h ago, no end", start: now.Add(-13 * time.Hour), want: PhasePast, isDiscussionOpen: true},
-		{name: "started 210h ago, ended 180h ago", start: now.Add(-210 * time.Hour), endsAt: &ended200hAgo, want: PhasePast, isDiscussionOpen: false},
+		{name: "started 210h ago, ended 200h ago", start: now.Add(-210 * time.Hour), endsAt: &ended200hAgo, want: PhasePast, isDiscussionOpen: false},
 	}
 
 	want := map[uuid.UUID]Phase{}
