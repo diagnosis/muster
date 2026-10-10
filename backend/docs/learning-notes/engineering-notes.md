@@ -230,3 +230,20 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 - **Compare times as numbers in tests,** not strings: Go and JavaScript format the same instant differently. Print both values, never a bare true or false.
 - **Build boundary times by adding hours,** not by naming two clock times. Fourteen days between two local 6 AMs is an hour longer across a daylight-saving change.
 - **Test both directions of a rule.** The cases that must be accepted matter as much as the ones that must be rejected.
+- 
+## Lessons from adding outing phases
+
+- **Stored facts are fields; anything derived is a function.** `StartsAt` is a fact. The phase is an answer worked out from facts plus the clock. If a value can go stale without anyone writing to it, don't keep it in a field that code relies on.
+- **Pass the clock in.** `PhaseAt(now)` and `DiscussionOpen(now)` take the time as a parameter, so a test can stand on an exact boundary with a fixed date.
+- **A field stamped for the client is empty inside the server.** `o.Phase` on an outing fresh from the store is `""`, which quietly compares as "not upcoming". Server rules call the method. There is exactly one assignment to `o.Phase`, inside `stamp`.
+- **One home for "everything computed for the client".** `stamp` sets every such field; all five endpoints call it. A second helper per field means five places to forget.
+- **The fake must not remember what the database can't.** A fake that keeps the caller's pointer keeps the stamped phase, and a test passes that would fail against Postgres. Store a copy, and clear fields that aren't columns.
+- **A slice passed to a function shares its elements; a slice built from it does not.** `for i := range s { s[i].X = … }` reaches the caller. `for _, v := range s` changes a copy. `slices.Concat`, `append`, `Clone` and `copy` all hand back a different slice.
+- **A non-pointer `time.Time` can't say "not set".** Left out of a test row it is year 1, not nil, and the row tests something else than its name says.
+- **Rows that must pass catch what rows that must fail can't.** A check that rejected everything was caught only by the "upcoming still succeeds" rows.
+- **Same status code, different rule.** Conflict is returned for "full", "not pending" and "already started". Give each assertion a fresh request so only one rule can be the reason, and see it red first.
+- **A test that re-implements the rule proves nothing.** State the expected answer; don't compute it with the same logic.
+- **Guards built on a positive flag need the `!`.** `if o.DiscussionOpen(now) { reject }` and `readOnly = … || is_open` were both written inverted. Where possible carry one positive name end to end (`canComment`) so there is nothing to flip.
+- **Tests that depend on a value must state it.** Random fixtures are fine for fields a test ignores. Capacity is not one of them.
+- **In React, derived values are not state.** Only what the user chose is state (`tab`). Counts and filtered lists are computed during render. Hooks go above every early return.
+- **Read the failure text before changing anything.** `[404]` and `got false, want true` point at different files.
