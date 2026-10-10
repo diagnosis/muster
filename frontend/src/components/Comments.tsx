@@ -30,7 +30,8 @@ export function Comments({outingId, hostId, canComment}:CommentsProp){
                     <p className={styles.meta}>No comments yet - start the conversation.</p>}
             {topLevel.length >0 && topLevel.map(c => (
                 <div key={c.id}>
-                    <CommentRow c={c} outingId={outingId} hostId={hostId} onReply={() => setReplyingTo(c.id)} />
+                    <CommentRow c={c} outingId={outingId} hostId={hostId}
+                                onReply={canComment ? () => setReplyingTo(c.id) : undefined}/>
                     {canComment && replyingTo === c.id && (
                         <CommentForm outingID={outingId} parentID={c.id} onDone={() => setReplyingTo(null)} />
                     )}

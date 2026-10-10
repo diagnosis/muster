@@ -557,9 +557,6 @@ func stampAll(outings []Outing, now time.Time) {
 	for i := range outings {
 		outings[i].stamp(now)
 	}
-	for i := range outings {
-		outings[i].Phase = outings[i].PhaseAt(now)
-	}
 }
 
 // Detail assembles the full view of one outing for one viewer: outing, host card, accepted roster, derived seat math, and — when viewerID is non-nil — the viewer's own request if any.

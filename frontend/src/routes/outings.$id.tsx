@@ -80,9 +80,11 @@ export function OutingDetailPage() {
                 <p>This outing was cancelled</p>
             </div>
         if (!me)
-        return <div className={`${styles.slot} ${styles.slotActive}`}>
-            <Link className={'btn-primary btn'} to="/login">Request to join</Link>
-        </div>
+            return rosterLocked
+                ? <div className={styles.slot}><p>This outing has already started.</p></div>
+                : <div className={`${styles.slot} ${styles.slotActive}`}>
+                    <Link className={'btn-primary btn'} to="/login">Request to join</Link>
+                </div>
 
         if (me.id === detail.outing.host_id) return <div className={`${styles.slot} ${styles.slotColumn}`}>
             <div className={styles.slotHead}>
@@ -96,7 +98,7 @@ export function OutingDetailPage() {
         if (st === 'requested')
             return <div className={styles.slot}>
                 <p>Requested — waiting on host</p>
-                <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>
+                {!rosterLocked && <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>}
             </div>
 
         if (st === 'accepted')
@@ -104,7 +106,7 @@ export function OutingDetailPage() {
                 <p>You're going! 🎉</p>
                 <div className={styles.slotActions}>
                     {chatLink}
-                    <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>
+                    {!rosterLocked && <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>}
                 </div>
             </div>
 
@@ -116,7 +118,9 @@ export function OutingDetailPage() {
             return <div className={styles.slot}>
                 <p>The host removed you from this outing.</p>
             </div>
-
+        if (rosterLocked) return <div className={styles.slot}>
+            <p>This outing has already started.</p>
+        </div>
         return <>
             {showForm
                 ? <>
@@ -149,10 +153,9 @@ export function OutingDetailPage() {
     const initial = (name: string) => name.charAt(0).toUpperCase()
     const totalSpots = detail.people_count + detail.spots_left
     const filledPct = totalSpots > 0 ? Math.round((detail.people_count / totalSpots) * 100) : 0
-
     const chatLink = canSeeChat &&
         <Link className={'btn btn-primary'} to={'/conversations/$id'} params={{id: detail.outing.conversation_id}}>Outing chat</Link>
-
+    const rosterLocked = detail.outing.phase !== 'upcoming'
     const messageBtn = (hikerId: string, name: string) => (
         <button className="icon-btn"
                 aria-label={`Message ${name}`}
@@ -205,7 +208,7 @@ export function OutingDetailPage() {
                         {m.name} · {m.experience}
                         <span className={styles.rowActions}>
                         {canSeeStartDmBtn && m.hiker_id !== me?.id && messageBtn(m.hiker_id, m.name)}
-                            {isHost &&
+                            {isHost && !rosterLocked &&
                                 <button aria-label={'Remove'} className={`icon-btn ${styles.removeIcon}`}
                                         onClick={() => setMemberToRemove(m)}><TrashIcon/></button>}
                     </span>
