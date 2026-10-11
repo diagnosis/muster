@@ -215,7 +215,7 @@ type PendingRequest struct {
 // on an outing (join_requests joined with hikers at the query level).
 type Member struct {
 	RequestID  *uuid.UUID `json:"request_id,omitempty"`
-	HikerID    uuid.UUID  `json:"hiker_id"`
+	HikerID    *uuid.UUID `json:"hiker_id,omitempty"`
 	Name       string     `json:"name"`
 	Experience string     `json:"experience"`
 }
@@ -228,18 +228,26 @@ type Member struct {
 //	SeatsShort   = max(0, PeopleCount − SeatCapacity)
 //	SpotsLeft    = max(0, min(SeatCapacity, MaxSize) − PeopleCount)
 type Detail struct {
-	Outing       Outing       `json:"outing"`
-	Host         Member       `json:"host"`
-	Roster       []Member     `json:"roster"` // accepted only; host NOT included
-	MyRequest    *JoinRequest `json:"my_request,omitempty"`
-	SeatCapacity int          `json:"seat_capacity"`
-	PeopleCount  int          `json:"people_count"`
-	SeatsShort   int          `json:"seats_short"`
-	SpotsLeft    int          `json:"spots_left"`
+	Outing       Outing        `json:"outing"`
+	Host         Member        `json:"host"`
+	Roster       []Member      `json:"roster"` // accepted only; host NOT included
+	MyRequest    *JoinRequest  `json:"my_request,omitempty"`
+	SeatCapacity int           `json:"seat_capacity"`
+	PeopleCount  int           `json:"people_count"`
+	SeatsShort   int           `json:"seats_short"`
+	SpotsLeft    int           `json:"spots_left"`
+	Waiting      []ListedHiker `json:"waiting"`
+	Withdrawn    []ListedHiker `json:"withdrawn"`
 }
 
 // MyOutings groups the outings a hiker hosts and the ones they joined.
 type MyOutings struct {
 	Hosting []Outing `json:"hosting"`
 	Joined  []Outing `json:"joined"`
+}
+
+// ListedHiker is a hiker shown by name only, on the waiting and
+// withdrawn lists.
+type ListedHiker struct {
+	Name string `json:"name"`
 }

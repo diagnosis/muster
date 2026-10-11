@@ -190,7 +190,10 @@ func (f *fakeStore) Roster(ctx context.Context, outingID uuid.UUID) ([]Member, e
 	for _, r := range f.requests {
 		if r.OutingID == outingID && r.Status == RequestStatusAccepted {
 			if m, ok := f.hikers[r.HikerID]; ok {
-				members = append(members, *m)
+				member := *m
+				rid := r.ID
+				member.RequestID = &rid
+				members = append(members, member)
 			}
 		}
 	}
