@@ -72,8 +72,8 @@ func seedJoinRequestWithSeatsOffered(outingID, hikerID uuid.UUID, status Request
 	f.requests[r.ID] = r
 	return r
 }
-func seedJoinRequestWithCreatedAt(outingID, hikerID uuid.UUID, status RequestStatus, role Role, f *fakeStore, guest int, createdAt time.Time) *JoinRequest {
-	r := &JoinRequest{ID: uuid.New(), OutingID: outingID, HikerID: hikerID, Status: status, Guests: guest, Role: role, CreatedAt: createdAt}
+func seedJoinRequestWithRequestedAt(outingID, hikerID uuid.UUID, status RequestStatus, role Role, f *fakeStore, guest int, requestedAt time.Time) *JoinRequest {
+	r := &JoinRequest{ID: uuid.New(), OutingID: outingID, HikerID: hikerID, Status: status, Guests: guest, Role: role, RequestedAt: requestedAt}
 	f.requests[r.ID] = r
 	return r
 }
@@ -593,9 +593,9 @@ func Test_PendingRequests_QueueOrder(t *testing.T) {
 	hostID := uuid.New()
 
 	o := seedOuting(7, 2, StatusOpen, hostID, f)
-	r1 := seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now())
-	r2 := seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
-	r3 := seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
+	r1 := seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now())
+	r2 := seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
+	r3 := seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
 
 	pendingRequests, err := svc.PendingRequests(context.Background(), hostID, o.ID)
 	if err != nil {
@@ -618,9 +618,9 @@ func Test_PendingRequests_Leaked(t *testing.T) {
 	hostID := uuid.New()
 
 	o := seedOuting(7, 2, StatusOpen, hostID, f)
-	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusAccepted, RoleDriver, f, 1, time.Now())
-	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusDeclined, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
-	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
+	_ = seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusAccepted, RoleDriver, f, 1, time.Now())
+	_ = seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusDeclined, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
+	_ = seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
 
 	pendingRequests, err := svc.PendingRequests(context.Background(), hostID, o.ID)
 	if err != nil {
@@ -640,9 +640,9 @@ func Test_PendingRequests_Forbidden(t *testing.T) {
 	hostID := uuid.New()
 
 	o := seedOuting(7, 2, StatusOpen, hostID, f)
-	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now())
-	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
-	_ = seedJoinRequestWithCreatedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
+	_ = seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now())
+	_ = seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
+	_ = seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
 	unknownHost := uuid.New()
 	_, err := svc.PendingRequests(context.Background(), unknownHost, o.ID)
 	wantStatus(t, err, apperr.CodeForbidden)
@@ -1431,5 +1431,95 @@ func Test_RequestJoin_StampsRequestedAt(t *testing.T) {
 	}
 	if !r.RequestedAt.After(old) {
 		t.Errorf("re-request: RequestedAt should move forward, old %v got %v", old, r.RequestedAt)
+	}
+}
+
+func Test_Detail_WaitingAndWithdrawnLists(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	m1, m2, m3, m4 := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	regMem := uuid.New()
+	stranger := uuid.New()
+
+	o := seedOuting(10, 4, StatusOpen, host, f)
+	seedMember(host, "mahir", "beginner", f)
+	_ = seedJoinRequest(o.ID, regMem, RequestStatusAccepted, RoleDriver, f, 0)
+	seedMember(regMem, "tahir", "beginner", f)
+
+	now := time.Now()
+	w1 := seedJoinRequestWithSeatsOffered(o.ID, m1, RequestStatusRequested, RoleDriver, f, 1, 3)
+	w1.RequestedAt = now.Add(-1 * time.Hour) // jale asked later
+	seedMember(m1, "jale", "beginner", f)
+	w2 := seedJoinRequest(o.ID, m2, RequestStatusRequested, RoleRider, f, 0)
+	w2.RequestedAt = now.Add(-2 * time.Hour) // hale asked first
+	seedMember(m2, "hale", "beginner", f)
+
+	x1 := seedJoinRequest(o.ID, m3, RequestStatusWithdrawn, RoleRider, f, 0)
+	x1.UpdatedAt = now.Add(-2 * time.Hour) // haluk withdrew first
+	seedMember(m3, "haluk", "intermediate", f)
+	x2 := seedJoinRequest(o.ID, m4, RequestStatusWithdrawn, RoleRider, f, 0)
+	x2.UpdatedAt = now.Add(-1 * time.Hour) // kalu withdrew most recently
+	seedMember(m4, "kalu", "beginner", f)
+
+	d, err := svc.Detail(context.Background(), o.ID, nil)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(d.Waiting) != 0 {
+		t.Fatalf("logout user: expected no one in waiting list, got %d number of members in waiting list", len(d.Waiting))
+	}
+	if len(d.Withdrawn) != 0 {
+		t.Fatalf("logout user: expected no one in withdrawn list got %d number of members in withdrawn list", len(d.Withdrawn))
+	}
+
+	d, err = svc.Detail(context.Background(), o.ID, &stranger)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(d.Waiting) != 2 {
+		t.Fatalf("stranger : expected 2 members in waiting list, got %d number of members in waiting list", len(d.Waiting))
+	}
+	if len(d.Withdrawn) != 2 {
+		t.Fatalf("stranger : expected 2 members in withdrawn list got %d number of members in withdrawn list", len(d.Withdrawn))
+	}
+	if d.Waiting[0].Name != "hale" || d.Waiting[1].Name != "jale" {
+		t.Errorf("stranger: waiting order, want [hale jale] got %v", d.Waiting)
+	}
+	if d.Withdrawn[0].Name != "kalu" || d.Withdrawn[1].Name != "haluk" {
+		t.Errorf("stranger: withdrawn order, want [kalu haluk] got %v", d.Withdrawn)
+	}
+
+	d, err = svc.Detail(context.Background(), o.ID, &host)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(d.Waiting) != 2 {
+		t.Fatalf("host : expected 2 members in waiting list, got %d number of members in waiting list", len(d.Waiting))
+	}
+	if len(d.Withdrawn) != 2 {
+		t.Fatalf("host : expected 2 members in withdrawn list got %d number of members in withdrawn list", len(d.Withdrawn))
+	}
+	if d.Waiting[0].Name != "hale" || d.Waiting[1].Name != "jale" {
+		t.Errorf("host: waiting order, want [hale jale] got %v", d.Waiting)
+	}
+	if d.Withdrawn[0].Name != "kalu" || d.Withdrawn[1].Name != "haluk" {
+		t.Errorf("host: withdrawn order, want [kalu haluk] got %v", d.Withdrawn)
+	}
+
+	d, err = svc.Detail(context.Background(), o.ID, &regMem)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(d.Waiting) != 2 {
+		t.Fatalf("member : expected 2 members in waiting list, got %d number of members in waiting list", len(d.Waiting))
+	}
+	if len(d.Withdrawn) != 2 {
+		t.Fatalf("member : expected 2 members in withdrawn list got %d number of members in withdrawn list", len(d.Withdrawn))
+	}
+	if d.Waiting[0].Name != "hale" || d.Waiting[1].Name != "jale" {
+		t.Errorf("member: waiting order, want [hale jale] got %v", d.Waiting)
+	}
+	if d.Withdrawn[0].Name != "kalu" || d.Withdrawn[1].Name != "haluk" {
+		t.Errorf("member: withdrawn order, want [kalu haluk] got %v", d.Withdrawn)
 	}
 }

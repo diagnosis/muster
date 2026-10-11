@@ -1,6 +1,6 @@
 import {expect, request, test} from '@playwright/test'
 import {asUser, BASE} from "../fixtures";
-import {accept, createOuting, getDetail, requestJoin, updateOuting} from "../api";
+import {accept, createOuting, getDetail, requestJoin, updateOuting, withdraw} from "../api";
 import {DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
 import {unwrap} from "../envelope";
 
@@ -46,5 +46,27 @@ test.describe("detail", ()=>{
         const detail = await unwrap<DetailResponse>(getDetail(ctxHost, outing.id), 200)
         expect(detail.roster.length).toBe(0)
         expect(Array.isArray(detail.roster)).toBe(true)
+    });
+    test("waiting and withdraw lists", async () => {
+        const host = await asUser(BASE)
+        const m1 = await asUser(BASE)
+        const m2 = await asUser(BASE)
+        const m3 = await asUser(BASE)
+
+        const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+        await unwrap(requestJoin(m1.ctx, o.id), 201)
+        await unwrap(requestJoin(m2.ctx, o.id), 201)
+        await unwrap<JoinRequestResponse>(requestJoin(m3.ctx, o.id), 201)
+        await unwrap(withdraw(m3.ctx, o.id), 200)
+
+        const stranger = await asUser(BASE)
+        const detail = await unwrap<DetailResponse>(getDetail(stranger.ctx, o.id), 200)
+        expect(detail.waiting).toEqual([{ name: m1.user.name }, { name: m2.user.name }])
+        expect(detail.withdrawn).toEqual([{ name: m3.user.name }])
+
+        const ctxAnonymous = await request.newContext({baseURL:BASE})
+        const anon = await unwrap<DetailResponse>(getDetail(ctxAnonymous, o.id), 200)
+        expect(anon.waiting).toEqual([])
+        expect(anon.withdrawn).toEqual([])
     })
 })

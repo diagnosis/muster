@@ -600,6 +600,67 @@ func (s *OutingStore) HostMember(ctx context.Context, hikerID uuid.UUID) (*outin
 	return host, nil
 }
 
+// WaitingNames returns the names of hikers with a pending request, in queue order.
+func (s *OutingStore) WaitingNames(ctx context.Context, outingID uuid.UUID) ([]outing.ListedHiker, error) {
+	q := `
+		SELECT h.name FROM hikers h 
+		    JOIN join_requests jr ON jr.hiker_id = h.id 
+		    WHERE jr.outing_id = $1 AND jr.status = 'requested'
+		ORDER BY jr.requested_at, jr.id
+		    `
+
+	rows, err := s.pool.Query(ctx, q, outingID)
+	if err != nil {
+		return nil, apperr.Database("failed to load waiting list", "failed to select hikers in waiting list", err)
+	}
+	defer rows.Close()
+
+	listedHikers := []outing.ListedHiker{}
+	for rows.Next() {
+		lh := outing.ListedHiker{}
+		err = rows.Scan(&lh.Name)
+		if err != nil {
+			return nil, apperr.Database("failed to load waiting list", "failed to scan hiker name", err)
+		}
+		listedHikers = append(listedHikers, lh)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, apperr.Database("failed to load waiting list", "iterate waiting list failed", err)
+	}
+
+	return listedHikers, nil
+}
+
+// WithdrawnNames returns the names of hikers who withdrew, most recent first.
+func (s *OutingStore) WithdrawnNames(ctx context.Context, outingID uuid.UUID) ([]outing.ListedHiker, error) {
+	q := `
+		SELECT h.name FROM hikers h 
+		    JOIN join_requests jr ON jr.hiker_id = h.id
+		WHERE jr.outing_id = $1 AND jr.status = 'withdrawn'
+		ORDER BY jr.updated_at DESC, jr.id
+`
+	rows, err := s.pool.Query(ctx, q, outingID)
+	if err != nil {
+		return nil, apperr.Database("failed to load withdrawn list", "failed to select hikers in withdrawn list", err)
+	}
+	defer rows.Close()
+
+	listedHikers := []outing.ListedHiker{}
+	for rows.Next() {
+		lh := outing.ListedHiker{}
+		err = rows.Scan(&lh.Name)
+		if err != nil {
+			return nil, apperr.Database("failed to load withdrawn list", "failed to scan hiker name", err)
+		}
+		listedHikers = append(listedHikers, lh)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, apperr.Database("failed to load withdrawn list", "iterate withdrawn list failed", err)
+	}
+
+	return listedHikers, nil
+}
+
 func scanMember(row pgx.Row) (*outing.Member, error) {
 	m := &outing.Member{}
 	var reqID uuid.UUID
