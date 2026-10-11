@@ -202,6 +202,7 @@ type JoinRequest struct {
 	Note         *string       `json:"note,omitempty"`
 	CreatedAt    time.Time     `json:"created_at"`
 	UpdatedAt    time.Time     `json:"updated_at"`
+	RequestedAt  time.Time     `json:"requested_at"`
 }
 
 // PendingRequest links a hiker and joinrequest to outing.

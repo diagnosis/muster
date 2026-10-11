@@ -370,6 +370,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 				SeatsOffered: in.SeatsOffered,
 				Guests:       in.Guests,
 				Note:         in.Note,
+				RequestedAt:  time.Now(),
 			}
 			if err = s.store.CreateJoinRequest(ctx, joinRequest); err != nil {
 				return nil, err
@@ -388,6 +389,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 		joinRequest.Guests = in.Guests
 		joinRequest.Note = in.Note
 		joinRequest.Status = RequestStatusRequested
+		joinRequest.RequestedAt = time.Now()
 		if err = s.store.UpdateJoinRequest(ctx, joinRequest); err != nil {
 			return nil, err
 		}

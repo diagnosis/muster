@@ -1400,3 +1400,36 @@ func Test_Detail_Users_SeesCountNotNames(t *testing.T) {
 	}
 
 }
+
+func Test_RequestJoin_StampsRequestedAt(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	m1, m2 := uuid.New(), uuid.New()
+
+	o := seedOuting(6, 4, StatusOpen, host, f)
+	ji := JoinInput{
+		Role:         RoleDriver,
+		SeatsOffered: 3,
+		Guests:       1,
+		Note:         nil,
+	}
+	r, err := svc.RequestJoin(context.Background(), m1, o.ID, ji)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if r.RequestedAt.IsZero() {
+		t.Errorf("first request: RequestedAt is zero")
+	}
+	// case 2
+	old := time.Now().Add(-48 * time.Hour)
+	r = seedJoinRequest(o.ID, m2, RequestStatusWithdrawn, RoleDriver, f, 0)
+	r.RequestedAt = old
+
+	r, err = svc.RequestJoin(context.Background(), m2, o.ID, JoinInput{Role: RoleRider})
+	if err != nil {
+		t.Fatalf("re-request: expected no error got %v", err)
+	}
+	if !r.RequestedAt.After(old) {
+		t.Errorf("re-request: RequestedAt should move forward, old %v got %v", old, r.RequestedAt)
+	}
+}

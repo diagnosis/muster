@@ -11,7 +11,7 @@ import {
     withdraw
 } from "../api";
 import {DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
-import {unwrap} from "../envelope";
+import {unwrap, unwrapExpectNoContent} from "../envelope";
 import {getNotificationsFor} from "../db";
 
 
@@ -153,6 +153,29 @@ test.describe("membership", ()=> {
 
       const res = await requestJoin(ctxHost, outing.id)
       expect(res.status()).toBe(400)
+  });
+  test("re-request moves the hiker to the back of the queue", async ()=>{
+      const {ctx: ctxHost} = await asUser(BASE)
+      const m1 = await asUser(BASE)
+      const m2 = await asUser(BASE)
+
+      const o = await unwrap<OutingResponse>(createOuting(ctxHost), 201)
+      const jr1 = await unwrap<JoinRequestResponse>(requestJoin(m1.ctx, o.id), 201)
+      const jr2 = await unwrap<JoinRequestResponse>(requestJoin(m2.ctx, o.id), 201)
+      await unwrap(withdraw(m1.ctx, o.id), 200)
+      const jr3 = await unwrap<JoinRequestResponse>(requestJoin(m1.ctx, o.id), 201)
+
+      expect(new Date(jr3.requested_at).getTime())
+          .toBeGreaterThan(new Date(jr1.requested_at).getTime())
+      const joinRequests = await unwrap<JoinRequestResponse[]>(listOutingRequests(ctxHost, o.id), 200)
+      expect(joinRequests.length).toBe(2)
+      expect(joinRequests[0].id).toBe(jr2.id)
+      expect(joinRequests[1].id).toBe(jr1.id)
+
+      const detail = await unwrap<DetailResponse>(getDetail(m1.ctx, o.id), 200)
+      expect(new Date(detail.my_request!.requested_at).getTime())
+          .toBe(new Date(jr3.requested_at).getTime())
+
   })
 
 })

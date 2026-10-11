@@ -56,6 +56,7 @@ export interface JoinRequestResponse {
     role: 'rider'|'driver'
     seats_offered: number
     guests: number
+    requested_at: string
 }
 
 export interface MemberResponse {
