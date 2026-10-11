@@ -627,6 +627,8 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 		Outing:       *o,
 		Host:         *host,
 		Roster:       []Member{},
+		Waiting: []ListedHiker{},
+		Withdrawn: []ListedHiker{},
 		MyRequest:    myReq,
 		SeatCapacity: seatCapacity,
 		PeopleCount:  peopleCount,

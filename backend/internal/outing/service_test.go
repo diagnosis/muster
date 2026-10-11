@@ -865,17 +865,17 @@ func Test_Detail_RosterExcludesNonAccepted(t *testing.T) {
 	_ = seedJoinRequest(o.ID, requested, RequestStatusRequested, RoleRider, f, 0)
 	seedMember(requested, "kalu", "intermediate", f)
 
-	detail, err := svc.Detail(context.Background(), o.ID, nil)
+	detail, err := svc.Detail(context.Background(), o.ID, &hostID)
 	if err != nil {
 		t.Fatalf("error on detail:%v", err)
 	}
 	if detail.PeopleCount != 2 {
 		t.Errorf("expected people count was 2 but got %d", detail.PeopleCount)
 	}
-	if len(detail.Roster) != 0 {
-		t.Errorf("expected roster size was 0 but got %d", len(detail.Roster))
+	if len(detail.Roster) != 1 {
+		t.Fatalf("expected roster size was 1 but got %d", len(detail.Roster))
 	}
-	if len(detail.Roster) == 1 && *detail.Roster[0].HikerID != accepted {
+	if *detail.Roster[0].HikerID != accepted {
 		t.Errorf("roster[0] = %s, want the accepted hiker %s", detail.Roster[0].HikerID, accepted)
 	}
 
@@ -1369,6 +1369,34 @@ func Test_Detail_Users_SeesCountNotNames(t *testing.T) {
 	}
 	if d.Roster[0].HikerID != nil {
 		t.Errorf("stranger: HikerID should be hidden, got %v", d.Roster[0].HikerID)
+	}
+	// member
+	d, err = svc.Detail(context.Background(), o.ID, &m1)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(d.Roster) != 1 {
+		t.Errorf("expected 1 got %d", len(d.Roster))
+	}
+	if d.Roster[0].RequestID != nil {
+		t.Errorf("member: RequestID should be hidden, got %v", d.Roster[0].RequestID)
+	}
+	if d.Roster[0].HikerID == nil {
+		t.Errorf("member: HikerID should  not be hidden, got %v", d.Roster[0].HikerID)
+	}
+	// host
+	d, err = svc.Detail(context.Background(), o.ID, &host)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(d.Roster) != 1 {
+		t.Errorf("expected 1 got %d", len(d.Roster))
+	}
+	if d.Roster[0].RequestID == nil {
+		t.Errorf("host: RequestID should be hidden, got %v", d.Roster[0].RequestID)
+	}
+	if d.Roster[0].HikerID == nil {
+		t.Errorf("host: HikerID should  not be hidden, got %v", d.Roster[0].HikerID)
 	}
 
 }

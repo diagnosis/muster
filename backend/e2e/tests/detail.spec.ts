@@ -8,7 +8,7 @@ test.describe("detail", ()=>{
     test("anonymous full assembly", async () =>{
         const {ctx: ctxHost, user:host} = await asUser(BASE)
         const outing = await unwrap<OutingResponse>(createOuting(ctxHost, {host_seats:2}), 201)
-        const {ctx: ctxRider} = await asUser(BASE)
+        const {ctx: ctxRider, user:rider} = await asUser(BASE)
         const joinRequest = await unwrap<JoinRequestResponse>(requestJoin(ctxRider, outing.id), 201)
 
         const res = await accept(ctxHost, joinRequest.id)
@@ -17,8 +17,11 @@ test.describe("detail", ()=>{
         const ctxAnonymous = await request.newContext({baseURL:BASE})
         const detail = await unwrap<DetailResponse>(getDetail(ctxAnonymous, outing.id), 200)
 
-
-        expect(detail.roster.length).toBe(1)
+        expect(JSON.stringify(detail)).not.toContain(rider.name)
+        expect(Array.isArray(detail.roster)).toBe(true)
+        expect(detail.roster).toHaveLength(0)
+        expect(detail.waiting).toEqual([])
+        expect(detail.withdrawn).toEqual([])
         expect(detail.host.name).toBe(host.name)
         expect(detail.seat_capacity).toBe(2)
         expect(detail.people_count).toBe(2)

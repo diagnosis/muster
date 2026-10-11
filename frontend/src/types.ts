@@ -63,7 +63,7 @@ export interface Detail{
 export type Experience = 'beginner'|'intermediate'|'experienced'
 export interface Member{
     request_id?: string
-    hiker_id: string
+    hiker_id?: string
     name: string
     experience: Experience
 }
