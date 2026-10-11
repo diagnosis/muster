@@ -1338,7 +1338,7 @@ func Test_Detail_Users_SeesCountNotNames(t *testing.T) {
 	stranger := uuid.New()
 
 	o := seedOuting(6, 4, StatusOpen, host, f)
-	seedJoinRequest(o.ID, m1, RequestStatusAccepted, "rider", f, 0)
+	r := seedJoinRequest(o.ID, m1, RequestStatusAccepted, "rider", f, 0)
 	seedMember(host, "salih", "beginner", f)
 	seedMember(m1, "cafer", "beginner", f)
 
@@ -1362,7 +1362,7 @@ func Test_Detail_Users_SeesCountNotNames(t *testing.T) {
 		t.Fatalf("expected no error got %v", err)
 	}
 	if len(d.Roster) != 1 {
-		t.Errorf("expected 1 got %d", len(d.Roster))
+		t.Fatalf("expected 1 got %d", len(d.Roster))
 	}
 	if d.Roster[0].RequestID != nil {
 		t.Errorf("stranger: RequestID should be hidden, got %v", d.Roster[0].RequestID)
@@ -1376,13 +1376,13 @@ func Test_Detail_Users_SeesCountNotNames(t *testing.T) {
 		t.Fatalf("expected no error got %v", err)
 	}
 	if len(d.Roster) != 1 {
-		t.Errorf("expected 1 got %d", len(d.Roster))
+		t.Fatalf("expected 1 got %d", len(d.Roster))
 	}
 	if d.Roster[0].RequestID != nil {
 		t.Errorf("member: RequestID should be hidden, got %v", d.Roster[0].RequestID)
 	}
-	if d.Roster[0].HikerID == nil {
-		t.Errorf("member: HikerID should  not be hidden, got %v", d.Roster[0].HikerID)
+	if d.Roster[0].HikerID == nil || *d.Roster[0].HikerID != m1 {
+		t.Errorf("member: expected HikerID %v got %v", m1, d.Roster[0].HikerID)
 	}
 	// host
 	d, err = svc.Detail(context.Background(), o.ID, &host)
@@ -1390,13 +1390,13 @@ func Test_Detail_Users_SeesCountNotNames(t *testing.T) {
 		t.Fatalf("expected no error got %v", err)
 	}
 	if len(d.Roster) != 1 {
-		t.Errorf("expected 1 got %d", len(d.Roster))
+		t.Fatalf("expected 1 got %d", len(d.Roster))
 	}
-	if d.Roster[0].RequestID == nil {
-		t.Errorf("host: RequestID should be hidden, got %v", d.Roster[0].RequestID)
+	if d.Roster[0].RequestID == nil || *d.Roster[0].RequestID != r.ID {
+		t.Errorf("host: expected RequestID %v got %v", r.ID, d.Roster[0].RequestID)
 	}
-	if d.Roster[0].HikerID == nil {
-		t.Errorf("host: HikerID should  not be hidden, got %v", d.Roster[0].HikerID)
+	if d.Roster[0].HikerID == nil || *d.Roster[0].HikerID != m1 {
+		t.Errorf("host: expected HikerID %v got %v", m1, d.Roster[0].HikerID)
 	}
 
 }

@@ -59,7 +59,8 @@ export interface JoinRequestResponse {
 }
 
 export interface MemberResponse {
-    hiker_id: string
+    hiker_id?: string
+    request_id?: string
     name: string
     experience: string
 }
