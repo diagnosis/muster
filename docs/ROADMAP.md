@@ -1,6 +1,6 @@
 # Muster — Roadmap
 
-*As of 2026-10-10 · repo: github.com/diagnosis/muster · written from the code on `main` (`faedc55`, PR #42 merged) and confirmed by Safa. Replaces the 2026-08-07 roadmap.*
+*As of 2026-10-11 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #43 merged) and confirmed by Safa. Replaces the 2026-08-07 roadmap.*
 
 *Doc hierarchy: roadmap = why and when · spec = what · engineering notes = how.*
 
@@ -10,7 +10,7 @@
 
 Muster is live at muster.safadev.app. Backend and frontend are on `main`, gated by CI (`ci.yml`) and deployed by `deploy.yml`. Migrations run before the new binary, so schema changes are expand-only.
 
-Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec files) that proves the real SQL and JSON, and a Playwright browser suite (19 spec files).
+Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec files) that proves the real SQL and JSON, and a Playwright browser suite (20 spec files).
 
 ### Shipped
 
@@ -18,22 +18,22 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 |---|---|
 | Accounts | signup, email verification, login, logout, refresh with shared in-flight request, forgot and reset password, profile edit |
 | Outings | create, edit, cancel, browse, detail, optional end time (max 14 days), My outings |
-| Joining | request with role, seats and guests; withdraw; re-request applies the new details; host accept, decline, remove; capacity checked atomically at accept |
+| Joining | request with role, seats and guests; withdraw; re-request applies the new details and goes to the back of the queue; host accept, decline, remove; capacity checked atomically at accept |
 | Outing phases (PR #42) | upcoming, in progress, past, computed on the server; My outings tabs; roster and waiting list frozen from the start; host edits until 12 hours before the start; comments open until 7 days after the end |
 | Discussion | comments with one level of replies, likes, soft delete |
 | Messaging | outing group chat, direct messages with request and accept, inbox, unread counts, delete, close and reopen |
 | Notifications | in-app bell, live updates over server-sent events, email for selected events |
-
+| Waiting and withdrew lists (PR #43) | on the outing page for logged-in viewers, names only; waiting in the order people asked (`requested_at`), withdrew most recent first; the going list is sent by viewer level: count only when logged out, names when logged in, hiker ids for members, request ids for the host |
 ---
 
 ## v1 — what is left
 
 In this order. Items can be added.
 
-1. **Waiting and withdrawn lists on the outing page.** Logged-in users only, names only. The server must not send the lists to logged-out visitors. This also fixes the going list, which today is sent in full to anyone. Visibility rule: full test rigor. Rules are in `waiting-list-rules.xlsx`.
-2. **Outing chat read-only 7 days after the end.** Same window as comments. Needs the message package to know an outing's end time; `DiscussionOpen` already exists.
-3. **Host request history, un-decline, undo removal.** A status filter on the requests list, plus two state changes that are host-only.
-4. **Change password while logged in.** Verify the current password, rehash, revoke refresh tokens. Today only the emailed reset exists.
+1. **Outing chat read-only 7 days after the end.** Same window as comments. Needs the message package to know an outing's end time; `DiscussionOpen` already exists.
+2. **Host request history, un-decline, undo removal.** A status filter on the requests list, plus two state changes that are host-only.
+3. **Change password while logged in.** Verify the current password, rehash, revoke refresh tokens. Today only the emailed reset exists.
+4. **Edit Pending Request** (role, seats, guests) without losing your place.
 5. **Passwordless login with an emailed code.**
 6. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
 7. **Pagination.** Browse first, with keyset pagination. Then chat, then the Past tab. Server-side phase filtering comes with it.
@@ -59,6 +59,11 @@ Also open from the original v1 list: `capacity_state` served by the API, so the 
 - Unnamed CHECK constraint on conversations given a name.
 - Unused `Phase.Valid()` removed.
 - Weekly digest email: maybe.
+- Guest counts on the going and waiting lists ("Selin + 2").
+- An injected clock in the outing service, as the message service has.
+- Rename the test helper seedMember to seedHiker.
+- An API spec for the withdrawn order with two people.
+- ESLint errors that are also on main (3 errors, 5 warnings; CI doesn’t run the linter).
 
 ---
 
