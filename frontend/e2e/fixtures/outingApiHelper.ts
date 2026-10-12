@@ -93,6 +93,10 @@ export async function removeMember(actor:Actor, requestId: string){
     const res = await actor.api.delete(`/api/requests/${requestId}/member`)
     return unwrap<JoinRequest>(res, 'remove member')
 }
+export async function withdraw(actor:Actor, outingId:string){
+    const res = await actor.api.delete(`/api/outings/${outingId}/requests/me`)
+    return unwrap(res, 'withdraw request')
+}
 
 export async function postMessage(actor:Actor,cid: string ,input:{body:string}){
     const res = await actor.api.post(`/api/conversations/${cid}/messages`, {data: input})

@@ -46,6 +46,9 @@ type Storage interface {
 	SoftDeleteComment(ctx context.Context, id uuid.UUID) error
 	LikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error
 	UnlikeComment(ctx context.Context, commentID, hikerID uuid.UUID) error
+
+	WaitingNames(ctx context.Context, outingID uuid.UUID) ([]ListedHiker, error)
+	WithdrawnNames(ctx context.Context, outingID uuid.UUID) ([]ListedHiker, error)
 }
 
 const maxOutingDuration = 14 * 24 * time.Hour
@@ -370,6 +373,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 				SeatsOffered: in.SeatsOffered,
 				Guests:       in.Guests,
 				Note:         in.Note,
+				RequestedAt:  time.Now(),
 			}
 			if err = s.store.CreateJoinRequest(ctx, joinRequest); err != nil {
 				return nil, err
@@ -388,6 +392,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 		joinRequest.Guests = in.Guests
 		joinRequest.Note = in.Note
 		joinRequest.Status = RequestStatusRequested
+		joinRequest.RequestedAt = time.Now()
 		if err = s.store.UpdateJoinRequest(ctx, joinRequest); err != nil {
 			return nil, err
 		}
@@ -559,7 +564,36 @@ func stampAll(outings []Outing, now time.Time) {
 	}
 }
 
-// Detail assembles the full view of one outing for one viewer: outing, host card, accepted roster, derived seat math, and — when viewerID is non-nil — the viewer's own request if any.
+// viewerLevel is how much of an outing's people data a viewer may see.
+// Levels are ordered: each one sees everything the one before it sees.
+type viewerLevel int
+
+const (
+	viewerAnonymous viewerLevel = iota // not logged in
+	viewerLoggedIn                     // logged in; not on the roster
+	viewerMember                       // accepted on this outing
+	viewerHost
+)
+
+func levelOf(o *Outing, viewerID *uuid.UUID, myReq *JoinRequest) viewerLevel {
+	switch {
+	case viewerID == nil:
+		return viewerAnonymous
+	case *viewerID == o.HostID:
+		return viewerHost
+	case myReq != nil && myReq.Status == RequestStatusAccepted:
+		return viewerMember
+	default:
+		return viewerLoggedIn
+	}
+}
+
+// Detail assembles the view of one outing for one viewer: the outing,
+// the host card, and the derived seat math for everyone. Logged-in
+// viewers also get the going list and the waiting and withdrawn lists
+// (names only); hiker ids are added for members and request ids for the
+// host. A logged-out viewer gets empty lists. MyRequest is the viewer's
+// own request, if any.
 func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid.UUID) (*Detail, error) {
 	o, err := s.store.GetOuting(ctx, outingID)
 	if err != nil {
@@ -599,16 +633,38 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 	}
 	seatsShort := max(0, peopleCount-seatCapacity)
 	spotsLeft := max(0, min(seatCapacity, o.MaxSize)-peopleCount)
-
 	detail := &Detail{
 		Outing:       *o,
 		Host:         *host,
-		Roster:       roster,
+		Roster:       []Member{},
+		Waiting:      []ListedHiker{},
+		Withdrawn:    []ListedHiker{},
 		MyRequest:    myReq,
 		SeatCapacity: seatCapacity,
 		PeopleCount:  peopleCount,
 		SeatsShort:   seatsShort,
 		SpotsLeft:    spotsLeft,
+	}
+	level := levelOf(o, viewerID, myReq)
+	if level >= viewerLoggedIn {
+		detail.Waiting, err = s.store.WaitingNames(ctx, outingID)
+		if err != nil {
+			return nil, err
+		}
+		detail.Withdrawn, err = s.store.WithdrawnNames(ctx, outingID)
+		if err != nil {
+			return nil, err
+		}
+
+		for i := range roster {
+			if level < viewerMember {
+				roster[i].HikerID = nil
+			}
+			if level < viewerHost {
+				roster[i].RequestID = nil
+			}
+		}
+		detail.Roster = roster
 	}
 
 	return detail, nil
@@ -796,7 +852,7 @@ func (s *Service) notifyOutingAudience(ctx context.Context, outing *Outing, kind
 		logger.Warn(ctx, "failed to get roster for notification", "err", err)
 	} else {
 		for _, member := range roster {
-			s.notify(ctx, member.HikerID, outing, kind)
+			s.notify(ctx, *member.HikerID, outing, kind)
 		}
 	}
 	pending, err := s.store.ListJoinRequests(ctx, outing.ID, RequestStatusRequested)
@@ -827,7 +883,7 @@ func (s *Service) isAudience(ctx context.Context, outing *Outing, hikerID uuid.U
 		return false, err
 	}
 	for _, m := range roster {
-		if m.HikerID == hikerID {
+		if *m.HikerID == hikerID {
 			return true, nil
 		}
 	}

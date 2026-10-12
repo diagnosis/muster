@@ -1,6 +1,6 @@
 import {expect, request, test} from '@playwright/test'
 import {asUser, BASE} from "../fixtures";
-import {accept, createOuting, getDetail, requestJoin, updateOuting} from "../api";
+import {accept, createOuting, getDetail, requestJoin, updateOuting, withdraw} from "../api";
 import {DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
 import {unwrap} from "../envelope";
 
@@ -8,7 +8,7 @@ test.describe("detail", ()=>{
     test("anonymous full assembly", async () =>{
         const {ctx: ctxHost, user:host} = await asUser(BASE)
         const outing = await unwrap<OutingResponse>(createOuting(ctxHost, {host_seats:2}), 201)
-        const {ctx: ctxRider} = await asUser(BASE)
+        const {ctx: ctxRider, user:rider} = await asUser(BASE)
         const joinRequest = await unwrap<JoinRequestResponse>(requestJoin(ctxRider, outing.id), 201)
 
         const res = await accept(ctxHost, joinRequest.id)
@@ -17,8 +17,11 @@ test.describe("detail", ()=>{
         const ctxAnonymous = await request.newContext({baseURL:BASE})
         const detail = await unwrap<DetailResponse>(getDetail(ctxAnonymous, outing.id), 200)
 
-
-        expect(detail.roster.length).toBe(1)
+        expect(JSON.stringify(detail)).not.toContain(rider.name)
+        expect(Array.isArray(detail.roster)).toBe(true)
+        expect(detail.roster).toHaveLength(0)
+        expect(detail.waiting).toEqual([])
+        expect(detail.withdrawn).toEqual([])
         expect(detail.host.name).toBe(host.name)
         expect(detail.seat_capacity).toBe(2)
         expect(detail.people_count).toBe(2)
@@ -43,5 +46,27 @@ test.describe("detail", ()=>{
         const detail = await unwrap<DetailResponse>(getDetail(ctxHost, outing.id), 200)
         expect(detail.roster.length).toBe(0)
         expect(Array.isArray(detail.roster)).toBe(true)
+    });
+    test("waiting and withdraw lists", async () => {
+        const host = await asUser(BASE)
+        const m1 = await asUser(BASE)
+        const m2 = await asUser(BASE)
+        const m3 = await asUser(BASE)
+
+        const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+        await unwrap(requestJoin(m1.ctx, o.id), 201)
+        await unwrap(requestJoin(m2.ctx, o.id), 201)
+        await unwrap<JoinRequestResponse>(requestJoin(m3.ctx, o.id), 201)
+        await unwrap(withdraw(m3.ctx, o.id), 200)
+
+        const stranger = await asUser(BASE)
+        const detail = await unwrap<DetailResponse>(getDetail(stranger.ctx, o.id), 200)
+        expect(detail.waiting).toEqual([{ name: m1.user.name }, { name: m2.user.name }])
+        expect(detail.withdrawn).toEqual([{ name: m3.user.name }])
+
+        const ctxAnonymous = await request.newContext({baseURL:BASE})
+        const anon = await unwrap<DetailResponse>(getDetail(ctxAnonymous, o.id), 200)
+        expect(anon.waiting).toEqual([])
+        expect(anon.withdrawn).toEqual([])
     })
 })

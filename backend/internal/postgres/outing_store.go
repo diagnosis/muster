@@ -153,9 +153,10 @@ func (s *OutingStore) CreateOuting(ctx context.Context, o *outing.Outing) error 
 	return nil
 }
 
-// UpdateJoinRequest persists the full request row — role, seats,
-// guests, note, and status. The store writes what it's given; deciding
-// which transitions are legal is the service's job.
+// UpdateJoinRequest persists the full request row: role, seats, guests,
+// note, status, and requested_at. The store writes what it's given;
+// deciding which transitions are legal, and when requested_at moves,
+// is the service's job.
 func (s *OutingStore) UpdateJoinRequest(ctx context.Context, jr *outing.JoinRequest) error {
 	q := ` 
 	UPDATE join_requests
@@ -164,11 +165,12 @@ func (s *OutingStore) UpdateJoinRequest(ctx context.Context, jr *outing.JoinRequ
 	    guests=$3,
 	    note=$4,
 	    status=$5,
-	    updated_at=NOW()
+	    updated_at=NOW(),
+		requested_at=$7
 	    WHERE
 		id = $6
 `
-	cmTag, err := s.pool.Exec(ctx, q, jr.Role, jr.SeatsOffered, jr.Guests, jr.Note, jr.Status, jr.ID)
+	cmTag, err := s.pool.Exec(ctx, q, jr.Role, jr.SeatsOffered, jr.Guests, jr.Note, jr.Status, jr.ID, jr.RequestedAt)
 	if err != nil {
 		return apperr.Database("could not update join request", "update_joinRequest: failed to execute statement", err)
 	}
@@ -280,15 +282,16 @@ func (s *OutingStore) ListUpcoming(ctx context.Context, now time.Time) ([]outing
 	return outings, nil
 }
 
-// ListJoinRequests returns the outing's requests with the given status, oldest first.
+// ListJoinRequests returns the outing's requests with the given status,
+// in queue order: earliest requested_at first, id as the tiebreaker.
 func (s *OutingStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, status outing.RequestStatus) ([]outing.PendingRequest, error) {
 	q := `
-	SELECT jr.id, jr.outing_id, jr.hiker_id, jr.status, jr.role, jr.seats_offered, jr.guests, jr.note, jr.created_at, jr.updated_at,
+	SELECT jr.id, jr.outing_id, jr.hiker_id, jr.status, jr.role, jr.seats_offered, jr.guests, jr.note, jr.created_at, jr.updated_at, jr.requested_at,
 	       h.name, h.experience
 		FROM join_requests jr
 		JOIN hikers h ON h.id = jr.hiker_id
 		WHERE jr.outing_id = $1 AND jr.status = $2
-	ORDER BY jr.created_at
+	ORDER BY jr.requested_at, jr.id
 `
 	rows, err := s.pool.Query(ctx, q, outingID, status)
 	if err != nil {
@@ -315,11 +318,11 @@ func (s *OutingStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, 
 func (s *OutingStore) CreateJoinRequest(ctx context.Context, r *outing.JoinRequest) error {
 	q := `
 		INSERT INTO join_requests 
-		(id, outing_id, hiker_id, status, role, seats_offered, guests, note)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		(id, outing_id, hiker_id, status, role, seats_offered, guests, note, requested_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		RETURNING created_at, updated_at
 `
-	row := s.pool.QueryRow(ctx, q, r.ID, r.OutingID, r.HikerID, r.Status, r.Role, r.SeatsOffered, r.Guests, r.Note)
+	row := s.pool.QueryRow(ctx, q, r.ID, r.OutingID, r.HikerID, r.Status, r.Role, r.SeatsOffered, r.Guests, r.Note, r.RequestedAt)
 	err := row.Scan(&r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -334,7 +337,7 @@ func (s *OutingStore) CreateJoinRequest(ctx context.Context, r *outing.JoinReque
 // GetJoinRequest returns the join request with the given id, regardless of status.
 func (s *OutingStore) GetJoinRequest(ctx context.Context, id uuid.UUID) (*outing.JoinRequest, error) {
 	q := `
-		SELECT id, outing_id, hiker_id, status, role, seats_offered, guests, note, created_at, updated_at	
+		SELECT id, outing_id, hiker_id, status, role, seats_offered, guests, note, created_at, updated_at, requested_at	
 		FROM join_requests WHERE id = $1
 `
 	row := s.pool.QueryRow(ctx, q, id)
@@ -353,7 +356,7 @@ func (s *OutingStore) GetJoinRequest(ctx context.Context, id uuid.UUID) (*outing
 // (uq_outing_hiker).
 func (s *OutingStore) GetJoinRequestByHiker(ctx context.Context, outingID, hikerID uuid.UUID) (*outing.JoinRequest, error) {
 	q := `
-		SELECT id, outing_id, hiker_id, status, role, seats_offered, guests, note, created_at, updated_at	
+		SELECT id, outing_id, hiker_id, status, role, seats_offered, guests, note, created_at, updated_at, requested_at	
 		FROM join_requests WHERE outing_id = $1 AND hiker_id = $2
 `
 	row := s.pool.QueryRow(ctx, q, outingID, hikerID)
@@ -597,6 +600,67 @@ func (s *OutingStore) HostMember(ctx context.Context, hikerID uuid.UUID) (*outin
 	return host, nil
 }
 
+// WaitingNames returns the names of hikers with a pending request, in queue order.
+func (s *OutingStore) WaitingNames(ctx context.Context, outingID uuid.UUID) ([]outing.ListedHiker, error) {
+	q := `
+		SELECT h.name FROM hikers h 
+		    JOIN join_requests jr ON jr.hiker_id = h.id 
+		    WHERE jr.outing_id = $1 AND jr.status = 'requested'
+		ORDER BY jr.requested_at, jr.id
+		    `
+
+	rows, err := s.pool.Query(ctx, q, outingID)
+	if err != nil {
+		return nil, apperr.Database("failed to load waiting list", "failed to select hikers in waiting list", err)
+	}
+	defer rows.Close()
+
+	listedHikers := []outing.ListedHiker{}
+	for rows.Next() {
+		lh := outing.ListedHiker{}
+		err = rows.Scan(&lh.Name)
+		if err != nil {
+			return nil, apperr.Database("failed to load waiting list", "failed to scan hiker name", err)
+		}
+		listedHikers = append(listedHikers, lh)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, apperr.Database("failed to load waiting list", "iterate waiting list failed", err)
+	}
+
+	return listedHikers, nil
+}
+
+// WithdrawnNames returns the names of hikers who withdrew, most recent first.
+func (s *OutingStore) WithdrawnNames(ctx context.Context, outingID uuid.UUID) ([]outing.ListedHiker, error) {
+	q := `
+		SELECT h.name FROM hikers h 
+		    JOIN join_requests jr ON jr.hiker_id = h.id
+		WHERE jr.outing_id = $1 AND jr.status = 'withdrawn'
+		ORDER BY jr.updated_at DESC, jr.id
+`
+	rows, err := s.pool.Query(ctx, q, outingID)
+	if err != nil {
+		return nil, apperr.Database("failed to load withdrawn list", "failed to select hikers in withdrawn list", err)
+	}
+	defer rows.Close()
+
+	listedHikers := []outing.ListedHiker{}
+	for rows.Next() {
+		lh := outing.ListedHiker{}
+		err = rows.Scan(&lh.Name)
+		if err != nil {
+			return nil, apperr.Database("failed to load withdrawn list", "failed to scan hiker name", err)
+		}
+		listedHikers = append(listedHikers, lh)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, apperr.Database("failed to load withdrawn list", "iterate withdrawn list failed", err)
+	}
+
+	return listedHikers, nil
+}
+
 func scanMember(row pgx.Row) (*outing.Member, error) {
 	m := &outing.Member{}
 	var reqID uuid.UUID
@@ -658,6 +722,7 @@ func scanPendingRequest(row pgx.Row) (*outing.PendingRequest, error) {
 		&r.Note,
 		&r.CreatedAt,
 		&r.UpdatedAt,
+		&r.RequestedAt,
 		&r.HikerName,
 		&r.HikerExperience,
 	)
@@ -678,6 +743,7 @@ func scanJoinRequest(row pgx.Row) (*outing.JoinRequest, error) {
 		&r.Note,
 		&r.CreatedAt,
 		&r.UpdatedAt,
+		&r.RequestedAt,
 	)
 	return r, err
 }

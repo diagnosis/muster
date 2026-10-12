@@ -151,7 +151,10 @@ func (f *fakeStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, st
 		}
 	}
 	sort.Slice(jrs, func(i, j int) bool {
-		return jrs[i].CreatedAt.Before(jrs[j].CreatedAt)
+		if !jrs[i].RequestedAt.Equal(jrs[j].RequestedAt) {
+			return jrs[i].RequestedAt.Before(jrs[j].RequestedAt)
+		}
+		return jrs[i].ID.String() < jrs[j].ID.String()
 	})
 	return jrs, nil
 }
@@ -190,7 +193,10 @@ func (f *fakeStore) Roster(ctx context.Context, outingID uuid.UUID) ([]Member, e
 	for _, r := range f.requests {
 		if r.OutingID == outingID && r.Status == RequestStatusAccepted {
 			if m, ok := f.hikers[r.HikerID]; ok {
-				members = append(members, *m)
+				member := *m
+				rid := r.ID
+				member.RequestID = &rid
+				members = append(members, member)
 			}
 		}
 	}
@@ -309,4 +315,47 @@ func (f *fakeStore) UnlikeComment(ctx context.Context, commentID, hikerID uuid.U
 	delete(f.likes, likeKey{commentID: commentID, hikerID: hikerID})
 
 	return nil
+}
+func (f *fakeStore) WaitingNames(ctx context.Context, outingID uuid.UUID) ([]ListedHiker, error) {
+	jr := []*JoinRequest{}
+	for _, r := range f.requests {
+		if r.OutingID == outingID && r.Status == RequestStatusRequested {
+			jr = append(jr, r)
+		}
+	}
+	sort.Slice(jr, func(i, j int) bool {
+		if !jr[i].RequestedAt.Equal(jr[j].RequestedAt) {
+			return jr[i].RequestedAt.Before(jr[j].RequestedAt)
+		}
+		return jr[i].ID.String() < jr[j].ID.String()
+	})
+	names := []ListedHiker{}
+	for _, r := range jr {
+		if h, ok := f.hikers[r.HikerID]; ok {
+			names = append(names, ListedHiker{Name: h.Name})
+		}
+	}
+	return names, nil
+}
+
+func (f *fakeStore) WithdrawnNames(ctx context.Context, outingID uuid.UUID) ([]ListedHiker, error) {
+	jr := []*JoinRequest{}
+	for _, r := range f.requests {
+		if r.OutingID == outingID && r.Status == RequestStatusWithdrawn {
+			jr = append(jr, r)
+		}
+	}
+	sort.Slice(jr, func(i, j int) bool {
+		if !jr[i].UpdatedAt.Equal(jr[j].UpdatedAt) {
+			return jr[i].UpdatedAt.After(jr[j].UpdatedAt)
+		}
+		return jr[i].ID.String() < jr[j].ID.String()
+	})
+	names := []ListedHiker{}
+	for _, r := range jr {
+		if h, ok := f.hikers[r.HikerID]; ok {
+			names = append(names, ListedHiker{Name: h.Name})
+		}
+	}
+	return names, nil
 }
