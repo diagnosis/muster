@@ -247,3 +247,29 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 - **Tests that depend on a value must state it.** Random fixtures are fine for fields a test ignores. Capacity is not one of them.
 - **In React, derived values are not state.** Only what the user chose is state (`tab`). Counts and filtered lists are computed during render. Hooks go above every early return.
 - **Read the failure text before changing anything.** `[404]` and `got false, want true` point at different files.
+
+## Lessons from the waiting list and going-list visibility
+
+- **Default to nothing, then add.** `Detail` starts with empty lists and fills them only when the viewer's level allows. A missed case then shows too little, never too much.
+- **Order the viewer levels and compare with `<` and `>=`.** One `levelOf` function decides who the viewer is; the rules read `level >= viewerLoggedIn`. Scattered `if host … else if member …` checks let one viewer fall through.
+- **`==` on two pointers compares addresses.** Two pointers to equal UUIDs are different. Dereference, and check for nil first: `p == nil || *p != want`. The same mistake in a test makes an assertion that can never fail.
+- **A nil slice is `null` in JSON; `[]T{}` is `[]`.** Initialise every list the client will loop over.
+- **A query that never selects a column cannot leak it.** The public lists use their own name-only queries and do not reuse the host's full-row query.
+- **Placeholders stand for values, not SQL.** `ASC`/`DESC`, column names and table names cannot be `$1`. Two fixed queries beat one built by string concatenation.
+- **Every `ORDER BY` needs a tiebreaker.** Real data already had rows sharing a timestamp. Without `, id` the order can change between queries and a spec flakes.
+- **`created_at`, `updated_at` and "when this last happened" are three different things.** A row reused on re-request keeps its `created_at`, and `updated_at` moves on any edit. Queue position got its own column, `requested_at`.
+- **One column, one clock.** `requested_at` is always set from Go. Mixing Go's clock with the database's `now()` can misorder rows milliseconds apart.
+- **An applied migration is frozen.** Goose never re-runs a version, so a new line added to an old file runs on a fresh database and never on production. Add a new file.
+- **`ADD COLUMN … NOT NULL` needs a default and usually a backfill.** The default keeps the old binary's inserts working during deploy; the backfill gives existing rows a true value.
+- **Prove a backfill with an aggregate.** A `GROUP BY status` with counts is a receipt; 500 pasted rows cut off by the client's page limit are not.
+- **SQL in a Go string is prose until it runs.** A missing comma, a missing semicolon and `FROM hiker` all passed `make check`. Only psql and the API suite can see them.
+- **A new column must be added to every scan of that table.** A missed `SELECT` returns a zero value silently, and the next write stores it. Assert the field on a read that goes through the database, not on the response of the write.
+- **Check `rows.Err()` after the loop.** `rows.Next()` returns false both at the end and on a failure; without the check a broken read looks like a short list.
+- **Reuse `err`.** Separate names per call (`werr`, `xerr`) made it possible to return the wrong one, which was nil.
+- **The fake mirrors the store's filter and order exactly, tiebreaker included.** Write the contract down as a small table before either side exists. A fake that sorted by a different column kept an order test green for the wrong reason.
+- **Seed in a different order than you expect back.** Otherwise a sort that does nothing passes.
+- **A length check is not a content check.** Two lists of two names passed with the lists swapped. Assert the names.
+- **A "sees nothing" test only means something where the thing would otherwise be there.** Assert the empty response on an outing that has people in both lists.
+- **When a rule change turns an old test red, read its name first.** Behaviour gone: delete it. Behaviour still there but the setup assumed the old rule: fix the setup. Test right, code wrong: fix the code. Changing the expected number is none of these.
+- **`toBe` compares identity, `toEqual` compares contents.** Comparing whole objects with `toEqual` also fails when an extra field appears, which makes it a leak check.
+- **A locator that matches two elements can pass by accident.** "Log in" passed on mobile only because the header link was hidden. Scope the locator to its container.
