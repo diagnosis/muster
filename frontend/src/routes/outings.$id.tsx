@@ -156,6 +156,7 @@ export function OutingDetailPage() {
     const chatLink = canSeeChat &&
         <Link className={'btn btn-primary'} to={'/conversations/$id'} params={{id: detail.outing.conversation_id}}>Outing chat</Link>
     const rosterLocked = detail.outing.phase !== 'upcoming'
+    const othersGoing = detail.people_count - 1
     const messageBtn = (hikerId: string, name: string) => (
         <button className="icon-btn"
                 aria-label={`Message ${name}`}
@@ -193,26 +194,50 @@ export function OutingDetailPage() {
             </section>
 
             <section className={styles.section}>
-                <h2 className={styles.subheading}>Who's going ({detail.roster.length + 1})</h2>
+                <h2 className={styles.subheading}>
+                    Who's going{me ? ` (${detail.roster.length + 1})` : ''}
+                </h2>
                 <div className={styles.card}>
                     <div className={styles.memberRow}>
                         <span className={styles.avatar} aria-hidden="true">{initial(detail.host.name)}</span>
                         <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience}</p>
                         <span className={styles.hostTag}>Host</span>
                         <span className={styles.rowActions}>
-                        {canSeeStartDmBtn && detail.host.hiker_id !== me?.id && messageBtn(detail.host.hiker_id, detail.host.name)}
-                    </span>
+            {canSeeStartDmBtn && detail.host.hiker_id && detail.host.hiker_id !== me?.id
+                && messageBtn(detail.host.hiker_id, detail.host.name)}
+        </span>
                     </div>
-                    {detail.roster.map(m => <div className={styles.memberRow} key={m.hiker_id}>
+
+                    {detail.roster.map((m, i) => <div className={styles.memberRow} key={m.hiker_id ?? i}>
                         <span className={styles.avatar} aria-hidden="true">{initial(m.name)}</span>
                         {m.name} · {m.experience}
                         <span className={styles.rowActions}>
-                        {canSeeStartDmBtn && m.hiker_id !== me?.id && messageBtn(m.hiker_id, m.name)}
+            {canSeeStartDmBtn && m.hiker_id && m.hiker_id !== me?.id
+                && messageBtn(m.hiker_id, m.name)}
                             {isHost && !rosterLocked &&
                                 <button aria-label={'Remove'} className={`icon-btn ${styles.removeIcon}`}
                                         onClick={() => setMemberToRemove(m)}><TrashIcon/></button>}
-                    </span>
+        </span>
                     </div>)}
+
+                    {!me && othersGoing > 0 && <p className={styles.moreRow}>
+                        {othersGoing} more going. <Link to="/login">Log in</Link> to see who.
+                    </p>}
+
+                    {detail.waiting.length > 0 && <>
+                        <h3 className={styles.groupLabel}>Waiting ({detail.waiting.length})</h3>
+                        <ol className={styles.chips}>
+                            {detail.waiting.map((w, i) => <li className={styles.chip} key={i}>
+                                <span className={styles.chipAvatar} aria-hidden="true">{initial(w.name)}</span>
+                                {w.name}
+                            </li>)}
+                        </ol>
+                    </>}
+
+                    {detail.withdrawn.length > 0 && <>
+                        <h3 className={styles.groupLabel}>Withdrew ({detail.withdrawn.length})</h3>
+                        <p className={styles.withdrawn}>{detail.withdrawn.map(w => w.name).join(', ')}</p>
+                    </>}
                 </div>
                 {startDM.isError && <p className={styles.error}>{startDM.error.message}</p>}
                 {memberToRemove && <Modal title={`Remove ${memberToRemove.name}`} onClose={() => setMemberToRemove(null)}>

@@ -48,11 +48,16 @@ export interface Outing{
     phase: Phase
     is_discussion_open: boolean
 }
+export interface ListedHiker {
+    name:string
+}
 
 export interface Detail{
     outing: Outing
     host: Member
     roster: Member[]
+    waiting: ListedHiker[]
+    withdrawn: ListedHiker[]
     my_request?: JoinRequest
     seat_capacity: number
     people_count: number
@@ -165,6 +170,7 @@ export interface NotificationEvent{
     read_at:  string|null
 }
 
+
 export interface CommentView{
     id: string
     outing_id: string
@@ -259,5 +265,6 @@ export interface ConversationSummary{
     created_at: string
     unread_count: number
 }
+
 
 

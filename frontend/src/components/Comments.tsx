@@ -26,8 +26,10 @@ export function Comments({outingId, hostId, canComment}:CommentsProp){
         <section className={styles.section}>
             <h2 className={styles.subheading}>Discussion</h2>
             <div className={styles.thread}>
-                {topLevel.length===0&&
-                    <p className={styles.meta}>No comments yet - start the conversation.</p>}
+                {topLevel.length === 0 &&
+                    <p className={styles.meta}>
+                        {canComment ? 'No comments yet - start the conversation.' : 'No comments were posted.'}
+                    </p>}
             {topLevel.length >0 && topLevel.map(c => (
                 <div key={c.id}>
                     <CommentRow c={c} outingId={outingId} hostId={hostId}
