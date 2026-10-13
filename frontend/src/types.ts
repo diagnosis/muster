@@ -245,6 +245,7 @@ export interface ConversationView{
     dm_status: DMStatus | null
     dm_declined_by: string | null
     created_at: string
+    is_discussion_open: boolean | null
 }
 
 

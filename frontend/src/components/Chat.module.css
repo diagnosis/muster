@@ -146,3 +146,14 @@
     flex: none;
     min-height: 44px;
 }
+
+/* a refused send: the server's reason, above the box */
+.sendError{
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius-control);
+    background: var(--surface-raised);
+    color: var(--color-danger);
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
+}
