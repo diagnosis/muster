@@ -28,7 +28,6 @@ type fakeStore struct {
 	outingEnds        map[uuid.UUID]*time.Time
 	names             map[uuid.UUID]string
 	conversationReads map[readsKey]int64
-	outings           map[uuid.UUID]*outing.Outing
 }
 
 func (f *fakeStore) OutingForChat(ctx context.Context, outingID uuid.UUID) (*outing.Outing, error) {
@@ -80,7 +79,6 @@ func newFakeStore() *fakeStore {
 		outingEnds:        make(map[uuid.UUID]*time.Time),
 		names:             make(map[uuid.UUID]string),
 		conversationReads: make(map[readsKey]int64),
-		outings:           make(map[uuid.UUID]*outing.Outing),
 	}
 }
 

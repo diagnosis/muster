@@ -119,7 +119,7 @@ test.describe("message api", ()=> {
 
 
     })
-    test("outing check is closed after 7 days", async () => {
+    test("outing chat is closed 7 days after the end", async () => {
         const host = await asUser(BASE)
         const hiker = await asUser(BASE)
         const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)

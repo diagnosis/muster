@@ -91,7 +91,6 @@ func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.
 		return nil, apperr.Forbidden("forbidden", "user not part of the roster", err)
 	}
 	if conv.OutingID != nil {
-		var outingStatusErr error
 		o, outingStatusErr := s.store.OutingForChat(ctx, *conv.OutingID)
 		if outingStatusErr != nil {
 			return nil, outingStatusErr

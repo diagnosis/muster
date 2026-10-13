@@ -1,6 +1,5 @@
 import { Pool } from 'pg'
 import { createHash, randomBytes} from "node:crypto"
-import {fdatasync} from "node:fs";
 
 let pool : Pool | null = null
 
