@@ -67,23 +67,25 @@ type Participant struct {
 
 // ConversationView is a conversation with everything the chat page needs to
 // render it: the row itself, its participants (host and accepted members for an
-// outing, both parties for a DM), and the outing's title and start time when
-// kind is outing. It is viewer-independent — the client picks "the other party"
-// for a DM by excluding itself from Participants.
+// outing, both parties for a DM), and, when kind is outing, the outing's title,
+// start time and whether its chat is still open. IsDiscussionOpen is nil for a
+// DM, where it doesn't apply. The view is viewer-independent: the client picks
+// "the other party" for a DM by excluding itself from Participants.
 type ConversationView struct {
-	ID             uuid.UUID        `json:"id"`
-	Kind           ConversationKind `json:"kind"`
-	OutingTitle    *string          `json:"outing_title"`
-	OutingStartsAt *time.Time       `json:"outing_starts_at"`
-	Participants   []Participant    `json:"participants"`
-	OutingID       *uuid.UUID       `json:"outing_id"`
-	OutingHostID   *uuid.UUID       `json:"outing_host_id"`
-	DmA            *uuid.UUID       `json:"dm_a"`
-	DmB            *uuid.UUID       `json:"dm_b"`
-	DmInitiator    *uuid.UUID       `json:"dm_initiator"`
-	DmStatus       *DMStatus        `json:"dm_status"`
-	DmDeclinedBy   *uuid.UUID       `json:"dm_declined_by"`
-	CreatedAt      time.Time        `json:"created_at"`
+	ID               uuid.UUID        `json:"id"`
+	Kind             ConversationKind `json:"kind"`
+	OutingTitle      *string          `json:"outing_title"`
+	OutingStartsAt   *time.Time       `json:"outing_starts_at"`
+	Participants     []Participant    `json:"participants"`
+	OutingID         *uuid.UUID       `json:"outing_id"`
+	OutingHostID     *uuid.UUID       `json:"outing_host_id"`
+	DmA              *uuid.UUID       `json:"dm_a"`
+	DmB              *uuid.UUID       `json:"dm_b"`
+	DmInitiator      *uuid.UUID       `json:"dm_initiator"`
+	DmStatus         *DMStatus        `json:"dm_status"`
+	DmDeclinedBy     *uuid.UUID       `json:"dm_declined_by"`
+	CreatedAt        time.Time        `json:"created_at"`
+	IsDiscussionOpen *bool            `json:"is_discussion_open"`
 }
 
 // ConversationSummary is one inbox row: what a hiker sees before opening a

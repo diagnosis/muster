@@ -233,6 +233,27 @@ export interface ConversationSummary{
     unread_count: number
 }
 
+export interface Participant {
+    hiker_id: string
+    name: string
+}
+
+export interface ConversationViewResponse {
+    id: string
+    kind: ConversationKind
+    outing_title: string | null
+    outing_starts_at: string | null
+    participants: Participant[]
+    outing_id: string | null
+    outing_host_id: string | null
+    dm_a: string | null
+    dm_b: string | null
+    dm_initiator: string | null
+    dm_status: DMStatus | null
+    dm_declined_by: string | null
+    created_at: string
+    is_discussion_open: boolean | null
+}
 
 export const CODE_EMAIL_NOT_VERIFIED = "email_not_verified"
 

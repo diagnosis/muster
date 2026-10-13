@@ -162,3 +162,5 @@ export const listConversations = (ctx: APIRequestContext) =>
     ctx.get('/api/conversations')
 export const markRead = (ctx: APIRequestContext, cid: string, input:{seq:number}) =>
     ctx.post(`/api/conversations/${cid}/read`, {data:input})
+export const getConversation = (ctx : APIRequestContext, cid: string) =>
+    ctx.get(`/api/conversations/${cid}`)

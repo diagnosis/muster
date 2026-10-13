@@ -1214,3 +1214,106 @@ func Test_MarkRead_NotMarkBeyond(t *testing.T) {
 		t.Errorf("marker: got %d, want %d (clamped to the highest seq)", got, message2.Seq)
 	}
 }
+
+func Test_PostMessage_OutingChatWindow(t *testing.T) {
+
+	starts := time.Date(2025, 10, 14, 12, 0, 0, 0, time.UTC)
+	ends := time.Date(2025, 10, 14, 20, 0, 0, 0, time.UTC)
+	f, _, _, svc, c, _, m1, _ := newOutingConv(t)
+
+	f.setOutingTimes(*c.OutingID, starts, &ends)
+	closes := time.Date(2025, 10, 21, 20, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name          string
+		now           time.Time
+		outingStatus  outing.Status
+		wantConflict  bool
+		wantForbidden bool
+	}{
+		{"one second before the window closes", closes.Add(-time.Second), outing.StatusOpen, false, false},
+		{"exactly when the window closes", closes, outing.StatusOpen, true, false},
+		{"cancelled outing, clock past the window", closes.Add(1 * time.Hour), outing.StatusCancelled, false, true},
+	}
+
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			f.outingStatuses[*c.OutingID] = cc.outingStatus
+			svc.now = func() time.Time {
+				return cc.now
+			}
+			_, err := svc.PostMessage(context.Background(), c.ID, m1, "hello")
+			switch {
+			case cc.wantConflict:
+				wantStatus(t, err, apperr.CodeConflict)
+			case cc.wantForbidden:
+				wantStatus(t, err, apperr.CodeForbidden)
+			case err != nil:
+				t.Fatalf("expected no error got %v", err)
+			}
+		})
+	}
+
+}
+
+func Test_DeleteMessage_AllowedAfterChatWindow(t *testing.T) {
+	starts := time.Date(2025, 10, 14, 12, 0, 0, 0, time.UTC)
+	ends := time.Date(2025, 10, 14, 20, 0, 0, 0, time.UTC)
+	closes := time.Date(2025, 10, 21, 20, 0, 0, 0, time.UTC)
+	f, _, _, svc, c, _, m1, _ := newOutingConv(t)
+	f.setOutingTimes(*c.OutingID, starts, &ends)
+
+	// posted while the window is open
+	svc.now = func() time.Time { return closes.Add(-time.Minute) }
+	msg, err := svc.PostMessage(context.Background(), c.ID, m1, "hello")
+	if err != nil {
+		t.Fatalf("post inside the window: expected no error got %v", err)
+	}
+
+	// deleted after it closed
+	svc.now = func() time.Time { return closes.Add(time.Hour) }
+	if err = svc.DeleteMessage(context.Background(), msg.ID, m1); err != nil {
+		t.Fatalf("delete after the window: expected no error got %v", err)
+	}
+}
+
+func Test_GetConversation_IsDiscussionOpen(t *testing.T) {
+	ctx := context.Background()
+	starts := time.Date(2025, 10, 14, 12, 0, 0, 0, time.UTC)
+	ends := time.Date(2025, 10, 14, 20, 0, 0, 0, time.UTC)
+	closes := time.Date(2025, 10, 21, 20, 0, 0, 0, time.UTC)
+	f, _, _, svc, c, _, m1, m2 := newOutingConv(t)
+	f.setOutingTimes(*c.OutingID, starts, &ends)
+
+	// outing chat, window open
+	svc.now = func() time.Time { return closes.Add(-time.Second) }
+	v, err := svc.GetConversation(ctx, c.ID, m1)
+	if err != nil {
+		t.Fatalf("open: expected no error got %v", err)
+	}
+	if v.IsDiscussionOpen == nil || !*v.IsDiscussionOpen {
+		t.Errorf("open: want true got %v", v.IsDiscussionOpen)
+	}
+
+	// outing chat, window closed
+	svc.now = func() time.Time { return closes }
+	v, err = svc.GetConversation(ctx, c.ID, m1)
+	if err != nil {
+		t.Fatalf("closed: expected no error got %v", err)
+	}
+	if v.IsDiscussionOpen == nil || *v.IsDiscussionOpen {
+		t.Errorf("closed: want false got %v", v.IsDiscussionOpen)
+	}
+
+	// a DM: doesn't apply
+	dm, err := svc.StartDM(ctx, m1, m2)
+	if err != nil {
+		t.Fatalf("dm: expected no error got %v", err)
+	}
+	v, err = svc.GetConversation(ctx, dm.ID, m1)
+	if err != nil {
+		t.Fatalf("dm: expected no error got %v", err)
+	}
+	if v.IsDiscussionOpen != nil {
+		t.Errorf("dm: want nil got %v", *v.IsDiscussionOpen)
+	}
+}
