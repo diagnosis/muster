@@ -273,3 +273,26 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 - **When a rule change turns an old test red, read its name first.** Behaviour gone: delete it. Behaviour still there but the setup assumed the old rule: fix the setup. Test right, code wrong: fix the code. Changing the expected number is none of these.
 - **`toBe` compares identity, `toEqual` compares contents.** Comparing whole objects with `toEqual` also fails when an extra field appears, which makes it a leak check.
 - **A locator that matches two elements can pass by accident.** "Log in" passed on mobile only because the header link was hidden. Scope the locator to its container.
+
+
+## Lessons from closing the outing chat
+
+- **A rule gets one home, even across packages.** The chat calls `Outing.DiscussionOpen`, the same function comments use. Comparing dates against seven days inside the message package would have defined the window twice.
+- **Give the service the facts in one read.** `OutingForChat` returns status, start and end together, so the status check and the window check see the same row. A partly filled struct is a trap, so the method is named for its purpose and its comment says which fields are set.
+- **Swap the plumbing first, then add the rule.** Replacing `OutingStatus` with `OutingForChat` was done with no behaviour change and the package green, before the new check went in. A failure after that could only be the new rule.
+- **A pointer can say "doesn't apply"; a plain value can't.** `IsDiscussionOpen *bool` is nil for a DM. A plain `bool` would have told every DM its discussion was closed. Same trap as a non-pointer `time.Time`.
+- **On the client, test a nullable flag with `=== false`.** `!flag` is true for `null`, which would have closed every DM.
+- **The JSON key comes from the tag, and only a spec that reads the key by name can check it.** A typo in a tag compiles, passes every Go test, and the page silently reads `undefined`.
+- **Put the change in the right struct.** Seven compile errors in a package you did not mean to touch means the edit landed in the wrong place. Stop and check before fixing them one by one.
+- **The fake needs one home per fact too.** A helper that filled one map while the method read another returned "not found" for every outing.
+- **A table column nothing reads is not setup.** A row declared `StatusCancelled` and the loop never applied it; the test passed or failed for a different reason than its name. Apply every column inside the loop, per row, so rows cannot leak into each other.
+- **State the boundary as dates.** `closes` is written out as a date in the test, not computed as `ends + 7 days`, so a change to the window in the code cannot quietly change the test with it.
+- **Test the instant, not a second past it.** "One second before" and "exactly at" pin `<` against `<=`. "One second after" passes either way.
+- **A test born green needs one sabotage.** The delete test and the DM row passed before any code was written for them. Each was proven by making the mistake it exists to catch.
+- **Pick the sabotage that matches the mistake.** Running the outing block for a DM would panic, which proves nothing about the assertion. Giving DMs a default value is the realistic mistake, and it is the one the row catches.
+- **To test a rule about the past against the real database, move the row.** The API refuses past times, so the e2e helper `setOutingTimes` updates both columns in one statement, after everything that needs an upcoming outing has been done.
+- **After a write in psql, read the result line.** A syntax error and `UPDATE 0` both look like "I ran it". A `SELECT` that returns the computed value (`closes_at`, `closed`) is a better check than reading raw columns.
+- **Check which row you changed.** The update went to one outing and the browser was open on another.
+- **The client learns a time-based flag when it fetches.** A page left open across the close instant still shows the input; the server refuses the send. The server is the rule and the page is a courtesy, but the page must show the refusal.
+- **Assert on the page with `await expect(locator)`.** `expect(await locator.isDisabled())` reads once and fails with a bare boolean. The retrying form waits and names the element.
+- **Read the remote, not the message.** "Pushed" was an empty file: `git add .` from a subfolder staged only what was beneath it. Run `git status` from the repo root before committing.
