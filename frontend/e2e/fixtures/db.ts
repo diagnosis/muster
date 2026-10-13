@@ -27,3 +27,10 @@ export async function mintVerificationToken(hikerID: string, overrides: Partial<
     )
     return raw
 }
+
+export async function setOutingTimes(outingID: string, startsAt: Date, endsAt: Date | null): Promise<void> {
+    await getPool().query(
+        `UPDATE outings SET starts_at = $2, ends_at = $3 WHERE id = $1`,
+        [outingID, startsAt, endsAt],
+    )
+}

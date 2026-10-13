@@ -34,8 +34,9 @@ function ConversationPage() {
     const reopenDM = useReopenDM(id)
     if (!me) return
     const isOuting = conv.kind === "outing"
+    const isDiscussionClosed = conv.is_discussion_open === false
     const canModerate = isOuting && conv.outing_host_id === me.id
-    let canPost = isOuting
+    let canPost = isOuting && !isDiscussionClosed
     if (!isOuting) {
         canPost = conv.dm_status === "accepted"
             || (conv.dm_status === "pending" && conv.dm_initiator === me.id)
@@ -53,6 +54,7 @@ function ConversationPage() {
     let disabledHint: string | undefined
     if (pending && !iStarted) disabledHint = "Accept the request to reply"
     if (declined) disabledHint = "This conversation is closed"
+    if (isDiscussionClosed) disabledHint = "This chat is closed"
 
     return (
         <div className={styles.page}>
@@ -113,7 +115,13 @@ function ConversationPage() {
                         <p className={styles.noticeText}>You can still read it. Only they can reopen it.</p>
                     </div>
                 </section>}
-
+            {isDiscussionClosed &&
+                <section className={`${styles.notice} ${styles.noticeMuted}`}>
+                    <div>
+                        <h2 className={styles.noticeTitle}>This chat is closed</h2>
+                        <p className={styles.noticeText}>Outing chats close 7 days after the outing ends. You can still read it.</p>
+                    </div>
+                </section>}
             <Chat cid={id} me={me} canPost={canPost} canModerate={canModerate} nameFor={nameFor}
                   showAuthors={isOuting} disabledHint={disabledHint}/>
         </div>

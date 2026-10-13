@@ -25,8 +25,21 @@ type fakeStore struct {
 	pendingRequests   map[uuid.UUID]map[uuid.UUID]struct{}
 	outingTitles      map[uuid.UUID]string
 	outingStarts      map[uuid.UUID]time.Time
+	outingEnds        map[uuid.UUID]*time.Time
 	names             map[uuid.UUID]string
 	conversationReads map[readsKey]int64
+}
+
+func (f *fakeStore) OutingForChat(ctx context.Context, outingID uuid.UUID) (*outing.Outing, error) {
+	status, ok := f.outingStatuses[outingID]
+	if !ok {
+		return nil, apperr.NotFound("outing not found", "outing not found")
+	}
+	return &outing.Outing{
+		Status:   status,
+		StartsAt: f.outingStarts[outingID],
+		EndsAt:   f.outingEnds[outingID],
+	}, nil
 }
 
 func (f *fakeStore) InsertMessage(ctx context.Context, m *Message, now time.Time) error {
@@ -63,6 +76,7 @@ func newFakeStore() *fakeStore {
 		pendingRequests:   make(map[uuid.UUID]map[uuid.UUID]struct{}),
 		outingTitles:      make(map[uuid.UUID]string),
 		outingStarts:      make(map[uuid.UUID]time.Time),
+		outingEnds:        make(map[uuid.UUID]*time.Time),
 		names:             make(map[uuid.UUID]string),
 		conversationReads: make(map[readsKey]int64),
 	}
@@ -122,13 +136,6 @@ func (f *fakeStore) addPendingRequest(outingID, hiker uuid.UUID) {
 	set[hiker] = struct{}{}
 }
 
-func (f *fakeStore) OutingStatus(ctx context.Context, outingID uuid.UUID) (outing.Status, error) {
-	v, ok := f.outingStatuses[outingID]
-	if !ok {
-		return "", apperr.NotFound("outing not found", "outing not found")
-	}
-	return v, nil
-}
 func (f *fakeStore) CountMessagesSince(ctx context.Context, conversationID, hikerID uuid.UUID, since time.Time) (int, error) {
 	count := 0
 	for _, m := range f.messages {
@@ -298,6 +305,11 @@ func (f *fakeStore) MarkRead(ctx context.Context, convID, hikerID uuid.UUID, seq
 		}] = seq
 	}
 	return nil
+}
+
+func (f *fakeStore) setOutingTimes(outingID uuid.UUID, starts time.Time, ends *time.Time) {
+	f.outingStarts[outingID] = starts
+	f.outingEnds[outingID] = ends
 }
 
 var _ Storage = (*fakeStore)(nil)

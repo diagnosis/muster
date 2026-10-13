@@ -23,7 +23,9 @@ type Storage interface {
 	IsMember(ctx context.Context, conversationID, hikerID uuid.UUID) (bool, error)
 	InsertMessage(ctx context.Context, m *Message, now time.Time) error
 	MemberIDs(ctx context.Context, conversationID uuid.UUID) ([]uuid.UUID, error)
-	OutingStatus(ctx context.Context, outingID uuid.UUID) (outing.Status, error)
+	// OutingForChat returns the outing's status, start and end: the facts the
+	// chat rules need. Other fields are left empty; do not read them.
+	OutingForChat(ctx context.Context, outingID uuid.UUID) (*outing.Outing, error)
 	CountMessagesSince(ctx context.Context, conversationID, hikerID uuid.UUID, since time.Time) (int, error)
 	ListMessages(ctx context.Context, conversationID uuid.UUID) ([]*Message, error)
 	GetMessage(ctx context.Context, messageID uuid.UUID) (*Message, error)
@@ -63,8 +65,10 @@ type poke struct {
 	OutingID         *uuid.UUID       `json:"outing_id,omitempty"`
 }
 
-// PostMessage inserts a message from hikerID into conversationID after verifying
-// membership, then emits one message.created poke (no body) to every member.
+// PostMessage inserts a message from hikerID into conversationID and emits
+// one message.created poke (no body) to every member. The sender must be a
+// member. In an outing chat the outing must be open, and posting closes 7
+// days after the outing ends; DMs follow the request-and-accept rules.
 func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.UUID, body string) (*Message, error) {
 	body = strings.TrimSpace(body)
 	n := utf8.RuneCountInString(body)
@@ -87,18 +91,21 @@ func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.
 		return nil, apperr.Forbidden("forbidden", "user not part of the roster", err)
 	}
 	if conv.OutingID != nil {
-		var outingStatusErr error
-		status, outingStatusErr := s.store.OutingStatus(ctx, *conv.OutingID)
+		o, outingStatusErr := s.store.OutingForChat(ctx, *conv.OutingID)
 		if outingStatusErr != nil {
 			return nil, outingStatusErr
 		}
-		if !status.Valid() {
+		if !o.Status.Valid() {
 			return nil, apperr.Internal("internal error", "invalid outing status")
 		}
-		if status != outing.StatusOpen {
-			msg := fmt.Sprintf("outing is %s", status)
+		if o.Status != outing.StatusOpen {
+			msg := fmt.Sprintf("outing is %s", o.Status)
 			return nil, apperr.Forbidden(msg, msg)
 		}
+		if !o.DiscussionOpen(s.now()) {
+			return nil, apperr.Conflict("chat closed 7 days after this outing ended", "outing chat window closed")
+		}
+
 	}
 
 	if conv.Kind == ConversationKindDM {
@@ -347,8 +354,9 @@ func (s *Service) ListConversations(ctx context.Context, hikerID uuid.UUID) ([]*
 }
 
 // GetConversation returns one conversation the hiker belongs to: an outing chat
-// they're on the roster of, or a DM they're a party of. Forbidden for anyone else,
-// NotFound when the conversation doesn't exist.
+// they're on the roster of, or a DM they're a party of. For an outing chat it
+// also stamps IsDiscussionOpen from the outing's times. Forbidden for anyone
+// else, NotFound when the conversation doesn't exist.
 func (s *Service) GetConversation(ctx context.Context, convID, hikerID uuid.UUID) (*ConversationView, error) {
 	conv, err := s.store.GetConversationView(ctx, convID)
 	if err != nil {
@@ -361,6 +369,16 @@ func (s *Service) GetConversation(ctx context.Context, convID, hikerID uuid.UUID
 	if !ok {
 		return nil, apperr.Forbidden("you're not part of this conversation", "get by non-member")
 	}
+
+	if conv.OutingID != nil {
+		o, verr := s.store.OutingForChat(ctx, *conv.OutingID)
+		if verr != nil {
+			return nil, verr
+		}
+		open := o.DiscussionOpen(s.now())
+		conv.IsDiscussionOpen = &open
+	}
+
 	return conv, nil
 }
 

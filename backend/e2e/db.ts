@@ -43,3 +43,13 @@ export async function getNotificationEmailedAt(hikerID: string): Promise<(string
     )
     return res.rows.map(r => r.emailed_at)
 }
+
+// setOutingTimes moves an outing's start and end directly in the database.
+// The API refuses past times, so specs use this to test rules about outings
+// that have already ended. ends_at must be later than starts_at, or null.
+export async function setOutingTimes(outingID: string, startsAt: Date, endsAt: Date | null): Promise<void> {
+    await getPool().query(
+        `UPDATE outings SET starts_at = $2, ends_at = $3 WHERE id = $1`,
+        [outingID, startsAt, endsAt],
+    )
+}

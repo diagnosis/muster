@@ -9,9 +9,18 @@ import {
     listMessages,
     deleteMessage,
     markRead,
-    listConversations
+    listConversations, getConversation
 } from "../api";
-import {JoinRequestResponse, ListConversationsResponse, ListMessages, Message, OutingResponse} from "../types";
+import {
+    ConversationViewResponse,
+    JoinRequestResponse,
+    ListConversationsResponse,
+    ListMessages,
+    Message,
+    OutingResponse
+} from "../types";
+import {unwatchFile} from "node:fs";
+import {setOutingTimes} from "../db";
 
 test.describe("message api", ()=> {
     test(`member posts -> 201; stranger posts->403; 
@@ -109,6 +118,30 @@ test.describe("message api", ()=> {
         expect(conv?.unread_count).toBe(1)
 
 
+    })
+    test("outing chat is closed 7 days after the end", async () => {
+        const host = await asUser(BASE)
+        const hiker = await asUser(BASE)
+        const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+        const jr = await unwrap<JoinRequestResponse>(requestJoin(hiker.ctx, o.id), 201)
+        await unwrap(accept(host.ctx, jr.id), 200)
+        const first = await unwrap<Message>(postMessage(hiker.ctx, o.conversation_id, {body:"hello"}), 201)
+        let conv = await unwrap<ConversationViewResponse>(getConversation(hiker.ctx, o.conversation_id), 200)
+        expect(conv.is_discussion_open).toBe(true)
+
+
+        const day = 24 * 60 * 60 * 1000
+        await setOutingTimes(o.id, new Date(Date.now() - 9 * day), new Date(Date.now() - 8 * day))
+        await unwrap(postMessage(hiker.ctx, o.conversation_id, {body:"hello"}), 409)
+
+        conv = await unwrap<ConversationViewResponse>(getConversation(hiker.ctx, o.conversation_id), 200)
+        expect(conv.is_discussion_open).toBe(false)
+
+        const data = await unwrap<ListMessages>(listMessages(hiker.ctx, o.conversation_id), 200)
+        expect(data.messages.map(m => m.id)).toContain(first.id)
+
+        const del = await deleteMessage(hiker.ctx, first.id)
+        expect(del.status()).toBe(204)
     })
 
 })

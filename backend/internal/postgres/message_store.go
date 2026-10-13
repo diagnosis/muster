@@ -18,6 +18,20 @@ type MessageStore struct {
 	pool *pgxpool.Pool
 }
 
+// OutingForChat returns the outing's status, start and end: the facts the
+// chat rules need. Other fields are left empty; do not read them.
+func (s *MessageStore) OutingForChat(ctx context.Context, outingID uuid.UUID) (*outing.Outing, error) {
+	q := `SELECT status, starts_at, ends_at FROM outings WHERE id = $1`
+	o := &outing.Outing{}
+	if err := s.pool.QueryRow(ctx, q, outingID).Scan(&o.Status, &o.StartsAt, &o.EndsAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperr.NotFound("outing not found", "outing not found")
+		}
+		return nil, apperr.Database("failed to fetch outing", "failed to scan outing for chat", err)
+	}
+	return o, nil
+}
+
 // GetConversationView loads one conversation with everything the chat page needs:
 // the row itself, the outing's title and start time when kind is outing (NULL for
 // DMs), and the participants with their names — host and accepted members for an
@@ -243,20 +257,6 @@ func (s *MessageStore) MemberIDs(ctx context.Context, conversationID uuid.UUID) 
 		return nil, apperr.Database("failed to list members", "iterate memberIDS failed", err)
 	}
 	return memberIDs, nil
-}
-
-// OutingStatus returns the outing's status; NotFound when absent.
-func (s *MessageStore) OutingStatus(ctx context.Context, outingID uuid.UUID) (outing.Status, error) {
-	q := `SELECT status from outings WHERE id = $1`
-	var status outing.Status
-	if err := s.pool.QueryRow(ctx, q, outingID).Scan(&status); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", apperr.NotFound("outing not found", "outing not found")
-		}
-		return "", apperr.Database("failed to fetch outing status", "failed to scan outing status", err)
-	}
-	return status, nil
-
 }
 
 // CountMessagesSince counts messages by hikerID in conversationID created

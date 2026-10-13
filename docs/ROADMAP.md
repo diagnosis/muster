@@ -1,6 +1,6 @@
 # Muster — Roadmap
 
-*As of 2026-10-11 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #43 merged) and confirmed by Safa. Replaces the 2026-08-07 roadmap.*
+*As of 2026-10-13 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #44 merged) and confirmed by Safa. Replaces the 2026-08-07 roadmap.*
 
 *Doc hierarchy: roadmap = why and when · spec = what · engineering notes = how.*
 
@@ -10,7 +10,7 @@
 
 Muster is live at muster.safadev.app. Backend and frontend are on `main`, gated by CI (`ci.yml`) and deployed by `deploy.yml`. Migrations run before the new binary, so schema changes are expand-only.
 
-Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec files) that proves the real SQL and JSON, and a Playwright browser suite (20 spec files).
+Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec files) that proves the real SQL and JSON, and a Playwright browser suite (21 spec files).
 
 ### Shipped
 
@@ -24,21 +24,22 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 | Messaging | outing group chat, direct messages with request and accept, inbox, unread counts, delete, close and reopen |
 | Notifications | in-app bell, live updates over server-sent events, email for selected events |
 | Waiting and withdrew lists (PR #43) | on the outing page for logged-in viewers, names only; waiting in the order people asked (`requested_at`), withdrew most recent first; the going list is sent by viewer level: count only when logged out, names when logged in, hiker ids for members, request ids for the host |
+| Chat closure (PR #44) | outing chat is read-only 7 days after the outing ends, the same window as comments; history stays readable and delete stays allowed; the chat page shows the server's reason when a send is refused |
+
 ---
 
 ## v1 — what is left
 
 In this order. Items can be added.
 
-1. **Outing chat read-only 7 days after the end.** Same window as comments. Needs the message package to know an outing's end time; `DiscussionOpen` already exists.
-2. **Host request history, un-decline, undo removal.** A status filter on the requests list, plus two state changes that are host-only.
-3. **Change password while logged in.** Verify the current password, rehash, revoke refresh tokens. Today only the emailed reset exists.
-4. **Edit Pending Request** (role, seats, guests) without losing your place.
-5. **Passwordless login with an emailed code.**
-6. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
-7. **Pagination.** Browse first, with keyset pagination. Then chat, then the Past tab. Server-side phase filtering comes with it.
-8. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
-9. **One real hike organized through Muster.** v1 is done when boots hit dirt.
+1. **Host request history, un-decline, undo removal.** A status filter on the requests list, plus two state changes that are host-only.
+2. **Change password while logged in.** Verify the current password, rehash, revoke refresh tokens. Today only the emailed reset exists.
+3. **Edit Pending Request** (role, seats, guests) without losing your place.
+4. **Passwordless login with an emailed code.**
+5. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
+6. **Pagination.** Browse first, with keyset pagination. Then chat, then the Past tab. Server-side phase filtering comes with it.
+7. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
+8. **One real hike organized through Muster.** v1 is done when boots hit dirt.
 
 Also open from the original v1 list: `capacity_state` served by the API, so the client stops deriving it.
 
@@ -64,6 +65,10 @@ Also open from the original v1 list: `capacity_state` served by the API, so the 
 - Rename the test helper seedMember to seedHiker.
 - An API spec for the withdrawn order with two people.
 - ESLint errors that are also on main (3 errors, 5 warnings; CI doesn’t run the linter).
+- Refetch the conversation after a refused send, so an open chat page catches up without a reload.
+- Chat page: hide the input on a cancelled outing (the conversation view needs the outing’s status).
+- backend/e2e/types.ts: ConversationResponse has dma_a where the server sends dm_a
+- An API spec for the 7-day comment window, using setOutingTimes (it is proven in Go only)
 
 ---
 

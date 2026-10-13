@@ -65,6 +65,7 @@ export function Chat({cid, me, canPost,canModerate, nameFor, showAuthors, disabl
                     )
                 })}
             </div>
+            {postMessage.isError && <p className={styles.sendError} role="alert">{postMessage.error.message}</p>}
             <form className={`${styles.composer} ${canPost ? '' : styles.composerDisabled}`}
                   onSubmit={(e) => { e.preventDefault(); send() }}>
                 <textarea
@@ -83,6 +84,7 @@ export function Chat({cid, me, canPost,canModerate, nameFor, showAuthors, disabl
                     }}
                     placeholder={canPost ? "Write a message" : (disabledHint ?? "You can't send messages here")}
                 />
+
                 <button className={`btn-primary ${styles.send}`} type='submit' disabled={!canPost}>Send</button>
             </form>
         </div>
