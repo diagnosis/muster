@@ -25,6 +25,7 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 | Notifications | in-app bell, live updates over server-sent events, email for selected events |
 | Waiting and withdrew lists (PR #43) | on the outing page for logged-in viewers, names only; waiting in the order people asked (`requested_at`), withdrew most recent first; the going list is sent by viewer level: count only when logged out, names when logged in, hiker ids for members, request ids for the host |
 | Chat closure (PR #44) | outing chat is read-only 7 days after the outing ends, the same window as comments; history stays readable and delete stays allowed; the chat page shows the server's reason when a send is refused |
+
 ---
 
 ## v1 — what is left
