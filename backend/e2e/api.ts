@@ -1,6 +1,6 @@
 // e2e/api.ts
 import { APIRequestContext } from '@playwright/test';
-import {CreateOutingInput, UpdateInput, UpdateMeInput} from "./types";
+import {CreateOutingInput, RequestStatus, UpdateInput, UpdateMeInput} from "./types";
 import {RegisterRequest} from "./types";
 import {tag} from "./fixtures";
 
@@ -105,8 +105,8 @@ export const signup = (ctx:APIRequestContext, input:RegisterRequest)=>
     ctx.post('/api/auth/signup', {data:input})
 
 
-export const listOutingRequests = (ctx:APIRequestContext, outingID:string) =>
-    ctx.get(`/api/outings/${outingID}/requests`)
+export const listOutingRequests = (ctx: APIRequestContext, outingID: string, status?: string) =>
+    ctx.get(`/api/outings/${outingID}/requests${status ? `?status=${status}` : ""}`)
 
 export const updateProfile = (ctx: APIRequestContext, data:UpdateMeInput) =>
     ctx.patch('/api/me/profile', {data})

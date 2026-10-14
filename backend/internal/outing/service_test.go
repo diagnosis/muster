@@ -1612,3 +1612,45 @@ func Test_Restore_OutingCancelled(t *testing.T) {
 		t.Errorf("expected to be declined got %v", f.requests[j.ID].Status)
 	}
 }
+
+func Test_JoinRequests_DeclineAndRemovedList(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	m1, m2, m3, m4 := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	o := seedOuting(10, 4, StatusOpen, host, f)
+	j1 := seedJoinRequestWithRequestedAt(o.ID, m1, RequestStatusDeclined, RoleDriver, f, 0, time.Now().Add(-10*time.Hour))
+	j2 := seedJoinRequestWithRequestedAt(o.ID, m2, RequestStatusDeclined, RoleDriver, f, 0, time.Now().Add(-9*time.Hour))
+	j3 := seedJoinRequestWithRequestedAt(o.ID, m3, RequestStatusRemoved, RoleDriver, f, 0, time.Now().Add(-7*time.Hour))
+	j4 := seedJoinRequestWithRequestedAt(o.ID, m4, RequestStatusRemoved, RoleDriver, f, 0, time.Now().Add(-6*time.Hour))
+
+	jrs, err := svc.JoinRequests(context.Background(), host, o.ID, RequestStatusDeclined)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(jrs) != 2 {
+		t.Fatalf("expected len 2 got %v", len(jrs))
+	}
+	if jrs[0].ID != j1.ID || jrs[1].ID != j2.ID {
+		t.Errorf("expected j1.ID: %v and j2.ID:%v got j1.ID:%v and j2.ID:%v", j1.ID, jrs[0].ID, j2.ID, jrs[1].ID)
+	}
+
+	jrs, err = svc.JoinRequests(context.Background(), host, o.ID, RequestStatusRemoved)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(jrs) != 2 {
+		t.Fatalf("expected len 2 got %v", len(jrs))
+	}
+	if jrs[0].ID != j3.ID || jrs[1].ID != j4.ID {
+		t.Errorf("expected j3.ID: %v and j4.ID:%v got j3.ID:%v and j4.ID:%v", j3.ID, jrs[0].ID, j4.ID, jrs[1].ID)
+	}
+
+	jrs, err = svc.JoinRequests(context.Background(), host, o.ID, "banana")
+
+	wantStatus(t, err, apperr.CodeBadRequest)
+
+	if len(jrs) != 0 {
+		t.Fatalf("expected len 0 got %v", len(jrs))
+	}
+
+}

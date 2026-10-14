@@ -1,4 +1,4 @@
-import {expect, test} from '@playwright/test'
+import {APIRequestContext, expect, test} from '@playwright/test'
 import { asUser,BASE } from "../fixtures";
 import {
     accept,
@@ -10,9 +10,16 @@ import {
     requestJoin, restoreRequest,
     withdraw
 } from "../api";
-import {DetailResponse, JoinRequestResponse, OutingResponse, RestoreRequestResponse} from "../types";
+import {
+    DetailResponse,
+    JoinRequestResponse,
+    JoinRequestViewResponse,
+    OutingResponse,
+    RestoreRequestResponse
+} from "../types";
 import {unwrap, unwrapExpectNoContent} from "../envelope";
 import {getNotificationsFor} from "../db";
+import {unwatchFile} from "node:fs";
 
 
 test.describe("membership", ()=> {
@@ -35,7 +42,7 @@ test.describe("membership", ()=> {
       const joinReq3 = await unwrap<JoinRequestResponse>(requestJoin(ctxHiker3, outing.id), 201)
       const hiker3Id = joinReq3.hiker_id
 
-      const inbox = await unwrap<JoinRequestResponse[]>(listOutingRequests(ctxHost, outing.id), 200)
+      const inbox = await unwrap<JoinRequestResponse[]>(listOutingRequests(ctxHost, outing.id, "requested"), 200)
       expect(inbox.length).toBe(3);
       expect(inbox[0].hiker_id).toBe(hiker1Id);   // oldest first
       expect(inbox[1].hiker_id).toBe(hiker2Id);
@@ -167,7 +174,7 @@ test.describe("membership", ()=> {
 
       expect(new Date(jr3.requested_at).getTime())
           .toBeGreaterThan(new Date(jr1.requested_at).getTime())
-      const joinRequests = await unwrap<JoinRequestResponse[]>(listOutingRequests(ctxHost, o.id), 200)
+      const joinRequests = await unwrap<JoinRequestResponse[]>(listOutingRequests(ctxHost, o.id, ""), 200)
       expect(joinRequests.length).toBe(2)
       expect(joinRequests[0].id).toBe(jr2.id)
       expect(joinRequests[1].id).toBe(jr1.id)
@@ -184,7 +191,7 @@ test.describe("membership", ()=> {
         const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
         const jr = await unwrap<JoinRequestResponse>(requestJoin(hiker.ctx, o.id), 201)
         const jr2 = await  unwrap<JoinRequestResponse>(requestJoin(hiker2.ctx, o.id), 201)
-        let jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+        let jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id, ""), 200)
         expect(jrs[0].id).toBe(jr.id)
         expect(jrs[1].id).toBe(jr2.id)
         expect(new Date(jrs[0].requested_at).getTime()).toBeLessThan(new Date(jrs[1].requested_at).getTime())
@@ -192,12 +199,12 @@ test.describe("membership", ()=> {
 
         await unwrap(decline(host.ctx, jr.id), 200)
         await unwrap(accept(host.ctx, jr.id), 409)
-        jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+        jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id, ""), 200)
         expect(jrs.length).toBe(1)
 
         const res = await unwrap<RestoreRequestResponse>(restoreRequest(host.ctx, jr.id), 200)
         expect(res.id).toBe(jr.id)
-        jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+        jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id, ""), 200)
 
         expect(jrs[0].status).toBe("requested")
         expect(jrs[0].id).toBe(jr.id)
@@ -213,7 +220,7 @@ test.describe("membership", ()=> {
         const jr = await unwrap<JoinRequestResponse>(requestJoin(hiker.ctx, o.id), 201)
         const jr2 = await unwrap<JoinRequestResponse>(requestJoin(hiker2.ctx, o.id), 201)
 
-        let jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+        let jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id, "requested"), 200)
         expect(jrs.map(j => j.id)).toEqual([jr.id, jr2.id])
         const requestedAt = jrs[0].requested_at
 
@@ -224,7 +231,7 @@ test.describe("membership", ()=> {
         expect(res.id).toBe(jr.id)
 
         // back in the queue, at the original place, with the original time
-        jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+        jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id, "requested"), 200)
         expect(jrs.map(j => j.id)).toEqual([jr.id, jr2.id])
         expect(jrs[0].status).toBe("requested")
         expect(jrs[0].requested_at).toBe(requestedAt)
@@ -247,6 +254,39 @@ test.describe("membership", ()=> {
         await unwrap(restoreRequest(hiker.ctx, jr.id), 403)
         await unwrap(restoreRequest(totalStranger.ctx, jr.id), 403)
 
+    })
+
+    test("join request list filters by status", async () => {
+        const host = await asUser(BASE)
+        const members = await Promise.all([1, 2, 3, 4, 5, 6].map(() => asUser(BASE)))
+
+        const o = await unwrap<OutingResponse>(createOuting(host.ctx, { max_size: 10, host_seats: 4 }), 201)
+        const jrs: JoinRequestViewResponse[] = []
+        for (const m of members) {
+            jrs.push(await unwrap(requestJoin(m.ctx, o.id), 201))
+        }
+        const ids = (list: JoinRequestViewResponse[]) => list.map(r => r.id)
+
+        let reqs = await unwrap<JoinRequestViewResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+        expect(ids(reqs)).toEqual(ids(jrs))
+
+        await unwrap(decline(host.ctx, jrs[0].id), 200)
+        await unwrap(decline(host.ctx, jrs[1].id), 200)
+        reqs = await unwrap<JoinRequestViewResponse[]>(listOutingRequests(host.ctx, o.id, "declined"), 200)
+        expect(ids(reqs)).toEqual([jrs[0].id, jrs[1].id])
+
+        await unwrap(accept(host.ctx, jrs[2].id), 200)
+        await unwrap(accept(host.ctx, jrs[3].id), 200)
+        await unwrap(removeMember(host.ctx, jrs[2].id), 200)
+        await unwrap(removeMember(host.ctx, jrs[3].id), 200)
+        reqs = await unwrap<JoinRequestViewResponse[]>(listOutingRequests(host.ctx, o.id, "removed"), 200)
+        expect(ids(reqs)).toEqual([jrs[2].id, jrs[3].id])
+
+        // history never leaks into the default inbox
+        reqs = await unwrap<JoinRequestViewResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+        expect(ids(reqs)).toEqual([jrs[4].id, jrs[5].id])
+
+        await unwrap(listOutingRequests(host.ctx, o.id, "banana"), 400)
     })
 
 

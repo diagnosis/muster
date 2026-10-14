@@ -92,7 +92,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/requests/{id}/restore", requireAuth(http.HandlerFunc(s.handleRestoreRequest)))
 
 	mux.Handle("POST /api/outings/{id}/cancel", requireAuth(http.HandlerFunc(s.handleCancelOuting)))
-	mux.Handle("GET /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handlePendingRequests)))
+	mux.Handle("GET /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handleJoinRequests)))
 	mux.Handle("GET /api/me/outings", requireAuth(http.HandlerFunc(s.handleMyOutings)))
 	mux.Handle("PATCH /api/outings/{id}", requireAuth(http.HandlerFunc(s.handleUpdateOuting)))
 
