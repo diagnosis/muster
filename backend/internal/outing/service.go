@@ -28,7 +28,7 @@ type Storage interface {
 	GetJoinRequest(ctx context.Context, id uuid.UUID) (*JoinRequest, error)
 	GetJoinRequestByHiker(ctx context.Context, outingID, hikerID uuid.UUID) (*JoinRequest, error)
 	SetJoinRequestStatus(ctx context.Context, id uuid.UUID, s RequestStatus) error
-	ListJoinRequests(ctx context.Context, outingID uuid.UUID, status RequestStatus) ([]PendingRequest, error)
+	ListJoinRequests(ctx context.Context, outingID uuid.UUID, status RequestStatus) ([]JoinRequestView, error)
 	UpdateJoinRequest(ctx context.Context, r *JoinRequest) error
 	// AcceptIfCapacity flips a request from requested to accepted only if
 	// it fits, atomically: a driver needs cap room (people + 1 + guests
@@ -450,8 +450,8 @@ func (s *Service) Accept(ctx context.Context, hostID, requestID uuid.UUID) error
 	return nil
 }
 
-// Decline rejects a pending join request. Host-only; declined is
-// terminal for this outing.
+// Decline rejects a pending join request. Host-only; the host can
+// undo it with RestoreRequest.
 func (s *Service) Decline(ctx context.Context, hostID, requestID uuid.UUID) error {
 	joinRequest, outing, err := s.loadForHostAction(ctx, hostID, requestID)
 	if err != nil {
@@ -494,8 +494,8 @@ func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) err
 	return nil
 }
 
-// RemoveMember removes an accepted member from the roster. Host-only,
-// and only before the outing starts.
+// RemoveMember removes an accepted member from the roster. Host-only; the host can
+// undo it with RestoreRequest.
 func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID) error {
 	joinRequest, o, err := s.loadForHostAction(ctx, hostID, requestID)
 	if err != nil {
@@ -524,10 +524,10 @@ func (s *Service) ListUpcoming(ctx context.Context) ([]Outing, error) {
 	return outings, nil
 }
 
-// PendingRequests returns the outing's pending join requests, oldest
-// first — the host's inbox, host-only. No outing-state gate: reads
+// JoinRequests returns the outing's join requests, filters by RequestStatus
+// oldest first — the host's inbox, host-only. No outing-state gate: reads
 // return history regardless of cancelled/past status.
-func (s *Service) PendingRequests(ctx context.Context, hostID, outingID uuid.UUID) ([]PendingRequest, error) {
+func (s *Service) JoinRequests(ctx context.Context, hostID, outingID uuid.UUID, status RequestStatus) ([]JoinRequestView, error) {
 	o, err := s.store.GetOuting(ctx, outingID)
 	if err != nil {
 		return nil, err
@@ -535,7 +535,10 @@ func (s *Service) PendingRequests(ctx context.Context, hostID, outingID uuid.UUI
 	if o.HostID != hostID {
 		return nil, apperr.Forbidden("only the host can view pending requests", "forbidden: non-host listing pending requests")
 	}
-	return s.store.ListJoinRequests(ctx, outingID, RequestStatusRequested)
+	if !status.Valid() {
+		return nil, apperr.BadRequest("invalid request status", "invalid request status")
+	}
+	return s.store.ListJoinRequests(ctx, outingID, status)
 }
 
 // MyOutings returns the outings the hiker hosts and the ones they've joined (accepted only), each soonest first.
@@ -830,6 +833,25 @@ func (s *Service) ListComments(ctx context.Context, outingID, hikerID uuid.UUID)
 		return nil, err
 	}
 	return cvs, nil
+}
+
+// RestoreRequest puts a declined or removed request back in the queue
+// as requested. Host-only, and only before the outing starts. The
+// request keeps its original requested_at, so the hiker returns to
+// their old place in the waiting order.
+func (s *Service) RestoreRequest(ctx context.Context, hostID, requestID uuid.UUID) error {
+	req, o, err := s.loadForHostAction(ctx, hostID, requestID)
+	if err != nil {
+		return err
+	}
+	if req.Status != RequestStatusDeclined && req.Status != RequestStatusRemoved {
+		return apperr.Conflict("only declined or removed requests can be restored", "restore requires declined or removed status")
+	}
+	if err = s.store.SetJoinRequestStatus(ctx, requestID, RequestStatusRequested); err != nil {
+		return err
+	}
+	s.notify(ctx, req.HikerID, o, notification.KindJoinRequestRestored)
+	return nil
 }
 
 // helpers

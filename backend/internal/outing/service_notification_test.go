@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/diagnosis/muster/internal/notification"
 	"github.com/google/uuid"
 )
@@ -298,4 +299,64 @@ func Test_Rerequest_NotifiesHost(t *testing.T) {
 		t.Errorf("expected %s got %s", notification.KindJoinRequestCreated, fn.events[1].Kind)
 	}
 
+}
+
+func Test_Restore_RemoveToRequestWillNotifyHiker(t *testing.T) {
+	svc, f, fn, _ := newTestService(t)
+	host, hiker := uuid.New(), uuid.New()
+
+	o := seedOuting(6, 4, StatusOpen, host, f)
+	jr := seedJoinRequest(o.ID, hiker, RequestStatusRemoved, RoleRider, f, 1)
+	seedMember(hiker, "hale", "beginner", f)
+	err := svc.RestoreRequest(context.Background(), host, jr.ID)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fn.events) != 1 {
+		t.Fatalf("expected notification events len 1 got %d", len(fn.events))
+	}
+	if fn.events[0].Kind != notification.KindJoinRequestRestored {
+		t.Errorf("expected %v got %v", notification.KindJoinRequestRestored, fn.events[0].Kind)
+	}
+	if fn.events[0].HikerID != hiker {
+		t.Errorf("expected %v got %v", hiker, fn.events[0].HikerID)
+	}
+
+}
+
+func Test_Restore_DeclineToRequestWillNotifyHiker(t *testing.T) {
+	svc, f, fn, _ := newTestService(t)
+	host, hiker := uuid.New(), uuid.New()
+
+	o := seedOuting(6, 4, StatusOpen, host, f)
+	jr := seedJoinRequest(o.ID, hiker, RequestStatusDeclined, RoleRider, f, 1)
+	seedMember(hiker, "salih", "beginner", f)
+	err := svc.RestoreRequest(context.Background(), host, jr.ID)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fn.events) != 1 {
+		t.Fatalf("expected notification events len 1 got %d", len(fn.events))
+	}
+	if fn.events[0].Kind != notification.KindJoinRequestRestored {
+		t.Errorf("expected %v got %v", notification.KindJoinRequestRestored, fn.events[0].Kind)
+	}
+	if fn.events[0].HikerID != hiker {
+		t.Errorf("expected %v got %v", hiker, fn.events[0].HikerID)
+	}
+
+}
+
+func Test_Restore_AcceptedReturns409(t *testing.T) {
+	svc, f, fn, _ := newTestService(t)
+	host, hiker := uuid.New(), uuid.New()
+
+	o := seedOuting(6, 4, StatusOpen, host, f)
+	jr := seedJoinRequest(o.ID, hiker, RequestStatusAccepted, RoleRider, f, 1)
+	seedMember(hiker, "muku", "beginner", f)
+	err := svc.RestoreRequest(context.Background(), host, jr.ID)
+	wantStatus(t, err, apperr.CodeConflict)
+	if len(fn.events) != 0 {
+		t.Fatalf("expected notification events len 0 got %d", len(fn.events))
+	}
 }

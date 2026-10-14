@@ -138,12 +138,12 @@ func (f *fakeStore) ListUpcoming(ctx context.Context, now time.Time) ([]Outing, 
 	return upcoming, nil
 }
 
-func (f *fakeStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, status RequestStatus) ([]PendingRequest, error) {
-	jrs := []PendingRequest{}
+func (f *fakeStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, status RequestStatus) ([]JoinRequestView, error) {
+	jrs := []JoinRequestView{}
 
 	for _, r := range f.requests {
 		if r.OutingID == outingID && r.Status == status {
-			jrs = append(jrs, PendingRequest{
+			jrs = append(jrs, JoinRequestView{
 				JoinRequest:     *r,
 				HikerName:       "Fake Hiker",
 				HikerExperience: "beginner",

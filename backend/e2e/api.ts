@@ -164,3 +164,5 @@ export const markRead = (ctx: APIRequestContext, cid: string, input:{seq:number}
     ctx.post(`/api/conversations/${cid}/read`, {data:input})
 export const getConversation = (ctx : APIRequestContext, cid: string) =>
     ctx.get(`/api/conversations/${cid}`)
+export const restoreRequest = (ctx: APIRequestContext, jrid:string) =>
+    ctx.post(`/api/requests/${jrid}/restore`)

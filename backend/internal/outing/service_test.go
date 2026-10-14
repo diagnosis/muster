@@ -597,7 +597,7 @@ func Test_PendingRequests_QueueOrder(t *testing.T) {
 	r2 := seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
 	r3 := seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
 
-	pendingRequests, err := svc.PendingRequests(context.Background(), hostID, o.ID)
+	pendingRequests, err := svc.JoinRequests(context.Background(), hostID, o.ID, RequestStatusRequested)
 	if err != nil {
 		t.Fatalf("PendingRequests: %v", err)
 	}
@@ -622,7 +622,7 @@ func Test_PendingRequests_Leaked(t *testing.T) {
 	_ = seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusDeclined, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
 	_ = seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
 
-	pendingRequests, err := svc.PendingRequests(context.Background(), hostID, o.ID)
+	pendingRequests, err := svc.JoinRequests(context.Background(), hostID, o.ID, RequestStatusRequested)
 	if err != nil {
 		t.Fatalf("ListUpcomingRequest: %v", err)
 	}
@@ -644,7 +644,7 @@ func Test_PendingRequests_Forbidden(t *testing.T) {
 	_ = seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleDriver, f, 1, time.Now().Add(-1*time.Hour))
 	_ = seedJoinRequestWithRequestedAt(o.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 2, time.Now().Add(1*time.Hour))
 	unknownHost := uuid.New()
-	_, err := svc.PendingRequests(context.Background(), unknownHost, o.ID)
+	_, err := svc.JoinRequests(context.Background(), unknownHost, o.ID, RequestStatusRequested)
 	wantStatus(t, err, apperr.CodeForbidden)
 
 }
@@ -653,7 +653,7 @@ func Test_PendingRequests_EmptyNotNil(t *testing.T) {
 	hostID := uuid.New()
 	o := seedOuting(7, 2, StatusOpen, hostID, f)
 
-	got, err := svc.PendingRequests(context.Background(), hostID, o.ID)
+	got, err := svc.JoinRequests(context.Background(), hostID, o.ID, RequestStatusRequested)
 	if err != nil {
 		t.Fatalf("PendingRequests: %v", err)
 	}
@@ -1521,5 +1521,94 @@ func Test_Detail_WaitingAndWithdrawnLists(t *testing.T) {
 	}
 	if d.Withdrawn[0].Name != "kalu" || d.Withdrawn[1].Name != "haluk" {
 		t.Errorf("member: withdrawn order, want [kalu haluk] got %v", d.Withdrawn)
+	}
+}
+
+func Test_RestoreRequest(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	m1 := uuid.New()
+
+	cases := []struct {
+		name              string
+		joinRequestStatus RequestStatus
+		wantConflict      bool
+	}{
+		{"restored from removed", RequestStatusRemoved, false},
+		{"restored from declined", RequestStatusDeclined, false},
+		{"attempt to restore from accepted", RequestStatusAccepted, true},
+		{"attempt to restore from requested", RequestStatusRequested, true},
+		{"attempt to restore from withdrawn", RequestStatusWithdrawn, true},
+	}
+
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			o := seedOuting(6, 4, StatusOpen, host, f)
+			j := seedJoinRequest(o.ID, m1, cc.joinRequestStatus, RoleRider, f, 0)
+			j.RequestedAt = time.Now().Add(-5 * time.Hour)
+			preRequestedAt := j.RequestedAt
+			err := svc.RestoreRequest(context.Background(), host, j.ID)
+			switch {
+			case cc.wantConflict:
+				wantStatus(t, err, apperr.CodeConflict)
+			case err != nil:
+				t.Fatalf("expected no error got %v", err)
+			case f.requests[j.ID].Status != RequestStatusRequested:
+				t.Errorf("expected status %s got %s", RequestStatusRequested, f.requests[j.ID].Status)
+			default:
+				if !f.requests[j.ID].RequestedAt.Equal(preRequestedAt) {
+					t.Errorf("expected requested at: %v got %v ", preRequestedAt, f.requests[j.ID].RequestedAt)
+				}
+			}
+		})
+	}
+
+}
+
+func Test_Restore_Auth(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	fakeHost := uuid.New()
+	m1 := uuid.New()
+
+	o := seedOuting(6, 4, StatusOpen, host, f)
+	j := seedJoinRequest(o.ID, m1, RequestStatusDeclined, RoleRider, f, 0)
+	err := svc.RestoreRequest(context.Background(), fakeHost, j.ID)
+	wantStatus(t, err, apperr.CodeForbidden)
+	if f.requests[j.ID].Status != RequestStatusDeclined {
+		t.Errorf("expected to be declined got %v", f.requests[j.ID].Status)
+	}
+	err = svc.RestoreRequest(context.Background(), host, j.ID)
+	if err != nil {
+		t.Errorf("expected no error got %v", err)
+	}
+	if f.requests[j.ID].Status != RequestStatusRequested {
+		t.Errorf("expected to be Requested got %v", f.requests[j.ID].Status)
+	}
+}
+
+func Test_Restore_OutingAlreadyStarted(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	m1 := uuid.New()
+
+	o := seedOutingWithStartTime(6, 4, StatusOpen, host, f, time.Now().Add(-time.Hour))
+	j := seedJoinRequest(o.ID, m1, RequestStatusDeclined, RoleRider, f, 0)
+	err := svc.RestoreRequest(context.Background(), host, j.ID)
+	wantStatus(t, err, apperr.CodeConflict)
+	if f.requests[j.ID].Status != RequestStatusDeclined {
+		t.Errorf("expected to be declined got %v", f.requests[j.ID].Status)
+	}
+}
+func Test_Restore_OutingCancelled(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	m1 := uuid.New()
+	o := seedOutingWithStartTime(6, 4, StatusCancelled, host, f, time.Now().Add(10*time.Hour))
+	j := seedJoinRequest(o.ID, m1, RequestStatusDeclined, RoleRider, f, 0)
+	err := svc.RestoreRequest(context.Background(), host, j.ID)
+	wantStatus(t, err, apperr.CodeConflict)
+	if f.requests[j.ID].Status != RequestStatusDeclined {
+		t.Errorf("expected to be declined got %v", f.requests[j.ID].Status)
 	}
 }

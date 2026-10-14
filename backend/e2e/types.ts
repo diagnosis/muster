@@ -255,6 +255,11 @@ export interface ConversationViewResponse {
     is_discussion_open: boolean | null
 }
 
+export interface RestoreRequestResponse{
+    message: string
+    id:string
+}
+
 export const CODE_EMAIL_NOT_VERIFIED = "email_not_verified"
 
 export const FORGOT_SENTENCE = "If email provided matches our record, you will receive a password reset email shortly."

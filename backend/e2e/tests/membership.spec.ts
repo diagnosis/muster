@@ -7,10 +7,10 @@ import {
     getDetail,
     listOutingRequests,
     removeMember,
-    requestJoin,
+    requestJoin, restoreRequest,
     withdraw
 } from "../api";
-import {DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
+import {DetailResponse, JoinRequestResponse, OutingResponse, RestoreRequestResponse} from "../types";
 import {unwrap, unwrapExpectNoContent} from "../envelope";
 import {getNotificationsFor} from "../db";
 
@@ -177,6 +177,78 @@ test.describe("membership", ()=> {
           .toBe(new Date(jr3.requested_at).getTime())
 
   })
+    test("un-decline declined", async()=> {
+        const host = await asUser(BASE)
+        const hiker  = await asUser(BASE)
+        const hiker2 = await asUser(BASE)
+        const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+        const jr = await unwrap<JoinRequestResponse>(requestJoin(hiker.ctx, o.id), 201)
+        const jr2 = await  unwrap<JoinRequestResponse>(requestJoin(hiker2.ctx, o.id), 201)
+        let jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+        expect(jrs[0].id).toBe(jr.id)
+        expect(jrs[1].id).toBe(jr2.id)
+        expect(new Date(jrs[0].requested_at).getTime()).toBeLessThan(new Date(jrs[1].requested_at).getTime())
+        const requestedAt = jrs[0].requested_at
+
+        await unwrap(decline(host.ctx, jr.id), 200)
+        await unwrap(accept(host.ctx, jr.id), 409)
+        jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+        expect(jrs.length).toBe(1)
+
+        const res = await unwrap<RestoreRequestResponse>(restoreRequest(host.ctx, jr.id), 200)
+        expect(res.id).toBe(jr.id)
+        jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+
+        expect(jrs[0].status).toBe("requested")
+        expect(jrs[0].id).toBe(jr.id)
+        expect(jrs[1].id).toBe(jr2.id)
+        expect(new Date(jrs[0].requested_at).getTime()).toBeLessThan(new Date(jrs[1].requested_at).getTime())
+        expect(jrs[0].requested_at).toBe(requestedAt)
+    })
+    test("un-remove removed", async () => {
+        const host = await asUser(BASE)
+        const hiker = await asUser(BASE)
+        const hiker2 = await asUser(BASE)
+        const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+        const jr = await unwrap<JoinRequestResponse>(requestJoin(hiker.ctx, o.id), 201)
+        const jr2 = await unwrap<JoinRequestResponse>(requestJoin(hiker2.ctx, o.id), 201)
+
+        let jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+        expect(jrs.map(j => j.id)).toEqual([jr.id, jr2.id])
+        const requestedAt = jrs[0].requested_at
+
+        await unwrap(accept(host.ctx, jr.id), 200)
+        await unwrap(removeMember(host.ctx, jr.id), 200)
+
+        const res = await unwrap<RestoreRequestResponse>(restoreRequest(host.ctx, jr.id), 200)
+        expect(res.id).toBe(jr.id)
+
+        // back in the queue, at the original place, with the original time
+        jrs = await unwrap<JoinRequestResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+        expect(jrs.map(j => j.id)).toEqual([jr.id, jr2.id])
+        expect(jrs[0].status).toBe("requested")
+        expect(jrs[0].requested_at).toBe(requestedAt)
+
+        // restore is not re-accept: nobody is on the roster
+        const detail = await unwrap<DetailResponse>(getDetail(host.ctx, o.id), 200)
+        expect(detail.roster).toHaveLength(0)
+    })
+
+    test("403 when non host attempts to restore", async () => {
+        const host = await asUser(BASE)
+        const hiker  = await asUser(BASE)
+        const totalStranger = await asUser(BASE)
+        const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+        const jr = await unwrap<JoinRequestResponse>(requestJoin(hiker.ctx, o.id), 201)
+        await unwrap(removeMember(host.ctx, jr.id), 409)
+        await unwrap(accept(host.ctx, jr.id),200)
+        await unwrap(removeMember(host.ctx, jr.id), 200)
+
+        await unwrap(restoreRequest(hiker.ctx, jr.id), 403)
+        await unwrap(restoreRequest(totalStranger.ctx, jr.id), 403)
+
+    })
+
 
 })
 

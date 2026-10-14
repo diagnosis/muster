@@ -164,6 +164,14 @@ func (d *Dispatcher) contentFor(ctx context.Context, u *Unsent) email.Content {
 			CTALabel: "View Conversation",
 			CTAURL:   d.conversationURL(convID),
 		}
+	case KindJoinRequestRestored:
+		return email.Content{
+			Subject:  "Muster - you're back in the queue",
+			Heading:  "Back in the waiting list",
+			Body:     fmt.Sprintf("The host put your request to join %s back in the waiting list. You'll hear from them if a spot opens up.", title),
+			CTALabel: "View outing",
+			CTAURL:   d.outingURL(id),
+		}
 	}
 	logger.Warn(ctx, "contentFor: unhandled kind", "kind", u.Event.Kind)
 	return email.Content{
