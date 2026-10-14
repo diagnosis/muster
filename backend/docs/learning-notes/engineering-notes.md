@@ -91,9 +91,9 @@ SELECT COALESCE(MAX(seq), 0) FROM messages WHERE conversation_id = $1
 ```sql
 INSERT INTO conversation_reads (conversation_id, hiker_id, last_read_seq)
 VALUES ($1, $2, $3)
-ON CONFLICT (conversation_id, hiker_id) DO UPDATE
-SET last_read_seq = GREATEST(conversation_reads.last_read_seq, EXCLUDED.last_read_seq),
-    updated_at    = now()
+    ON CONFLICT (conversation_id, hiker_id) DO UPDATE
+                                                   SET last_read_seq = GREATEST(conversation_reads.last_read_seq, EXCLUDED.last_read_seq),
+                                                   updated_at    = now()
 ```
 
 `EXCLUDED` is the row the insert tried to add and was refused. It exists only inside `DO UPDATE`. The table name refers to the row already stored.
@@ -107,9 +107,9 @@ INSERT INTO conversation_reads (conversation_id, hiker_id, last_read_seq)
 SELECT c.id, jr.hiker_id,
        COALESCE((SELECT MAX(m.seq) FROM messages m WHERE m.conversation_id = c.id), 0)
 FROM conversations c
-JOIN join_requests jr ON c.outing_id = jr.outing_id
+         JOIN join_requests jr ON c.outing_id = jr.outing_id
 WHERE c.kind = 'outing' AND jr.status = 'accepted'
-ON CONFLICT DO NOTHING;
+    ON CONFLICT DO NOTHING;
 ```
 
 Check it with counts: rows inserted against rows expected. Muster's backfill gave 2,843 and 2,843.
@@ -133,15 +133,15 @@ The viewer's id does two jobs: it removes their own messages, and it finds their
 
 ```sql
 WITH accepted AS (
-    UPDATE join_requests r SET status = 'accepted' ...
+UPDATE join_requests r SET status = 'accepted' ...
     RETURNING r.outing_id, r.hiker_id, r.updated_at
 ),
 marker AS (
-    INSERT INTO conversation_reads (...)
-    SELECT c.id, a.hiker_id, ...
+INSERT INTO conversation_reads (...)
+SELECT c.id, a.hiker_id, ...
     FROM accepted a JOIN conversations c ON c.outing_id = a.outing_id
     ON CONFLICT (conversation_id, hiker_id) DO UPDATE SET ...
-)
+        )
 SELECT updated_at FROM accepted;
 ```
 
@@ -230,7 +230,7 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 - **Compare times as numbers in tests,** not strings: Go and JavaScript format the same instant differently. Print both values, never a bare true or false.
 - **Build boundary times by adding hours,** not by naming two clock times. Fourteen days between two local 6 AMs is an hour longer across a daylight-saving change.
 - **Test both directions of a rule.** The cases that must be accepted matter as much as the ones that must be rejected.
-- 
+-
 ## Lessons from adding outing phases
 
 - **Stored facts are fields; anything derived is a function.** `StartsAt` is a fact. The phase is an answer worked out from facts plus the clock. If a value can go stale without anyone writing to it, don't keep it in a field that code relies on.
@@ -296,3 +296,20 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 - **The client learns a time-based flag when it fetches.** A page left open across the close instant still shows the input; the server refuses the send. The server is the rule and the page is a courtesy, but the page must show the refusal.
 - **Assert on the page with `await expect(locator)`.** `expect(await locator.isDisabled())` reads once and fails with a bare boolean. The retrying form waits and names the element.
 - **Read the remote, not the message.** "Pushed" was an empty file: `git add .` from a subfolder staged only what was beneath it. Run `git status` from the repo root before committing.
+
+## Lessons from request history and restore
+
+- **Restore is a status change, not a new request.** `SetJoinRequestStatus(..., requested)` touches `status` and `updated_at` only, so `requested_at` survives and the hiker returns to their old place. Reusing the re-request path would have stamped a new time and sent them to the back.
+- **Declined and removed are terminal for the hiker, not for the host.** `TestRequestJoin_DeclinedIsTerminal` still passes; only `RestoreRequest` reopens them. One sentence, two rules.
+- **Call the guard, don't copy it.** The host, closed and started checks were pasted into `RestoreRequest` and drifted on the first day: a stranger got "this outing is closed" instead of 403. `loadForHostAction` is the one home, and when it was sabotaged every host action went red together, which is the proof it is one home.
+- **Permission before state.** The host check runs first so a non-host learns nothing about the outing or the request.
+- **A new enum value has more than one home.** `join_request_restored` had to land in the Go constant, `Kind.Valid()`, the CHECK constraint, and `contentFor`. The grep for the previous kind (`dm_reopened`) is the checklist; the `contentFor: unhandled kind` warning was the one that was missed.
+- **The migration string is frozen on apply.** `join_request_restore` (no `d`) was in the file for one round. Compare the SQL literal to the Go constant character by character before `goose up`; no unit test can catch it, only a real insert.
+- **A CHECK is validated against every existing row.** A Down that puts the old constraint back fails if rows of the new kind exist, so the Down deletes them first. The DM-kinds migration has the same gap and is on the ledger.
+- **`notify` swallows its own failure.** A rejected insert logs a warning and the action still returns 200, so a passing restore proves nothing about the notification. The receipt is the `notification_events` row.
+- **Validate the filter in the service, and prove the proof.** `?status=banana` reaches the store as a query for a status that never exists: an empty 200 for a typo. `Valid()` already existed, so the test was born green and was sabotaged by removing the check.
+- **A helper that builds `?status=undefined` is a client bug the server should refuse.** It did, with 400, which is how the e2e helper's missing guard was found.
+- **The query key is the cache key.** Three tabs sharing `['outing-join-requests', id]` show one list. The status belongs in the key, the same way it belongs in the URL.
+- **`&&` in an order check only fails when every position is wrong.** `jrs[0] != a && jrs[1] != b` passes `[a, c]`. Compare the ID slice in one `toEqual`.
+- **A global `button:hover` outranks a module class of equal specificity by source order.** The active tab went white on hover; the fix is a hover rule in the module.
+- **A new word on a page can break an old test on another page.** `getByText(/waiting/i)` in the DM spec matched the new Waiting tab during navigation. Assert the exact copy that only the target page has.

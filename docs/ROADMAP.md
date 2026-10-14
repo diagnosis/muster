@@ -1,6 +1,6 @@
 # Muster — Roadmap
 
-*As of 2026-10-13 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #44 merged) and confirmed by Safa. Replaces the 2026-08-07 roadmap.*
+*As of 2026-10-14 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #45 merged) and confirmed by Safa. Replaces the 2026-08-07 roadmap.*
 
 *Doc hierarchy: roadmap = why and when · spec = what · engineering notes = how.*
 
@@ -10,7 +10,7 @@
 
 Muster is live at muster.safadev.app. Backend and frontend are on `main`, gated by CI (`ci.yml`) and deployed by `deploy.yml`. Migrations run before the new binary, so schema changes are expand-only.
 
-Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec files) that proves the real SQL and JSON, and a Playwright browser suite (21 spec files).
+Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec files) that proves the real SQL and JSON, and a Playwright browser suite (22 spec files).
 
 ### Shipped
 
@@ -25,6 +25,7 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 | Notifications | in-app bell, live updates over server-sent events, email for selected events |
 | Waiting and withdrew lists (PR #43) | on the outing page for logged-in viewers, names only; waiting in the order people asked (`requested_at`), withdrew most recent first; the going list is sent by viewer level: count only when logged out, names when logged in, hiker ids for members, request ids for the host |
 | Chat closure (PR #44) | outing chat is read-only 7 days after the outing ends, the same window as comments; history stays readable and delete stays allowed; the chat page shows the server's reason when a send is refused |
+| Request history and restore (PR #45) | the host's requests list takes `?status=` (requested, declined, removed; anything else is 400); declined and removed requests can be restored to the queue at their original `requested_at`, host-only and only before the outing starts; the hiker gets a `join_request_restored` notification; the outing page shows Waiting, Declined and Removed tabs with a Restore button on history rows |
 
 ---
 
@@ -32,14 +33,13 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 
 In this order. Items can be added.
 
-1. **Host request history, un-decline, undo removal.** A status filter on the requests list, plus two state changes that are host-only.
-2. **Change password while logged in.** Verify the current password, rehash, revoke refresh tokens. Today only the emailed reset exists.
-3. **Edit Pending Request** (role, seats, guests) without losing your place.
-4. **Passwordless login with an emailed code.**
-5. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
-6. **Pagination.** Browse first, with keyset pagination. Then chat, then the Past tab. Server-side phase filtering comes with it.
-7. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
-8. **One real hike organized through Muster.** v1 is done when boots hit dirt.
+1. **Change password while logged in.** Verify the current password, rehash, revoke refresh tokens. Today only the emailed reset exists.
+2. **Edit Pending Request** (role, seats, guests) without losing your place.
+3. **Passwordless login with an emailed code.**
+4. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
+5. **Pagination.** Browse first, with keyset pagination. Then chat, then the Past tab. Server-side phase filtering comes with it.
+6. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
+7. **One real hike organized through Muster.** v1 is done when boots hit dirt.
 
 Also open from the original v1 list: `capacity_state` served by the API, so the client stops deriving it.
 
@@ -69,6 +69,11 @@ Also open from the original v1 list: `capacity_state` served by the API, so the 
 - Chat page: hide the input on a cancelled outing (the conversation view needs the outing’s status).
 - backend/e2e/types.ts: ConversationResponse has dma_a where the server sends dm_a
 - An API spec for the 7-day comment window, using setOutingTimes (it is proven in Go only)
+- Undo removal in one click: restore, then try to accept, so the host is not sent back to the Waiting tab.
+- Notification-kind migrations: the Down of the DM-kinds migration fails if rows of a removed kind exist; the restored-kind migration deletes them first. Backfill the older one the same way.
+- The host card fetches all three request lists on load for the tab counts; one endpoint returning counts would do it in one request.
+- The pending-request row has no visible cue that it opens a modal; a chevron or "Review" label would help.
+- Full UI audit before v1 ships: one filled button per card, hover states on every custom control, button classes reconciled (`btn`, `btn-primary`, module overrides).
 
 ---
 
