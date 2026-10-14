@@ -1,9 +1,10 @@
 import {createFileRoute, redirect, useNavigate} from '@tanstack/react-router'
-import {meQueryOptions, outingQueryOptions, useOuting} from "@/queries.ts";
+import {meQueryOptions} from "@/queries.ts";
 import {OutingForm} from "@/components/OutingForm.tsx";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import type {CreateOutingInput, Outing} from "@/types.ts";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
+import {outingQueryOptions, useOuting} from "@/queries/outing.ts";
 
 export const Route = createFileRoute('/outings_/$id/edit')({
     beforeLoad: async ({context, params}) => {

@@ -2,7 +2,8 @@
 import {createFileRoute, Link} from '@tanstack/react-router'
 import {OutingCard} from "@/components/OutingCard.tsx";
 import styles from "@/routes/index.module.css"
-import {useOutings} from "@/queries.ts";
+import {useOutings} from "@/queries/outing.ts";
+
 
 
 export const Route = createFileRoute('/')({

@@ -117,11 +117,10 @@ test.describe("chat message", ()=> {
 
         const hostPage = await hostCtx.newPage()
         await hostPage.goto(`/outings/${outing.id}`)
-        await expect(hostPage.getByText("Requests (0)")).toBeVisible()
-
+        const waiting = hostPage.getByRole('tab', { name: 'Waiting' })
+        await expect(waiting).toContainText('0')
         await joinRequest(hiker, outing.id)                       // API, no browser for the hiker
-
-        await expect(hostPage.getByText("Requests (1)")).toBeVisible()   // no reload
+        await expect(waiting).toContainText('1')// no reload
         await expect(hostPage.getByRole("button", { name: "Notifications" })).toContainText("1")
     })
     test("host DMs a pending requester; bell rings; accept opens the composer", async ({ browser }) => {
@@ -146,7 +145,7 @@ test.describe("chat message", ()=> {
         await hostPage.getByRole("button", { name: `Message ${hiker.user.name}` }).click()
         await expect(hostPage).toHaveURL(/\/conversations\//)
         // pending from the initiator's side: one opening message allowed, then it's on them
-        await expect(hostPage.getByText(/waiting/i)).toBeVisible()
+        await expect(hostPage.getByText(`Waiting for ${hiker.user.name} to accept`)).toBeVisible()
 
         // --- the hiker's bell moves with no reload: proves KindDMRequested + the poke
         await expect(hikerPage.getByRole("button", { name: "Notifications" })).toContainText("1")

@@ -1,9 +1,10 @@
 import {createFileRoute, Link} from '@tanstack/react-router'
-import {requireAuth, useMyOutings} from "@/queries.ts";
+import {requireAuth} from "@/queries.ts";
 import {OutingCard} from "@/components/OutingCard.tsx";
 import styles from "@/routes/me.outings.module.css"
 import type {Phase} from "@/types.ts";
 import {useState} from "react";
+import {useMyOutings} from "@/queries/outing.ts";
 
 
 
