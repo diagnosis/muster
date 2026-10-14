@@ -86,8 +86,8 @@ export interface JoinRequest{
     note?: string
     created_at: string
     updated_at: string
-
 }
+
 export interface JoinRequestInput {
     role: HikerRole
     seats_offered: number
@@ -116,7 +116,7 @@ export interface RegisterRequest{
     experience: Experience
 }
 
-export interface PendingRequestResponse extends JoinRequest{
+export interface JoinRequestView extends JoinRequest{
     hiker_name: string
     hiker_experience: Experience
 }

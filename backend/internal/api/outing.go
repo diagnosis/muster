@@ -206,6 +206,40 @@ func (s *Server) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func (s *Server) handleRestoreRequest(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+
+	hostID, err := getAuthenticatedUserID(r)
+	if err != nil {
+		logger.Warn(r.Context(), "failed to capture hostID", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	jrID, err := pathUUID(r, "id")
+	if err != nil {
+		logger.Warn(r.Context(), "failed to capture joinRequest id", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	if err = s.outings.RestoreRequest(r.Context(), hostID, jrID); err != nil {
+		logger.Warn(r.Context(), "failed to restore request", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	responder.JSON(
+		w,
+		http.StatusOK,
+		map[string]any{
+			"message": "request restored successfully",
+			"id":      jrID,
+		},
+		correlationID,
+	)
+}
+
 // handleCancelOuting cancels the outing ({id} = outing id). Host-only,
 // enforced by the service.
 func (s *Server) handleCancelOuting(w http.ResponseWriter, r *http.Request) {
@@ -244,8 +278,10 @@ func (s *Server) handleListUpcoming(w http.ResponseWriter, r *http.Request) {
 	responder.JSON(w, http.StatusOK, outings, correlationID)
 }
 
-// handlePendingRequests returns the outing's pending join requests ({id} = outing id), oldest first. Host-only, enforced by the service.
-func (s *Server) handlePendingRequests(w http.ResponseWriter, r *http.Request) {
+// handleJoinRequests lists the outing's join requests ({id} = outing id),
+// filtered by ?status= (default requested), oldest first. Host-only,
+// enforced by the service.
+func (s *Server) handleJoinRequests(w http.ResponseWriter, r *http.Request) {
 	correlationID, _ := logger.GetCorrelationID(r.Context())
 
 	hostID, err := getAuthenticatedUserID(r)
@@ -261,8 +297,13 @@ func (s *Server) handlePendingRequests(w http.ResponseWriter, r *http.Request) {
 		responder.Error(w, err, correlationID)
 		return
 	}
+	status := outing.RequestStatusRequested
+	requestStatus := r.URL.Query().Get("status")
+	if requestStatus != "" {
+		status = outing.RequestStatus(requestStatus)
+	}
 
-	jrs, err := s.outings.PendingRequests(r.Context(), hostID, outingID)
+	jrs, err := s.outings.JoinRequests(r.Context(), hostID, outingID, status)
 	if err != nil {
 		logger.Warn(r.Context(), "outing: pending requests failed", "err", err)
 		responder.Error(w, err, correlationID)

@@ -284,7 +284,7 @@ func (s *OutingStore) ListUpcoming(ctx context.Context, now time.Time) ([]outing
 
 // ListJoinRequests returns the outing's requests with the given status,
 // in queue order: earliest requested_at first, id as the tiebreaker.
-func (s *OutingStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, status outing.RequestStatus) ([]outing.PendingRequest, error) {
+func (s *OutingStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, status outing.RequestStatus) ([]outing.JoinRequestView, error) {
 	q := `
 	SELECT jr.id, jr.outing_id, jr.hiker_id, jr.status, jr.role, jr.seats_offered, jr.guests, jr.note, jr.created_at, jr.updated_at, jr.requested_at,
 	       h.name, h.experience
@@ -299,7 +299,7 @@ func (s *OutingStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, 
 	}
 	defer rows.Close()
 
-	jrs := []outing.PendingRequest{}
+	jrs := []outing.JoinRequestView{}
 
 	for rows.Next() {
 		jr, err := scanPendingRequest(rows)
@@ -709,8 +709,8 @@ func scanOuting(row pgx.Row) (*outing.Outing, error) {
 	return o, err
 }
 
-func scanPendingRequest(row pgx.Row) (*outing.PendingRequest, error) {
-	r := &outing.PendingRequest{}
+func scanPendingRequest(row pgx.Row) (*outing.JoinRequestView, error) {
+	r := &outing.JoinRequestView{}
 	err := row.Scan(
 		&r.ID,
 		&r.OutingID,

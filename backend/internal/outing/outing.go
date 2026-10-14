@@ -205,8 +205,8 @@ type JoinRequest struct {
 	RequestedAt  time.Time     `json:"requested_at"`
 }
 
-// PendingRequest links a hiker and joinrequest to outing.
-type PendingRequest struct {
+// JoinRequestView links a hiker and JoinRequest to outing.
+type JoinRequestView struct {
 	JoinRequest
 	HikerName       string `json:"hiker_name"`
 	HikerExperience string `json:"hiker_experience"`

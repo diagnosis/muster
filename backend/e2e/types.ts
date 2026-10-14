@@ -41,22 +41,35 @@ export interface OutingResponse {
     max_size: number
     host_seats: number
     cost_per_seat_cents: number
-    difficulty: 'hard'|'easy'|'moderate'
-    pace: 'relaxed' | 'fast' | 'moderate'
+    difficulty: Difficulty
+    pace: Pace
     conversation_id: string
     ends_at?: string
     phase: string
 }
 
+export type RequestStatus = 'requested'|'accepted'|'declined'|'withdrawn'|'removed' | 'banana'
 export interface JoinRequestResponse {
     id: string
     outing_id: string
     hiker_id: string
-    status: 'requested'|'accepted'|'declined'|'withdrawn'
+    status: RequestStatus
     role: 'rider'|'driver'
     seats_offered: number
     guests: number
     requested_at: string
+}
+export interface JoinRequestViewResponse{
+    id: string
+    outing_id: string
+    hiker_id: string
+    status: RequestStatus | ""
+    role: 'rider'|'driver'
+    seats_offered: number
+    guests: number
+    requested_at: string
+    hiker_name: string
+    hiker_experience: string
 }
 
 export interface MemberResponse {
@@ -253,6 +266,11 @@ export interface ConversationViewResponse {
     dm_declined_by: string | null
     created_at: string
     is_discussion_open: boolean | null
+}
+
+export interface RestoreRequestResponse{
+    message: string
+    id:string
 }
 
 export const CODE_EMAIL_NOT_VERIFIED = "email_not_verified"

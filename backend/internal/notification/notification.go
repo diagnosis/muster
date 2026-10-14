@@ -25,13 +25,14 @@ const (
 	KindDMRequested          Kind = "dm_requested"
 	KindDMAccepted           Kind = "dm_accepted"
 	KindDMReopened           Kind = "dm_reopened"
+	KindJoinRequestRestored  Kind = "join_request_restored"
 )
 
 // Valid reports whether k is a known notification kind.
 func (k Kind) Valid() bool {
 	switch k {
 	case KindJoinRequestCreated, KindJoinRequestApproved, KindJoinRequestDeclined, KindJoinRequestWithdrawn,
-		KindMemberRemoved, KindOutingCancelled, KindOutingUpdated, KindDMRequested, KindDMAccepted, KindDMReopened:
+		KindMemberRemoved, KindOutingCancelled, KindOutingUpdated, KindDMRequested, KindDMAccepted, KindDMReopened, KindJoinRequestRestored:
 		return true
 	}
 	return false

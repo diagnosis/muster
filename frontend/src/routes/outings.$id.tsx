@@ -2,7 +2,7 @@ import {createFileRoute, Link, useNavigate} from '@tanstack/react-router'
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import type {Detail, Member} from "@/types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
-import {useMeQuery, useOuting} from "@/queries.ts";
+import {useMeQuery} from "@/queries.ts";
 import {useEffect, useState} from "react";
 import {JoinForm} from "@/components/JoinForm.tsx";
 import {HostControls} from "@/components/HostControls.tsx";
@@ -15,6 +15,7 @@ import {useEvents} from "@/events/EventProvider.tsx";
 import {useStartDM} from "@/queries/conversation.ts";
 import {CalendarIcon, FlagIcon, MessageIcon, PinIcon, TrashIcon} from "@/components/Icons.tsx";
 import {outingRange} from "@/utils/date.ts";
+import {useOuting} from "@/queries/outing.ts";
 
 
 export const Route = createFileRoute('/outings/$id')({
@@ -52,8 +53,9 @@ export function OutingDetailPage() {
             throw new ApiRequestError(res.error, res.httpStatus)
         },
         onSuccess : () => {
-            qc.invalidateQueries({queryKey: ['outing', id]})
+            qc.invalidateQueries({queryKey:['outing', id]})
             qc.invalidateQueries({queryKey: ['my-outings']})
+            qc.invalidateQueries({queryKey:['outing-join-requests', id]})
         }
     })
     const removeMemberMutation = useMutation({
@@ -65,8 +67,9 @@ export function OutingDetailPage() {
             throw new ApiRequestError(res.error, res.httpStatus)
         },
         onSuccess: () =>{
-            qc.invalidateQueries({queryKey: ['outing', id]})
+            qc.invalidateQueries({queryKey:['outing', id]})
             qc.invalidateQueries({queryKey: ['my-outings']})
+            qc.invalidateQueries({queryKey:['outing-join-requests', id]})
             setMemberToRemove(null)
         }
     })

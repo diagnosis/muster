@@ -19,6 +19,7 @@ transition that affects someone who didn't cause it:
 | join_request_declined   | requester      |  ✓    |  ✓   |
 | join_request_withdrawn  | host           |  ✓    |  ✓   |
 | member_removed          | removed hiker  |  ✓    |  ✓   |
+| join_request_restored   | requester      |  ✓    |  ✓   |
 | outing_cancelled        | each member    |  ✓    |  ✓   |
 | outing_updated          | each member    |  ✓    |  ✓   |
 
