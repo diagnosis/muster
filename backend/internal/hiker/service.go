@@ -3,6 +3,7 @@ package hiker
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -141,11 +142,7 @@ const (
 
 // Valid reports whether p is a known platform.
 func (p Platform) Valid() bool {
-	switch p {
-	case PlatformWeb, PlatformIOS, PlatformAndroid:
-		return true
-	}
-	return false
+	return slices.Contains(AllPlatforms, p)
 }
 
 // AllPlatforms lists every known platform; Valid and session-wide
