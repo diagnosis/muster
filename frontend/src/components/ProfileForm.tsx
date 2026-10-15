@@ -5,6 +5,7 @@ import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
 import styles from "@/routes/form.module.css";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
+import {useForgotPasswordMutation} from "@/queries/auth.ts";
 
 interface ProfileFormProps{
     me: MeResponse
@@ -28,7 +29,7 @@ export function ProfileForm({me}: ProfileFormProps){
             }
         }
     )
-
+    const forgotPasswordMutation = useForgotPasswordMutation()
     function handleProfileUpdate(e:React.SubmitEvent){
         e.preventDefault()
         meMutation.mutate({ name: hikerName, experience: hikerExperience })
@@ -40,6 +41,7 @@ export function ProfileForm({me}: ProfileFormProps){
         !hikerName ||
         !isDirty ||
         meMutation.isPending
+
     return <div>
 
         <form className={styles.form} onSubmit={handleProfileUpdate}>
@@ -94,8 +96,21 @@ export function ProfileForm({me}: ProfileFormProps){
             {meMutation.error&&<p className={styles.error}>{meMutation.error.message}</p>}
             <button type={"submit"} className="btn-primary" disabled={isDisabled}>Save changes</button>
             {!isDirty && <p className={styles.hint}>Nothing to save yet.</p>}
-
         </form>
+        <section className={`${styles.form} top-margin`} aria-labelledby="password-heading">
+            <h2 id="password-heading" className={styles.sectionTitle}>Password</h2>
+            <p className={styles.hint}>
+                We'll email you a link to set a new one. Using it signs you out everywhere, including here.
+            </p>
+            {forgotPasswordMutation.isSuccess
+                ? <p className={styles.readOnlyRow}>Link sent to {me.email}. Check your inbox, and spam if it isn't there.</p>
+                : <button type="button" className={styles.quietAction}
+                          disabled={forgotPasswordMutation.isPending}
+                          onClick={() => forgotPasswordMutation.mutate({email: me.email})}>
+                    Send reset link
+                </button>}
+            {forgotPasswordMutation.isError && <p className={styles.error}>{forgotPasswordMutation.error.message}</p>}
+        </section>
     </div>
 
 }

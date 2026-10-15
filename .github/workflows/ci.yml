@@ -54,8 +54,8 @@ jobs:
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           APP_DISPATCHER_INTERVAL: 3s
-          RATE_LIMIT_RPS: "100"
-          RATE_LIMIT_BURST: "200"
+          RATE_LIMIT_RPS: "250"
+          RATE_LIMIT_BURST: "500"
         run: |
           go build -o muster ./cmd/muster
           ./muster &

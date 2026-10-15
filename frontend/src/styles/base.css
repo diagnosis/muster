@@ -86,3 +86,6 @@ textarea{
     background: none;
     opacity: 0.5;
 }
+.top-margin{
+    margin-top: var(--space-6);
+}

@@ -15,7 +15,14 @@ test.describe('profile', ()=>{
         await page.getByRole('button', { name: 'Save changes' }).click()
         await openNav(page)
         await expect(page.getByRole('link', {name:newName})).toBeVisible()
-
-
     });
+    test("send password reset link", async ({page, context})=>{
+        const actor = await createActor()
+        await actorInBrowser(actor, context)
+        await page.goto('/me/profile')
+        await expect(page.getByText(actor.user.email)).toBeVisible()
+
+        await page.getByRole('button', {name:'Send reset link'}).click()
+        await expect(page.getByText(`Link sent to ${actor.user.email}`)).toBeVisible()
+    })
 })
