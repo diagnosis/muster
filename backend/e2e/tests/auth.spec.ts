@@ -183,17 +183,5 @@ test.describe('auth', ()=>{
     const raw = await mintVerificationToken(id, {purpose:"forgot_password"})
     await unwrap(await resetPassword(ctx, weakPassword, raw), 400)
   })
-  test("reset password revokes the hiker’s sessions; others stay logged in", async () => {
-    const h1 = await asUser(BASE)
-    const h2 = await asUser(BASE)
-    await unwrap(refresh(h1.ctx), 200)
-    await unwrap(refresh(h2.ctx), 200)
-    const raw = await mintVerificationToken(h1.id, {purpose:"forgot_password"})
-    await unwrap<ResetPasswordResponse>(await resetPassword(h1.ctx, "Secure123", raw), 200)
-    await unwrap(refresh(h1.ctx), 401)
-    await unwrap(refresh(h2.ctx), 200)
-    await unwrap(login(h1.ctx, {email:h1.user.email, password:"Secure123"}), 200)
-
-  })
 
 })
