@@ -313,3 +313,16 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 - **`&&` in an order check only fails when every position is wrong.** `jrs[0] != a && jrs[1] != b` passes `[a, c]`. Compare the ID slice in one `toEqual`.
 - **A global `button:hover` outranks a module class of equal specificity by source order.** The active tab went white on hover; the fix is a hover rule in the module.
 - **A new word on a page can break an old test on another page.** `getByText(/waiting/i)` in the DM spec matched the new Waiting tab during navigation. Assert the exact copy that only the target page has.
+
+## Lessons from change password
+
+- **Reuse the flow that already proves the right thing.** The emailed reset link proves control of the inbox; an in-app form would have added a second password rule to maintain and a second thing to attack. The profile button calls the forgot endpoint with the user's own email and nothing else is new.
+- **Read what the existing flow actually does before trusting it.** "Reset revokes sessions" was assumed; the code did not. The red test (`got 2` sessions after reset) was the proof that the gap was real.
+- **Revocation is a security step, not a courtesy.** A failed email is logged and the reset continues; a failed revocation returns the error, because a reset that leaves an attacker's session alive did not do its job.
+- **A list of enum values has one home.** `AllPlatforms` feeds `Valid()` and the revocation loop. The first draft listed the three platforms in the method, which is the same drift as the pasted host guard in PR #45.
+- **A helper that reads `sent[0]` works until the second user.** `registerAndVerify` always read the first email, so the second hiker's verification consumed the first hiker's used token. Read the last mail, so one user and many behave the same.
+- **A test that is born green needs a sabotage that reaches the assertion.** Dropping the fake's hiker filter failed at setup (Login's own cleanup), before the reset ran, so it proved nothing about the assertion. Some fakes can't be sabotaged cleanly; the API spec against Postgres carried that proof instead.
+- **See the API spec red against the old binary.** The first run passed because the server was still the pre-change build. A restart turned it red, the fix turned it green; that is the whole point of running it before the code. Air now rebuilds on save so a stale binary is harder to get.
+- **The rate limiter sees the whole test suite as one client.** Every Playwright worker comes from 127.0.0.1, so the suite crossed the burst threshold when it grew by one spec and five tests went flaky with 429s. Dev and CI run with high limits from env; prod keeps its own.
+- **`go install` for tools, never `go get -tool`.** The second one put air and its Hugo dependency tree into `go.mod`. The Makefile calls the binary by its GOPATH path, so JetBrains' `air` on PATH does not shadow it.
+- **A direct push to main is a tooling problem, not a discipline problem.** The branch ruleset refuses it now; a reverted commit and a cherry-pick were the cost of learning that.
