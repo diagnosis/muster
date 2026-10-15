@@ -26,6 +26,10 @@ check: fmt lint build test
 run:
 	go run cmd/muster/main.go
 
+# running app with air
+dev:
+	$(shell go env GOPATH)/bin/air
+
 # open a psql shell against the configured database
 psql:
 	@psql "$(DATABASE_URL)"

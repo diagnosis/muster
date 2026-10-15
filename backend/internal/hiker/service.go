@@ -148,6 +148,10 @@ func (p Platform) Valid() bool {
 	return false
 }
 
+// AllPlatforms lists every known platform; Valid and session-wide
+// revocation both read it, so a new platform is added in one place.
+var AllPlatforms = []Platform{PlatformWeb, PlatformIOS, PlatformAndroid}
+
 // Login authenticates a hiker by email and password. It returns a
 // Session on success and apperr.InvalidCredentials for any failure —
 // deliberately not revealing whether the email or password was wrong.
@@ -332,7 +336,10 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 	return nil
 }
 
-// ResetPassword set new function for user login.
+// ResetPassword consumes a forgot-password token, sets the new password,
+// and revokes every refresh token the hiker holds on every platform, so
+// no session that knew the old password survives. Then it emails the
+// hiker that the password changed.
 func (s *Service) ResetPassword(ctx context.Context, raw, newPassword string) error {
 
 	v := validator.New()
@@ -356,6 +363,13 @@ func (s *Service) ResetPassword(ctx context.Context, raw, newPassword string) er
 	err = s.store.SetPassword(ctx, hikerID, hash)
 	if err != nil {
 		return err
+	}
+	for _, p := range AllPlatforms {
+		err = s.store.DeleteRefreshTokens(ctx, hikerID, p)
+		if err != nil {
+			logger.Warn(ctx, "failed to delete old tokens", "err", err)
+			return err
+		}
 	}
 
 	c := email.Content{
