@@ -192,3 +192,18 @@
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
 }
+.sectionTitle{
+    font-family: var(--font-display);
+    font-size: var(--text-title);
+    line-height: var(--leading-title);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+/* one-off secondary action inside a card: outlined accent, natural width */
+.quietAction{
+    align-self: flex-start;
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    font-weight: 600;
+}
+.quietAction:hover{ background: var(--surface-sunken); }

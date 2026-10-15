@@ -4,10 +4,11 @@ import {createFileRoute, useNavigate} from '@tanstack/react-router'
 import {useState} from "react";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient, ApiRequestError} from "@/lib/api";
-import type {ForgotPasswordResponse, MeResponse, ResendEmailResponse} from "@/types";
+import type { MeResponse, ResendEmailResponse} from "@/types";
 import styles from "@/routes/form.module.css"
 import {requireGuest} from "@/queries.ts";
 import {CODE_EMAIL_NOT_VERIFIED} from "@/lib/copy.ts";
+import {useForgotPasswordMutation} from "@/queries/auth.ts";
 
 export const Route = createFileRoute('/login')({
     beforeLoad: async ({context}) => requireGuest(context.queryClient),
@@ -45,15 +46,7 @@ export function LoginPage(){
     }
     })
 
-    const forgotPasswordMutation = useMutation({
-        mutationFn: async (email:{email:string}) =>{
-            const res = await apiClient.post<ForgotPasswordResponse>('/api/auth/forgot-password', email)
-            if (res.ok){
-                return res.data
-            }
-            throw new ApiRequestError(res.error, res.httpStatus)
-        }
-    })
+    const forgotPasswordMutation = useForgotPasswordMutation()
 
 
     function handleSubmit(e : React.SubmitEvent){
