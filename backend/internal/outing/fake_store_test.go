@@ -151,6 +151,12 @@ func (f *fakeStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, st
 		}
 	}
 	sort.Slice(jrs, func(i, j int) bool {
+		if jrs[i].Role == RoleDriver && jrs[j].Role == RoleRider {
+			return true
+		}
+		if jrs[i].Role == RoleRider && jrs[j].Role == RoleDriver {
+			return false
+		}
 		if !jrs[i].RequestedAt.Equal(jrs[j].RequestedAt) {
 			return jrs[i].RequestedAt.Before(jrs[j].RequestedAt)
 		}

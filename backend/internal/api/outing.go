@@ -393,3 +393,49 @@ func (s *Server) handleUpdateOuting(w http.ResponseWriter, r *http.Request) {
 	responder.JSON(w, http.StatusOK, updatedOuting, correlationID)
 
 }
+
+// handleEditJoinRequest lets the signed-in hiker change their own pending
+// request on an outing: PATCH /api/outings/{id}/requests/me. Absent fields
+// are left unchanged. Returns the updated request; 404 when the hiker has
+// no request here, 409 when it isn't pending or the outing isn't open.
+func (s *Server) handleEditJoinRequest(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+
+	hikerID, err := getAuthenticatedUserID(r)
+	if err != nil {
+		logger.Warn(r.Context(), "join request: auth failed on edit join request", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	outingID, err := pathUUID(r, "id")
+	if err != nil {
+		logger.Warn(r.Context(), "join request: invalid outing id on edit join request", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+
+	var in outing.EditJoinRequestInput
+	err = decodeJSON(r, &in)
+	if err != nil {
+		logger.Warn(r.Context(), "join request: bad request from update input", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	jr, err := s.outings.MyJoinRequest(r.Context(), outingID, hikerID)
+	if err != nil {
+		logger.Warn(r.Context(), "failed to fetch my join request", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+
+	updated, err := s.outings.EditJoinRequest(r.Context(), hikerID, jr.ID, in)
+	if err != nil {
+		logger.Warn(r.Context(), "failed to edit my join request", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	responder.JSON(w, http.StatusOK, updated, correlationID)
+}

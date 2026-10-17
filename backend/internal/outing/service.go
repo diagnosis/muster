@@ -328,39 +328,44 @@ type JoinInput struct {
 	Note         *string `json:"note"`
 }
 
+func (s *Service) validateJoinRequest(in JoinInput, o *Outing, hikerID uuid.UUID) error {
+	if !in.Role.Valid() {
+		return apperr.BadRequest("invalid role", "invalid role")
+	}
+	if in.Role == RoleRider && in.SeatsOffered != 0 {
+		return apperr.BadRequest("rider cannot offer seats", "rider cannot offer seats")
+	}
+	if in.Role == RoleDriver && in.SeatsOffered < 1 {
+		return apperr.BadRequest("driver needs to offer at least one seat", "one seat needs to be offered as driver")
+	}
+	if in.Guests < 0 || in.Guests > maxGuests {
+		return apperr.BadRequest("number of guests should be between 0-3", "guest count violation")
+	}
+	if o.Status != StatusOpen {
+		return apperr.Conflict("outing is not open", "outing closed or cancelled")
+	}
+	if time.Until(o.StartsAt) <= 0 {
+		return apperr.Conflict("outing already started", "past outing")
+	}
+	if o.HostID == hikerID {
+		return apperr.BadRequest("you can't join your own outing", "host self-join")
+	}
+	return nil
+}
+
 // RequestJoin asks to join an outing. A first request creates a row in
 // requested; a withdrawn request may re-request; declined is terminal;
 // an active request conflicts. Hosts cannot join their own outing.
 // Capacity is deliberately NOT checked here — it gates acceptance,
 // not asking.
 func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, in JoinInput) (*JoinRequest, error) {
-	if !in.Role.Valid() {
-		return nil, apperr.BadRequest("invalid role", "invalid role")
-	}
-	if in.Role == RoleRider && in.SeatsOffered != 0 {
-		return nil, apperr.BadRequest("rider cannot offer seats", "rider cannot offer seats")
-	}
-	if in.Role == RoleDriver && in.SeatsOffered < 1 {
-		return nil, apperr.BadRequest("driver needs to offer at least one seat", "one seat needs to be offered as driver")
-	}
-	if in.Guests < 0 || in.Guests > maxGuests {
-		return nil, apperr.BadRequest("number of guests should be between 0-3", "guest count violation")
-	}
-
 	o, err := s.store.GetOuting(ctx, outingID)
 	if err != nil {
 		return nil, err
 	}
-	if o.Status != StatusOpen {
-		return nil, apperr.Conflict("outing is not open", "outing closed or cancelled")
+	if err = s.validateJoinRequest(in, o, hikerID); err != nil {
+		return nil, err
 	}
-	if time.Until(o.StartsAt) <= 0 {
-		return nil, apperr.Conflict("outing already started", "past outing")
-	}
-	if o.HostID == hikerID {
-		return nil, apperr.BadRequest("you can't join your own outing", "host self-join")
-	}
-
 	joinRequest, err := s.store.GetJoinRequestByHiker(ctx, o.ID, hikerID)
 	if err != nil {
 		if se, ok := apperr.AsStatusErr(err); ok && se.Status == apperr.CodeNotFound {
@@ -551,6 +556,83 @@ func (s *Service) MyOutings(ctx context.Context, hikerID uuid.UUID) (*MyOutings,
 	stampAll(mine.Joined, now)
 	stampAll(mine.Hosting, now)
 	return mine, nil
+}
+
+// EditJoinRequestInput is a partial update to a pending request. Every
+// field is optional: nil means "leave as is", so a client may send only
+// what changed. Validation runs on the merged result, not on this struct.
+type EditJoinRequestInput struct {
+	Role         *Role   `json:"role"`
+	Guests       *int    `json:"guests"`
+	SeatsOffered *int    `json:"seats_offered"`
+	Note         *string `json:"note"`
+}
+
+// EditJoinRequest lets a hiker change their own pending request. Nil
+// fields keep their current value; the merged result is validated
+// exactly like a new request. An edit that asks the outing for more —
+// more guests, fewer seats offered, or driver → rider — moves the
+// request to the back of the queue (requested_at = now); anything else
+// keeps its place. The host is notified when role, seats or guests
+// change; a note-only edit is silent. Only pending requests on open,
+// upcoming outings can be edited.
+func (s *Service) EditJoinRequest(ctx context.Context, hikerID, joinRequestID uuid.UUID, editJoinRequestInput EditJoinRequestInput) (*JoinRequest, error) {
+	now := time.Now()
+	jr, err := s.store.GetJoinRequest(ctx, joinRequestID)
+	if err != nil {
+		return nil, err
+	}
+	if jr.HikerID != hikerID {
+		return nil, apperr.Forbidden("forbidden", "forbidden")
+	}
+	if jr.Status != RequestStatusRequested {
+		return nil, apperr.Conflict("status is not requested", "wrong status")
+	}
+	o, err := s.store.GetOuting(ctx, jr.OutingID)
+	if err != nil {
+		return nil, err
+	}
+
+	before := *jr
+
+	if editJoinRequestInput.Role != nil {
+		jr.Role = *editJoinRequestInput.Role
+
+	}
+	if editJoinRequestInput.Guests != nil {
+		jr.Guests = *editJoinRequestInput.Guests
+	}
+	if editJoinRequestInput.SeatsOffered != nil {
+		jr.SeatsOffered = *editJoinRequestInput.SeatsOffered
+	}
+	if editJoinRequestInput.Note != nil {
+		jr.Note = editJoinRequestInput.Note
+	}
+	err = s.validateJoinRequest(JoinInput{
+		Role:         jr.Role,
+		SeatsOffered: jr.SeatsOffered,
+		Guests:       jr.Guests,
+		Note:         jr.Note,
+	}, o, hikerID)
+	if err != nil {
+		return nil, err
+	}
+
+	askMore := (before.Role == RoleDriver && jr.Role == RoleRider) || jr.Guests > before.Guests || (jr.Role == RoleDriver && jr.SeatsOffered < before.SeatsOffered)
+
+	if askMore {
+		jr.RequestedAt = now
+	}
+
+	err = s.store.UpdateJoinRequest(ctx, jr)
+	if err != nil {
+		return nil, err
+	}
+	if before.Guests != jr.Guests || before.SeatsOffered != jr.SeatsOffered || before.Role != jr.Role {
+		s.notify(ctx, o.HostID, o, notification.KindJoinRequestUpdated)
+	}
+
+	return jr, nil
 }
 
 // stamp fills the fields computed for the client as of now. They are
@@ -854,6 +936,13 @@ func (s *Service) RestoreRequest(ctx context.Context, hostID, requestID uuid.UUI
 	return nil
 }
 
+// MyJoinRequest returns the caller's own request on an outing, whatever
+// its status. It is a plain lookup — no guards, no state change — so the
+// handler can resolve "my request" to an id before calling EditJoinRequest.
+// Returns 404 when the hiker has never asked to join.
+func (s *Service) MyJoinRequest(ctx context.Context, outingID, hikerID uuid.UUID) (*JoinRequest, error) {
+	return s.store.GetJoinRequestByHiker(ctx, outingID, hikerID)
+}
 // helpers
 
 func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, outing *Outing, kind notification.Kind) {

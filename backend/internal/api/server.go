@@ -95,6 +95,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("GET /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handleJoinRequests)))
 	mux.Handle("GET /api/me/outings", requireAuth(http.HandlerFunc(s.handleMyOutings)))
 	mux.Handle("PATCH /api/outings/{id}", requireAuth(http.HandlerFunc(s.handleUpdateOuting)))
+	mux.Handle("PATCH /api/outings/{id}/requests/me", requireAuth(http.HandlerFunc(s.handleEditJoinRequest)))
 
 	// protected notifications routes
 	mux.Handle("GET /api/notifications", requireAuth(http.HandlerFunc(s.handleGetNotifications)))
