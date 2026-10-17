@@ -1,6 +1,6 @@
 import {createFileRoute, Link, useNavigate} from '@tanstack/react-router'
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
-import type {Detail, Member} from "@/types.ts";
+import type {Detail, JoinRequest, Member} from "@/types.ts";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useMeQuery} from "@/queries.ts";
 import {useEffect, useState} from "react";
@@ -99,10 +99,19 @@ export function OutingDetailPage() {
 
         const st = detail.my_request?.status
         if (st === 'requested')
-            return <div className={styles.slot}>
-                <p>Requested — waiting on host</p>
-                {!rosterLocked && <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>}
-            </div>
+            return showForm
+                    ? <JoinForm outingId={id} initial={detail.my_request} onClose={handleOnClose}/>
+                    : <div className={styles.slot}>
+                        <div className={styles.slotText}>
+                            <p>Requested — waiting on host</p>
+                            <p className={styles.slotSub}>{requestSummary(detail.my_request!)}</p>
+                            <p className={styles.slotSub}>Drivers go first, then in the order people asked. Asking for more later moves you to the back.</p>
+                        </div>
+                        {!rosterLocked && <div className={styles.slotActions}>
+                            <button className="btn-outline" onClick={() => setShowForm(true)}>Edit request</button>
+                            <button className="btn" onClick={() => withdrawMutation.mutate()}>Withdraw</button>
+                        </div>}
+           </div>
 
         if (st === 'accepted')
             return <div className={`${styles.slot} ${styles.slotActive}`}>
@@ -265,4 +274,7 @@ export function OutingDetailPage() {
             )}
         </div>
     )
+}
+function requestSummary(req:JoinRequest){
+    return `You asked as a ${req.role}${req.role==='driver'?` with ${req.seats_offered} ${req.seats_offered===1?"seat":"seats"}`:''}, bringing ${req.guests===0?'no':req.guests} ${req.guests===1?"guest":"guests"}`
 }

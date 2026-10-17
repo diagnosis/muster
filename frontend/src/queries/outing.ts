@@ -1,6 +1,14 @@
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
-import type {Detail, JoinRequestView, MyOutings, Outing, RequestStatus} from "@/types.ts";
-import {useQuery} from "@tanstack/react-query";
+import type {
+    Detail,
+    EditJoinRequestInput,
+    JoinRequest, JoinRequestInput,
+    JoinRequestView,
+    MyOutings,
+    Outing,
+    RequestStatus
+} from "@/types.ts";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 
 
 export const getOutingByID = async (id:string) => {
@@ -70,4 +78,47 @@ export function useMyOutings(){
             }
         }
     )
+}
+
+
+// join requests
+
+
+export function useJoinRequestMutation(outingId:string){
+    const qc = useQueryClient()
+    return useMutation(
+        {
+            mutationFn : async (body: JoinRequestInput) => {
+                const res =
+                    await apiClient.post<JoinRequest>(`/api/outings/${outingId}/requests`, body)
+                if (res.ok){
+                    return res.data
+                }
+                throw new ApiRequestError(res.error, res.httpStatus)
+            },
+            onSuccess: () => {
+                qc.invalidateQueries({queryKey:['outing', outingId]})
+                qc.invalidateQueries({queryKey:['my-outings']})
+            }
+        }
+    )
+}
+
+export function useEditMyRequestMutation(outingId:string){
+    const qc = useQueryClient()
+    return useMutation({
+        mutationFn: async (edit:EditJoinRequestInput) => {
+            const res = await apiClient.patch<JoinRequest>(`/api/outings/${outingId}/requests/me`, edit)
+            if (res.ok) {
+                return res.data
+            }
+            throw new ApiRequestError(res.error, res.httpStatus)
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({queryKey:['outing', outingId]})
+            qc.invalidateQueries({queryKey:['outing-join-requests', outingId]})
+            qc.invalidateQueries({queryKey:['my-outings']})
+        }
+
+    })
 }

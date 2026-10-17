@@ -4,7 +4,7 @@ import {
     accept,
     createOuting,
     decline, editJoinRequest,
-    getDetail,
+    getDetail, getNotifications,
     listOutingRequests,
     removeMember,
     requestJoin, restoreRequest,
@@ -13,7 +13,7 @@ import {
 import {
     DetailResponse,
     JoinRequestResponse,
-    JoinRequestViewResponse,
+    JoinRequestViewResponse, type NotificationsResponse,
     OutingResponse,
     RestoreRequestResponse
 } from "../types";
@@ -310,6 +310,9 @@ test.describe("membership", ()=> {
       const beforeRequestedAt = j1.requested_at
 
       const updated = await unwrap<JoinRequestResponse>(editJoinRequest(h1.ctx, o.id, {guests:2}),200)
+      let n = await unwrap<NotificationsResponse>(await getNotifications(host.ctx), 200)
+      expect(n.unread_count).toBe(2)
+      expect(n.notifications.filter(x => x.kind === 'join_request_updated')).toHaveLength(1)
       expect(Date.parse(updated.requested_at)).toBeGreaterThan(Date.parse(beforeRequestedAt))
   });
   test("remove guest will not update requested_at", async ()=>{

@@ -944,8 +944,6 @@ func (s *Service) MyJoinRequest(ctx context.Context, outingID, hikerID uuid.UUID
 	return s.store.GetJoinRequestByHiker(ctx, outingID, hikerID)
 }
 
-
-
 // helpers
 func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, outing *Outing, kind notification.Kind) {
 	if err := s.notifications.Insert(ctx, &notification.Event{

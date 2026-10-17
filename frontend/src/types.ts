@@ -86,12 +86,19 @@ export interface JoinRequest{
     note?: string
     created_at: string
     updated_at: string
+    requested_at: string
 }
 
 export interface JoinRequestInput {
     role: HikerRole
     seats_offered: number
     guests: number
+    note?: string
+}
+export interface EditJoinRequestInput {
+    role?: HikerRole
+    seats_offered?: number
+    guests?: number
     note?: string
 }
 

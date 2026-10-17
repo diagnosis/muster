@@ -90,3 +90,16 @@ export interface Message {
     body: string
     created_at: string
 }
+
+export interface JoinRequestViewResponse{
+    id: string
+    outing_id: string
+    hiker_id: string
+    status: RequestStatus | ""
+    role: 'rider'|'driver'
+    seats_offered: number
+    guests: number
+    requested_at: string
+    hiker_name: string
+    hiker_experience: string
+}

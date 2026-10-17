@@ -1,6 +1,14 @@
 import {expect, test} from "@playwright/test";
 import {actorInBrowser, createActor} from "../fixtures/actor.ts";
-import {acceptRequest, createOuting, declineRequest, joinRequest, withdraw} from "../fixtures/outingApiHelper.ts";
+import {
+    acceptRequest,
+    createOuting,
+    declineRequest,
+    joinRequest,
+    listOutingRequests,
+    withdraw
+} from "../fixtures/outingApiHelper.ts";
+
 
 
 test.describe("waiting and withdraw list", ()=>{
@@ -83,5 +91,28 @@ test.describe("waiting and withdraw list", ()=>{
         await expect(tab('Waiting')).toContainText('2')
         await tab('Waiting').click()
         await expect(pendingRows).toContainText([hikerA.user.name, hikerB.user.name])
+    })
+    test("hiker edits their request and move to back", async ({page, context})=>{
+        const host = await createActor()
+        const hiker1 = await createActor()
+        const hiker2 = await createActor()
+        const driver = await createActor()
+        const o = await createOuting(host, {host_seats:3, max_size:8})
+        const j1 = await joinRequest(hiker1, o.id, {role:"rider", guests:1})
+        const j2 = await joinRequest(hiker2, o.id)
+        const j3 = await joinRequest(driver, o.id, {role:"driver", seats_offered:2})
+
+        await actorInBrowser(hiker1, context)
+        await page.goto(`/outings/${o.id}`)
+        await expect(page.getByText("You asked as a rider, bringing 1 guest", {exact:true})).toBeVisible()
+        await page.getByRole('button', { name: 'Edit request' }).click()
+        await page.getByRole('spinbutton', { name: 'Guests' }).fill("2")
+        await expect(page.getByText('Saving this moves you to the back of the waiting list.')).toBeVisible()
+        await page.getByRole('button', { name: 'Save changes' }).click()
+        await expect(page.getByText("You asked as a rider, bringing 2 guests", {exact:true})).toBeVisible()
+        const jrws = await listOutingRequests(host, o.id, "requested")
+        const ids = jrws.map(jrw => jrw.id)
+        expect(ids).toEqual([j3.id,j2.id,j1.id])
+
     })
 })
