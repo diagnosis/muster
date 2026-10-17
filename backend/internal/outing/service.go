@@ -328,7 +328,7 @@ type JoinInput struct {
 	Note         *string `json:"note"`
 }
 
-func (s *Service) validateJoinRequest(in JoinInput, o *Outing, hikerID uuid.UUID) error {
+func validateJoinRequest(in JoinInput, o *Outing, hikerID uuid.UUID) error {
 	if !in.Role.Valid() {
 		return apperr.BadRequest("invalid role", "invalid role")
 	}
@@ -363,7 +363,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 	if err != nil {
 		return nil, err
 	}
-	if err = s.validateJoinRequest(in, o, hikerID); err != nil {
+	if err = validateJoinRequest(in, o, hikerID); err != nil {
 		return nil, err
 	}
 	joinRequest, err := s.store.GetJoinRequestByHiker(ctx, o.ID, hikerID)
@@ -608,7 +608,7 @@ func (s *Service) EditJoinRequest(ctx context.Context, hikerID, joinRequestID uu
 	if editJoinRequestInput.Note != nil {
 		jr.Note = editJoinRequestInput.Note
 	}
-	err = s.validateJoinRequest(JoinInput{
+	err = validateJoinRequest(JoinInput{
 		Role:         jr.Role,
 		SeatsOffered: jr.SeatsOffered,
 		Guests:       jr.Guests,
@@ -943,8 +943,10 @@ func (s *Service) RestoreRequest(ctx context.Context, hostID, requestID uuid.UUI
 func (s *Service) MyJoinRequest(ctx context.Context, outingID, hikerID uuid.UUID) (*JoinRequest, error) {
 	return s.store.GetJoinRequestByHiker(ctx, outingID, hikerID)
 }
-// helpers
 
+
+
+// helpers
 func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, outing *Outing, kind notification.Kind) {
 	if err := s.notifications.Insert(ctx, &notification.Event{
 		HikerID: hikerID,

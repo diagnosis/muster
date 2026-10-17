@@ -415,7 +415,6 @@ func (s *Server) handleEditJoinRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	var in outing.EditJoinRequestInput
 	err = decodeJSON(r, &in)
 	if err != nil {
@@ -426,14 +425,14 @@ func (s *Server) handleEditJoinRequest(w http.ResponseWriter, r *http.Request) {
 
 	jr, err := s.outings.MyJoinRequest(r.Context(), outingID, hikerID)
 	if err != nil {
-		logger.Warn(r.Context(), "failed to fetch my join request", "err", err)
+		logger.Warn(r.Context(), "join request: failed to fetch my join request", "err", err)
 		responder.Error(w, err, correlationID)
 		return
 	}
 
 	updated, err := s.outings.EditJoinRequest(r.Context(), hikerID, jr.ID, in)
 	if err != nil {
-		logger.Warn(r.Context(), "failed to edit my join request", "err", err)
+		logger.Warn(r.Context(), "join request: failed to edit my join request", "err", err)
 		responder.Error(w, err, correlationID)
 		return
 	}

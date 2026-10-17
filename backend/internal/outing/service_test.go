@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
+	"github.com/diagnosis/muster/internal/notification"
 	"github.com/google/uuid"
 )
 
@@ -1806,10 +1807,12 @@ func Test_EditRequest_Table(t *testing.T) {
 				if len(fn.events) != 1 {
 					t.Fatalf("expected len 1 got %v", len(fn.events))
 				}
-			} else {
-				if len(fn.events) != 0 {
-					t.Fatalf("expected len 0 got %v", len(fn.events))
+				if fn.events[0].Kind == notification.KindOutingUpdated {
+					t.Errorf("expected %v got %v", notification.KindOutingUpdated, fn.events[0].Kind)
 				}
+			} else if len(fn.events) != 0 {
+				t.Fatalf("expected len 0 got %v", len(fn.events))
+
 			}
 			if cc.restamp {
 				if before.Equal(f.requests[jr.ID].RequestedAt) {
@@ -1827,6 +1830,7 @@ func Test_EditRequest_Table(t *testing.T) {
 			if got != cc.edit.note {
 				t.Errorf("note: want %q got %q", cc.edit.note, got)
 			}
+
 		})
 	}
 
