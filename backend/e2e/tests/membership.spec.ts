@@ -329,7 +329,7 @@ test.describe("membership", ()=> {
       const beforeRequestedAt = j1.requested_at
 
       const updated = await unwrap<JoinRequestResponse>(editJoinRequest(h1.ctx, o.id, {guests:1}),200)
-      expect(beforeRequestedAt).toBe(updated.requested_at)
+      expect(Date.parse(updated.requested_at)).toBe(Date.parse(beforeRequestedAt))
   });
   test ("edit role to driver will move placement up", async ()=>{
       const host = await asUser(BASE)
