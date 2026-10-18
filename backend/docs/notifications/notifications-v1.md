@@ -20,10 +20,13 @@ transition that affects someone who didn't cause it:
 | join_request_withdrawn  | host           |  ✓    |  ✓   |
 | member_removed          | removed hiker  |  ✓    |  ✓   |
 | join_request_restored   | requester      |  ✓    |  ✓   |
+| join_request_updated    | host           |  ✓    |  ✓   |
 | outing_cancelled        | each member    |  ✓    |  ✓   |
 | outing_updated          | each member    |  ✓    |  ✓   |
 
 Event names byte-mirror the join-request status enum (two-homes rule).
+`join_request_updated` fires when a pending hiker changes role, seats or
+guests; a note-only edit is silent.
 
 **Parked (v2):** `new_outing_created` broadcast — unbounded fan-out; waits
 for groups/subscriptions so "all" becomes a scoped audience. No v1 emails.

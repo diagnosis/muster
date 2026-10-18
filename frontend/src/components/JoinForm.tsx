@@ -1,49 +1,40 @@
 
 // src/components/JoinForm.tsx
-import type {HikerRole, JoinRequest, JoinRequestInput} from "@/types.ts";
-import {useMutation, useQueryClient} from "@tanstack/react-query";
-import {apiClient, ApiRequestError} from "@/lib/api.ts";
+import type { HikerRole, JoinRequest } from "@/types.ts";
+
 import styles from '@/routes/form.module.css'
 import {useState} from "react";
+import {useEditMyRequestMutation, useJoinRequestMutation} from "@/queries/outing.ts";
 
 
 interface JoinProps{
     outingId: string
     onClose: () => void
+    initial?: JoinRequest
 }
 
-export function JoinForm({outingId, onClose}:JoinProps){
-    const queryClient = useQueryClient()
-    const [hikerRole, setHikerRole] = useState<HikerRole|null>(null)
-    const [seats, setSeats] = useState(0)
-    const [guests, setGuests] = useState(0)
-    const [note, setNote] = useState<string>("")
+export function JoinForm({outingId, onClose, initial}:JoinProps){
 
-    const joinReqMutation = useMutation(
-        {
-            mutationFn : async (body: JoinRequestInput) => {
-                const res =
-                   await apiClient.post<JoinRequest>(`/api/outings/${outingId}/requests`, body)
-                if (res.ok){
-                    return res.data
-                }
-                throw new ApiRequestError(res.error, res.httpStatus)
-            },
-            onSuccess: () => {
-                queryClient.invalidateQueries({queryKey:['outing', outingId]})
-                onClose()
-            }
-        }
-    )
+    const [hikerRole, setHikerRole] = useState<HikerRole|null>(initial?.role??null)
+    const [seats, setSeats] = useState(initial?.seats_offered??0)
+    const [guests, setGuests] = useState(initial?.guests??0)
+    const [note, setNote] = useState<string>(initial?.note??"")
 
+    const joinReqMutation = useJoinRequestMutation(outingId)
+    const editJoinReqMutation = useEditMyRequestMutation(outingId)
+    const mutation = initial?editJoinReqMutation:joinReqMutation
     function handleSubmit(e:React.SubmitEvent){
         e.preventDefault()
         if(!hikerRole) return
-        joinReqMutation.mutate({role:hikerRole, seats_offered:seats, guests:guests, note:note||undefined})
+        mutation.mutate({role:hikerRole, seats_offered:seats, guests:guests, note:initial?note:note||undefined}, {onSuccess: () => {onClose()}})
     }
-
+    const askMore = !!initial && (
+        (initial.role === 'driver' && hikerRole === 'rider') ||
+        guests > initial.guests ||
+        (hikerRole === 'driver' && seats < initial.seats_offered)
+    )
     return(
-        <form aria-label={'Join outing'} className={styles.form} onSubmit={handleSubmit}>
+        <form aria-label={initial?'Edit your request':'Join outing'} className={styles.form} onSubmit={handleSubmit}>
             <fieldset className={styles.fieldset}>
                 <legend className={styles.legend}>Hiker role</legend>
                 <div className={styles.radioRow}>
@@ -100,13 +91,13 @@ export function JoinForm({outingId, onClose}:JoinProps){
                     onChange={e => setNote(e.target.value)}
                 ></textarea>
             </label>
-            {joinReqMutation.error && <p className={styles.error}>{joinReqMutation.error.message}</p>}
-
+            {mutation.error && <p className={styles.error}>{mutation.error.message}</p>}
+            {askMore&&<p role="status" className={styles.notice}>Saving this moves you to the back of the waiting list.</p>}
             <button
                className={"btn-primary"}
                 type={'submit'}
-                disabled={!hikerRole || joinReqMutation.isPending}
-            >Request to join</button>
+                disabled={!hikerRole || mutation.isPending}
+            >{initial? 'Save changes':'Request to join'}</button>
             {!hikerRole && <p className={styles.hint}>Pick a role first.</p>}
             <button
                 className={styles.quietBtn}

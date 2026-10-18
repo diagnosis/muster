@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
+	"github.com/diagnosis/muster/internal/notification"
 	"github.com/google/uuid"
 )
 
@@ -74,6 +75,11 @@ func seedJoinRequestWithSeatsOffered(outingID, hikerID uuid.UUID, status Request
 }
 func seedJoinRequestWithRequestedAt(outingID, hikerID uuid.UUID, status RequestStatus, role Role, f *fakeStore, guest int, requestedAt time.Time) *JoinRequest {
 	r := &JoinRequest{ID: uuid.New(), OutingID: outingID, HikerID: hikerID, Status: status, Guests: guest, Role: role, RequestedAt: requestedAt}
+	f.requests[r.ID] = r
+	return r
+}
+func seedJoinRequestWithRequestedAtAndSeatsOffered(outingID, hikerID uuid.UUID, status RequestStatus, role Role, f *fakeStore, guest int, requestedAt time.Time, seatsOffered int) *JoinRequest {
+	r := &JoinRequest{ID: uuid.New(), OutingID: outingID, HikerID: hikerID, Status: status, Guests: guest, Role: role, RequestedAt: requestedAt, SeatsOffered: seatsOffered}
 	f.requests[r.ID] = r
 	return r
 }
@@ -1482,8 +1488,8 @@ func Test_Detail_WaitingAndWithdrawnLists(t *testing.T) {
 	if len(d.Withdrawn) != 2 {
 		t.Fatalf("stranger : expected 2 members in withdrawn list got %d number of members in withdrawn list", len(d.Withdrawn))
 	}
-	if d.Waiting[0].Name != "hale" || d.Waiting[1].Name != "jale" {
-		t.Errorf("stranger: waiting order, want [hale jale] got %v", d.Waiting)
+	if d.Waiting[0].Name != "jale" || d.Waiting[1].Name != "hale" {
+		t.Errorf("stranger: waiting order, want [jale hale] got %v", d.Waiting)
 	}
 	if d.Withdrawn[0].Name != "kalu" || d.Withdrawn[1].Name != "haluk" {
 		t.Errorf("stranger: withdrawn order, want [kalu haluk] got %v", d.Withdrawn)
@@ -1499,8 +1505,8 @@ func Test_Detail_WaitingAndWithdrawnLists(t *testing.T) {
 	if len(d.Withdrawn) != 2 {
 		t.Fatalf("host : expected 2 members in withdrawn list got %d number of members in withdrawn list", len(d.Withdrawn))
 	}
-	if d.Waiting[0].Name != "hale" || d.Waiting[1].Name != "jale" {
-		t.Errorf("host: waiting order, want [hale jale] got %v", d.Waiting)
+	if d.Waiting[0].Name != "jale" || d.Waiting[1].Name != "hale" {
+		t.Errorf("host: waiting order, want [jale hale] got %v", d.Waiting)
 	}
 	if d.Withdrawn[0].Name != "kalu" || d.Withdrawn[1].Name != "haluk" {
 		t.Errorf("host: withdrawn order, want [kalu haluk] got %v", d.Withdrawn)
@@ -1516,8 +1522,8 @@ func Test_Detail_WaitingAndWithdrawnLists(t *testing.T) {
 	if len(d.Withdrawn) != 2 {
 		t.Fatalf("member : expected 2 members in withdrawn list got %d number of members in withdrawn list", len(d.Withdrawn))
 	}
-	if d.Waiting[0].Name != "hale" || d.Waiting[1].Name != "jale" {
-		t.Errorf("member: waiting order, want [hale jale] got %v", d.Waiting)
+	if d.Waiting[0].Name != "jale" || d.Waiting[1].Name != "hale" {
+		t.Errorf("member: waiting order, want [jale hale] got %v", d.Waiting)
 	}
 	if d.Withdrawn[0].Name != "kalu" || d.Withdrawn[1].Name != "haluk" {
 		t.Errorf("member: withdrawn order, want [kalu haluk] got %v", d.Withdrawn)
@@ -1653,4 +1659,230 @@ func Test_JoinRequests_DeclineAndRemovedList(t *testing.T) {
 		t.Fatalf("expected len 0 got %v", len(jrs))
 	}
 
+}
+
+// Edit Join request
+
+func Test_JoinRequest_OrderByRole(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	h1, d1, h2, d2 := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	o := seedOuting(6, 2, StatusOpen, host, f)
+	now := time.Now()
+	j1 := seedJoinRequestWithRequestedAt(o.ID, h1, RequestStatusRequested, RoleRider, f, 1, now.Add(-10*time.Hour))
+	j2 := seedJoinRequestWithRequestedAtAndSeatsOffered(o.ID, d1, RequestStatusRequested, RoleDriver, f, 0, now.Add(-5*time.Hour), 3)
+	j3 := seedJoinRequestWithRequestedAt(o.ID, h2, RequestStatusRequested, RoleRider, f, 1, now.Add(-2*time.Hour))
+	j4 := seedJoinRequestWithRequestedAtAndSeatsOffered(o.ID, d2, RequestStatusRequested, RoleDriver, f, 0, now.Add(-1*time.Hour), 2)
+	reqs, err := svc.JoinRequests(context.Background(), host, o.ID, RequestStatusRequested)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(reqs) != 4 {
+		t.Fatalf("expected requested size:4 got %d", len(reqs))
+	}
+	expectedOrder := []uuid.UUID{j2.ID, j4.ID, j1.ID, j3.ID}
+	for i, id := range expectedOrder {
+		if reqs[i].ID != id {
+			t.Errorf("expected %v got %v", id, reqs[i].ID)
+		}
+	}
+
+}
+
+func Test_EditRequest_Table(t *testing.T) {
+
+	svc, f, fn, _ := newTestService(t)
+	host := uuid.New()
+
+	type in struct {
+		role  Role
+		guest int
+		seats int
+		note  string
+	}
+	badRequest := apperr.CodeBadRequest
+
+	now := time.Now()
+	cases := []struct {
+		name    string
+		seeded  in
+		edit    in
+		want    *apperr.Status
+		restamp bool
+		notify  bool
+	}{
+		{name: "rider adds guest", seeded: in{role: RoleRider, guest: 0, note: "", seats: 0},
+			edit: in{role: RoleRider, guest: 1, seats: 0, note: ""}, want: nil, restamp: true, notify: true},
+		{name: "rider drops guest", seeded: in{role: RoleRider, guest: 2, seats: 0, note: ""}, edit: in{
+			role:  RoleRider,
+			guest: 1,
+			seats: 0,
+			note:  "",
+		}, restamp: false, notify: true},
+		{name: "driver offers fewer seats", seeded: in{role: RoleDriver, seats: 3, note: ""}, edit: in{
+			role:  RoleDriver,
+			guest: 0,
+			seats: 2,
+			note:  "",
+		}, want: nil, restamp: true, notify: true},
+		{name: "driver offers more seats", seeded: in{role: RoleDriver, seats: 2, guest: 0, note: ""}, edit: in{
+			role:  RoleDriver,
+			guest: 0,
+			seats: 3,
+			note:  "",
+		}, want: nil, restamp: false, notify: true},
+		{name: "driver becomes rider", seeded: in{
+			role:  RoleDriver,
+			guest: 0,
+			seats: 2,
+			note:  "",
+		}, edit: in{
+			role:  RoleRider,
+			guest: 1,
+			seats: 0,
+			note:  "",
+		}, want: nil, restamp: true, notify: true},
+		{name: "rider becomes driver", seeded: in{
+			role:  RoleRider,
+			guest: 2,
+			seats: 0,
+			note:  "",
+		}, edit: in{
+			role:  RoleDriver,
+			guest: 0,
+			seats: 2,
+			note:  "",
+		}, want: nil, restamp: false, notify: true},
+		{name: "no-op", seeded: in{role: RoleRider, guest: 1}, edit: in{role: RoleRider, guest: 1}, want: nil, restamp: false, notify: false},
+		{name: "note only", seeded: in{role: RoleRider, guest: 1}, edit: in{
+			role:  RoleRider,
+			guest: 1,
+			seats: 0,
+			note:  "Life is cool!",
+		}, want: nil, restamp: false, notify: false},
+		{name: "negative guests", seeded: in{
+			role:  RoleRider,
+			guest: 0,
+			seats: 0,
+			note:  "",
+		}, edit: in{
+			role:  RoleRider,
+			guest: -1,
+			seats: 0,
+			note:  "",
+		}, want: &badRequest},
+		{name: "driver with 0 seats", seeded: in{role: RoleRider}, edit: in{
+			role:  RoleDriver,
+			guest: 0,
+			seats: 0,
+			note:  "",
+		}, want: &badRequest},
+		{name: "rider with seats", seeded: in{role: RoleRider}, edit: in{
+			role:  RoleRider,
+			guest: 0,
+			seats: 2,
+			note:  "",
+		}, want: &badRequest},
+	}
+
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			h1 := uuid.New()
+			o := seedOuting(10, 2, StatusOpen, host, f)
+			jr := seedJoinRequestWithRequestedAtAndSeatsOffered(o.ID, h1, RequestStatusRequested, cc.seeded.role, f, cc.seeded.guest, now.Add(-5*time.Hour), cc.seeded.seats)
+			before := jr.RequestedAt
+			fn.events = nil
+			_, err := svc.EditJoinRequest(context.Background(), h1, jr.ID, EditJoinRequestInput{
+				Role:         ptr(cc.edit.role),
+				Guests:       ptr(cc.edit.guest),
+				SeatsOffered: ptr(cc.edit.seats),
+				Note:         ptr(cc.edit.note),
+			})
+			if cc.want != nil {
+				wantStatus(t, err, *cc.want)
+			} else if err != nil {
+				t.Fatalf("expected no error got %v", err)
+			}
+			if cc.notify {
+				if len(fn.events) != 1 {
+					t.Fatalf("expected len 1 got %v", len(fn.events))
+				}
+				if fn.events[0].Kind == notification.KindOutingUpdated {
+					t.Errorf("expected %v got %v", notification.KindOutingUpdated, fn.events[0].Kind)
+				}
+			} else if len(fn.events) != 0 {
+				t.Fatalf("expected len 0 got %v", len(fn.events))
+
+			}
+			if cc.restamp {
+				if before.Equal(f.requests[jr.ID].RequestedAt) {
+					t.Error("expected requested at restamped but got same")
+				}
+			} else {
+				if !before.Equal(f.requests[jr.ID].RequestedAt) {
+					t.Errorf("expected requested untouched (expected:%v) but got (actual:%v)", jr.RequestedAt, f.requests[jr.ID].RequestedAt)
+				}
+			}
+			got := ""
+			if n := f.requests[jr.ID].Note; n != nil {
+				got = *n
+			}
+			if got != cc.edit.note {
+				t.Errorf("note: want %q got %q", cc.edit.note, got)
+			}
+
+		})
+	}
+
+}
+
+func Test_EditRequest_Forbidden(t *testing.T) {
+	svc, f, fn, _ := newTestService(t)
+	host, hiker := uuid.New(), uuid.New()
+	o := seedOuting(6, 2, StatusOpen, host, f)
+	jr := seedJoinRequest(o.ID, hiker, RequestStatusRequested, RoleRider, f, 0)
+	_, err := svc.EditJoinRequest(context.Background(), uuid.New(), jr.ID, EditJoinRequestInput{
+		Role:         nil,
+		Guests:       ptr(2),
+		SeatsOffered: nil,
+		Note:         nil,
+	})
+	wantStatus(t, err, apperr.CodeForbidden)
+	if len(fn.events) != 0 {
+		t.Fatalf("expected 0 got %d", len(fn.events))
+	}
+}
+
+func Test_EditRequest_Conflicts(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host, hiker := uuid.New(), uuid.New()
+	now := time.Now()
+	cases := []struct {
+		name         string
+		outingStarts time.Time
+		reqStatus    RequestStatus
+		outingStatus Status
+		want         apperr.Status
+	}{
+		{name: "request status accepted", outingStarts: now.Add(24 * time.Hour), reqStatus: RequestStatusAccepted, outingStatus: StatusOpen, want: apperr.CodeConflict},
+		{name: "outing started", outingStarts: now.Add(-1 * time.Hour), reqStatus: RequestStatusRequested, outingStatus: StatusOpen, want: apperr.CodeConflict},
+		{name: "outing cancelled", outingStarts: now.Add(36 * time.Hour), reqStatus: RequestStatusRequested, outingStatus: StatusCancelled, want: apperr.CodeConflict},
+	}
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			o := seedOutingWithStartTime(6, 4, cc.outingStatus, host, f, cc.outingStarts)
+			jr := seedJoinRequest(o.ID, hiker, cc.reqStatus, RoleRider, f, 0)
+			_, err := svc.EditJoinRequest(context.Background(), hiker, jr.ID, EditJoinRequestInput{
+				Role:         nil,
+				Guests:       ptr(2),
+				SeatsOffered: nil,
+				Note:         nil,
+			})
+			wantStatus(t, err, cc.want)
+		})
+	}
+
+}
+func ptr[T any](v T) *T {
+	return &v
 }

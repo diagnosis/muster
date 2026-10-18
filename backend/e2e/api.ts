@@ -1,6 +1,6 @@
 // e2e/api.ts
 import { APIRequestContext } from '@playwright/test';
-import {CreateOutingInput, RequestStatus, UpdateInput, UpdateMeInput} from "./types";
+import {CreateOutingInput, EditJoinRequestInput, RequestStatus, UpdateInput, UpdateMeInput} from "./types";
 import {RegisterRequest} from "./types";
 import {tag} from "./fixtures";
 
@@ -166,3 +166,5 @@ export const getConversation = (ctx : APIRequestContext, cid: string) =>
     ctx.get(`/api/conversations/${cid}`)
 export const restoreRequest = (ctx: APIRequestContext, jrid:string) =>
     ctx.post(`/api/requests/${jrid}/restore`)
+export const editJoinRequest = (ctx: APIRequestContext, outingID:string, edit:EditJoinRequestInput)=>
+    ctx.patch(`/api/outings/${outingID}/requests/me`, {data:edit})

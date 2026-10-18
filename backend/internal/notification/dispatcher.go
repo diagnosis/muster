@@ -172,6 +172,14 @@ func (d *Dispatcher) contentFor(ctx context.Context, u *Unsent) email.Content {
 			CTALabel: "View outing",
 			CTAURL:   d.outingURL(id),
 		}
+	case KindJoinRequestUpdated:
+		return email.Content{
+			Subject:  "Muster - a request changed",
+			Heading:  "Someone updated their request",
+			Body:     "A hiker in your waiting list changed their role, seats or guests. Have a look before you accept",
+			CTALabel: "View outing",
+			CTAURL:   d.outingURL(id),
+		}
 	}
 	logger.Warn(ctx, "contentFor: unhandled kind", "kind", u.Event.Kind)
 	return email.Content{

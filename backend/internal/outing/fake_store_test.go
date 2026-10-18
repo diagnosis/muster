@@ -151,6 +151,12 @@ func (f *fakeStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, st
 		}
 	}
 	sort.Slice(jrs, func(i, j int) bool {
+		if jrs[i].Role == RoleDriver && jrs[j].Role == RoleRider {
+			return true
+		}
+		if jrs[i].Role == RoleRider && jrs[j].Role == RoleDriver {
+			return false
+		}
 		if !jrs[i].RequestedAt.Equal(jrs[j].RequestedAt) {
 			return jrs[i].RequestedAt.Before(jrs[j].RequestedAt)
 		}
@@ -317,20 +323,26 @@ func (f *fakeStore) UnlikeComment(ctx context.Context, commentID, hikerID uuid.U
 	return nil
 }
 func (f *fakeStore) WaitingNames(ctx context.Context, outingID uuid.UUID) ([]ListedHiker, error) {
-	jr := []*JoinRequest{}
+	jrs := []*JoinRequest{}
 	for _, r := range f.requests {
 		if r.OutingID == outingID && r.Status == RequestStatusRequested {
-			jr = append(jr, r)
+			jrs = append(jrs, r)
 		}
 	}
-	sort.Slice(jr, func(i, j int) bool {
-		if !jr[i].RequestedAt.Equal(jr[j].RequestedAt) {
-			return jr[i].RequestedAt.Before(jr[j].RequestedAt)
+	sort.Slice(jrs, func(i, j int) bool {
+		if jrs[i].Role == RoleDriver && jrs[j].Role == RoleRider {
+			return true
 		}
-		return jr[i].ID.String() < jr[j].ID.String()
+		if jrs[i].Role == RoleRider && jrs[j].Role == RoleDriver {
+			return false
+		}
+		if !jrs[i].RequestedAt.Equal(jrs[j].RequestedAt) {
+			return jrs[i].RequestedAt.Before(jrs[j].RequestedAt)
+		}
+		return jrs[i].ID.String() < jrs[j].ID.String()
 	})
 	names := []ListedHiker{}
-	for _, r := range jr {
+	for _, r := range jrs {
 		if h, ok := f.hikers[r.HikerID]; ok {
 			names = append(names, ListedHiker{Name: h.Name})
 		}

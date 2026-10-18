@@ -1,7 +1,15 @@
 // e2e/fixtures/outingApiHelper.ts
 
 
-import type {CreateOutingInput, JoinRequest, JoinRequestInput, Message, Outing} from "./types.ts";
+import type {
+    CreateOutingInput,
+    JoinRequest,
+    JoinRequestInput,
+    JoinRequestViewResponse,
+    Message,
+    Outing,
+    RequestStatus
+} from "./types.ts";
 import {type Actor} from "./actor.ts";
 import {tag} from "./mint.ts";
 import {unwrap} from "./api.ts";
@@ -101,4 +109,9 @@ export async function withdraw(actor:Actor, outingId:string){
 export async function postMessage(actor:Actor,cid: string ,input:{body:string}){
     const res = await actor.api.post(`/api/conversations/${cid}/messages`, {data: input})
     return unwrap<Message>(res, 'post message')
+}
+
+export async function listOutingRequests(actor:Actor, outingId: string, status:RequestStatus){
+    const res = await  actor.api.get(`/api/outings/${outingId}/requests${status ? `?status=${status}` : ""}`)
+    return unwrap<JoinRequestViewResponse[]>(res, 'list requests')
 }

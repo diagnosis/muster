@@ -291,7 +291,7 @@ func (s *OutingStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, 
 		FROM join_requests jr
 		JOIN hikers h ON h.id = jr.hiker_id
 		WHERE jr.outing_id = $1 AND jr.status = $2
-	ORDER BY jr.requested_at, jr.id
+	ORDER BY jr.role = 'driver' DESC, jr.requested_at, jr.id
 `
 	rows, err := s.pool.Query(ctx, q, outingID, status)
 	if err != nil {
@@ -606,7 +606,7 @@ func (s *OutingStore) WaitingNames(ctx context.Context, outingID uuid.UUID) ([]o
 		SELECT h.name FROM hikers h 
 		    JOIN join_requests jr ON jr.hiker_id = h.id 
 		    WHERE jr.outing_id = $1 AND jr.status = 'requested'
-		ORDER BY jr.requested_at, jr.id
+		ORDER BY jr.role = 'driver' DESC, jr.requested_at, jr.id
 		    `
 
 	rows, err := s.pool.Query(ctx, q, outingID)

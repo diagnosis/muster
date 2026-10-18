@@ -3,8 +3,8 @@ import { asUser,BASE } from "../fixtures";
 import {
     accept,
     createOuting,
-    decline,
-    getDetail,
+    decline, editJoinRequest,
+    getDetail, getNotifications,
     listOutingRequests,
     removeMember,
     requestJoin, restoreRequest,
@@ -13,7 +13,7 @@ import {
 import {
     DetailResponse,
     JoinRequestResponse,
-    JoinRequestViewResponse,
+    JoinRequestViewResponse, type NotificationsResponse,
     OutingResponse,
     RestoreRequestResponse
 } from "../types";
@@ -265,7 +265,7 @@ test.describe("membership", ()=> {
         for (const m of members) {
             jrs.push(await unwrap(requestJoin(m.ctx, o.id), 201))
         }
-        const ids = (list: JoinRequestViewResponse[]) => list.map(r => r.id)
+
 
         let reqs = await unwrap<JoinRequestViewResponse[]>(listOutingRequests(host.ctx, o.id), 200)
         expect(ids(reqs)).toEqual(ids(jrs))
@@ -287,8 +287,86 @@ test.describe("membership", ()=> {
         expect(ids(reqs)).toEqual([jrs[4].id, jrs[5].id])
 
         await unwrap(listOutingRequests(host.ctx, o.id, "banana"), 400)
-    })
+    });
+  test("request order drivers first", async() => {
+      const host = await asUser(BASE)
+      const h1 = await asUser(BASE)
+      const h2 = await asUser(BASE)
+      const d1 = await asUser(BASE)
+      const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+      const j1 = await  unwrap<JoinRequestResponse>(requestJoin(h1.ctx, o.id), 201)
+      const j2 = await  unwrap<JoinRequestResponse>(requestJoin(h2.ctx, o.id), 201)
+      const j3 = await  unwrap<JoinRequestResponse>(requestJoin(d1.ctx, o.id, {role:"driver", seats_offered:2}), 201)
+
+      const reqs = await unwrap<JoinRequestViewResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+      expect(reqs.length).toBe(3)
+      expect(ids(reqs)).toEqual([j3.id, j1.id, j2.id])
+
+      await unwrap<JoinRequestResponse[]>(listOutingRequests(h2.ctx, o.id), 403)
+      const details = await unwrap<DetailResponse>(getDetail(h2.ctx, o.id), 200)
+      const names = details.waiting.map(w => w.name)
+      expect(names).toEqual([d1.user.name, h1.user.name, h2.user.name])
+
+  });
+  test("edit ask more", async() => {
+      const host = await asUser(BASE)
+      const h1 = await asUser(BASE)
+      const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+      const j1 = await  unwrap<JoinRequestResponse>(requestJoin(h1.ctx, o.id), 201)
+      const beforeRequestedAt = j1.requested_at
+
+      const updated = await unwrap<JoinRequestResponse>(editJoinRequest(h1.ctx, o.id, {guests:2}),200)
+      let n = await unwrap<NotificationsResponse>(await getNotifications(host.ctx), 200)
+      expect(n.unread_count).toBe(2)
+      expect(n.notifications.filter(x => x.kind === 'join_request_updated')).toHaveLength(1)
+      expect(Date.parse(updated.requested_at)).toBeGreaterThan(Date.parse(beforeRequestedAt))
+  });
+  test("remove guest will not update requested_at", async ()=>{
+      const host = await asUser(BASE)
+      const h1 = await asUser(BASE)
+      const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+      const j1 = await  unwrap<JoinRequestResponse>(requestJoin(h1.ctx, o.id, {guests:2}), 201)
+      const beforeRequestedAt = j1.requested_at
+
+      const updated = await unwrap<JoinRequestResponse>(editJoinRequest(h1.ctx, o.id, {guests:1}),200)
+      expect(Date.parse(updated.requested_at)).toBe(Date.parse(beforeRequestedAt))
+  });
+  test ("edit role to driver will move placement up", async ()=>{
+      const host = await asUser(BASE)
+      const h1 = await asUser(BASE)
+      const h2 = await asUser(BASE)
+      const futureDriver = await asUser(BASE)
+      const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+      const j1 = await  unwrap<JoinRequestResponse>(requestJoin(h1.ctx, o.id), 201)
+      const j2 = await  unwrap<JoinRequestResponse>(requestJoin(h2.ctx, o.id), 201)
+      const j3 = await  unwrap<JoinRequestResponse>(requestJoin(futureDriver.ctx, o.id), 201)
+      let reqs = await unwrap<JoinRequestViewResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+      expect(reqs.length).toBe(3)
+      expect(ids(reqs)).toEqual([j1.id, j2.id, j3.id])
+
+      await unwrap<JoinRequestResponse>(editJoinRequest(futureDriver.ctx, o.id, {role:'driver', seats_offered:2}), 200)
+      reqs = await unwrap<JoinRequestViewResponse[]>(listOutingRequests(host.ctx, o.id), 200)
+      expect(reqs.length).toBe(3)
+      expect(ids(reqs)).toEqual([j3.id, j1.id, j2.id])
+  });
+  test("accepted hiker attempt to edit -> 409", async()=>{
+      const host = await asUser(BASE)
+      const h1 = await asUser(BASE)
+      const o = await unwrap<OutingResponse>(createOuting(host.ctx, {max_size:10, host_seats:4}), 201)
+      const j1 = await  unwrap<JoinRequestResponse>(requestJoin(h1.ctx, o.id, {guests:2}), 201)
+      await unwrap(accept(host.ctx, j1.id), 200)
+      await unwrap<JoinRequestResponse>(editJoinRequest(h1.ctx, o.id, {note:'i can be driver'}), 409)
+  });
+  test("hiker with no request->404", async () => {
+      const host = await asUser(BASE)
+      const h1 = await asUser(BASE)
+      const alien = await asUser(BASE)
+      const o = await unwrap<OutingResponse>(createOuting(host.ctx, {max_size:10, host_seats:4}), 201)
+      await  unwrap<JoinRequestResponse>(requestJoin(h1.ctx, o.id, {guests:2}), 201)
+      await unwrap<JoinRequestResponse>(editJoinRequest(alien.ctx, o.id, {note:'i can be driver'}), 404)
+  })
 
 
 })
 
+const ids = (list: JoinRequestViewResponse[]) => list.map(r => r.id)
