@@ -326,3 +326,25 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 - **The rate limiter sees the whole test suite as one client.** Every Playwright worker comes from 127.0.0.1, so the suite crossed the burst threshold when it grew by one spec and five tests went flaky with 429s. Dev and CI run with high limits from env; prod keeps its own.
 - **`go install` for tools, never `go get -tool`.** The second one put air and its Hugo dependency tree into `go.mod`. The Makefile calls the binary by its GOPATH path, so JetBrains' `air` on PATH does not shadow it.
 - **A direct push to main is a tooling problem, not a discipline problem.** The branch ruleset refuses it now; a reverted commit and a cherry-pick were the cost of learning that.
+
+## Lessons from edit pending request
+
+- **Rule the feature in a spreadsheet before the first test.** Nine rules, nineteen rows, five sabotages; the table test was then transcription, and "driver → rider restamps" was settled on paper rather than argued over a red.
+- **A change asks for more or it doesn't.** More guests, fewer seats offered, or driver → rider asks the outing for more and goes to the back; everything else keeps its place. One `askMore` boolean and one `time.Now()`; the first draft had three stamps in three branches.
+- **Merge first, validate second.** `EditJoinRequest` overlays the non-nil fields onto the stored request and then runs the merged result through `validateJoinRequest`, the same function `RequestJoin` uses. Validating the input fields one by one gave a rider sending `seats_offered: 0` a 400 and let a driver who omitted `role` be treated as a rider.
+- **Validating before the merge validates yesterday.** The extracted validator was first called on the stored values and every inline check stayed in place to do the real work. Order of operations is the refactor.
+- **Pointer fields are a PATCH convention, not a free lunch.** `*int` tells 0 from absent, which the UI never needs today; the cost is a merge step and a `ptr` helper in tests. Kept because a future client that sends one field is plausible.
+- **Table rows spell out the full state.** `edit: in{guest: 1}` left `role` as `""` and "note only" was a guest change in disguise. Zero values mean zero; the row says every field.
+- **One hiker and one outing per row.** Eleven requests from one hiker on one outing is cross-row state; row 7 can pass because of row 3. `uuid.New()` inside `t.Run` costs nothing.
+- **Count assertions must fail in both directions.** `if notify && len != 1` never fails on the rows that exist to prove silence. Compare against the wanted count on every row, and check the kind when it is 1.
+- **Capture `before` as a value.** `before := *jr` cannot alias the store; comparing `jr.RequestedAt` to itself after the service mutates it is a test that cannot fail.
+- **A `!= nil` guard on an assertion means it only runs when the value exists.** The note check skipped the exact case it was written for (the note never saved, so `Note` stayed nil). Read the pointer into a plain string, then compare unconditionally.
+- **A fix without a red is indistinguishable from luck.** The note-only bug was fixed before the assertion existed; the sabotage (put `Update` back inside the `if changed`) was how the assertion earned its place.
+- **Inverted condition and inverted test shake hands.** `StartsAt.After(now)` for "has started" plus a test seeding `+1h` and expecting 409 were both wrong and both green. The time check has one home (`validateJoinRequest`); the test seeds a past start.
+- **Persist, then notify.** A notification sent before the write tells the host about an edit that may not have landed.
+- **The second query is the one you forget.** `ListJoinRequests` got drivers-first; `WaitingNames` kept time order, so the host's tabs and the page's chips disagreed. Found by asking which query the chips read; proven by the API spec reading both as different users, and by reverting the store line to see the names flip.
+- **Operand swap, second month running.** `(hikerID, requestID)` called as `(jr.ID, h1)` is a 404 that looks like a fake-store bug. Read the signature before the fake.
+- **The name said driver, the body didn't.** `d1` requested as a rider because the helper's default body was used. A variable name is not test data.
+- **Playwright's `exact: true` is the plural test.** `"bringing 1 guest"` as a substring passes against "1 guests"; the exact match is what proves the singular.
+- **A webServer exit code 2 is TypeScript.** Run `npx tsc -b` on its own and read the first error; Playwright hides it. And a bare `tsc` reads a different config than `tsc -b` — don't fix the code to please the wrong compiler.
+- **Say what you have before saying what to do with it.** "Not needed" meant two different things to two people and cost a revert. When the mentor says "use the existing one", ask which one.
