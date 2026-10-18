@@ -121,6 +121,8 @@ function notificationText(n: NotificationEvent): string {
         case 'dm_requested': return `${hikerName} sent a dm request`
         case 'dm_reopened': return  `${hikerName} reopened the dm`
         case 'dm_accepted': return  `${hikerName} accepted the dm`
+        case 'join_request_restored': return `Your request to join ${title} was restored`
+        case 'join_request_updated': return `Hiker updated their request to join ${title}`
         default:                       return 'You have a new notification'
     }
 }

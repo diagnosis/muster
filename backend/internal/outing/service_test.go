@@ -1488,8 +1488,8 @@ func Test_Detail_WaitingAndWithdrawnLists(t *testing.T) {
 	if len(d.Withdrawn) != 2 {
 		t.Fatalf("stranger : expected 2 members in withdrawn list got %d number of members in withdrawn list", len(d.Withdrawn))
 	}
-	if d.Waiting[0].Name != "hale" || d.Waiting[1].Name != "jale" {
-		t.Errorf("stranger: waiting order, want [hale jale] got %v", d.Waiting)
+	if d.Waiting[0].Name != "jale" || d.Waiting[1].Name != "hale" {
+		t.Errorf("stranger: waiting order, want [jale hale] got %v", d.Waiting)
 	}
 	if d.Withdrawn[0].Name != "kalu" || d.Withdrawn[1].Name != "haluk" {
 		t.Errorf("stranger: withdrawn order, want [kalu haluk] got %v", d.Withdrawn)
@@ -1505,8 +1505,8 @@ func Test_Detail_WaitingAndWithdrawnLists(t *testing.T) {
 	if len(d.Withdrawn) != 2 {
 		t.Fatalf("host : expected 2 members in withdrawn list got %d number of members in withdrawn list", len(d.Withdrawn))
 	}
-	if d.Waiting[0].Name != "hale" || d.Waiting[1].Name != "jale" {
-		t.Errorf("host: waiting order, want [hale jale] got %v", d.Waiting)
+	if d.Waiting[0].Name != "jale" || d.Waiting[1].Name != "hale" {
+		t.Errorf("host: waiting order, want [jale hale] got %v", d.Waiting)
 	}
 	if d.Withdrawn[0].Name != "kalu" || d.Withdrawn[1].Name != "haluk" {
 		t.Errorf("host: withdrawn order, want [kalu haluk] got %v", d.Withdrawn)
@@ -1522,8 +1522,8 @@ func Test_Detail_WaitingAndWithdrawnLists(t *testing.T) {
 	if len(d.Withdrawn) != 2 {
 		t.Fatalf("member : expected 2 members in withdrawn list got %d number of members in withdrawn list", len(d.Withdrawn))
 	}
-	if d.Waiting[0].Name != "hale" || d.Waiting[1].Name != "jale" {
-		t.Errorf("member: waiting order, want [hale jale] got %v", d.Waiting)
+	if d.Waiting[0].Name != "jale" || d.Waiting[1].Name != "hale" {
+		t.Errorf("member: waiting order, want [jale hale] got %v", d.Waiting)
 	}
 	if d.Withdrawn[0].Name != "kalu" || d.Withdrawn[1].Name != "haluk" {
 		t.Errorf("member: withdrawn order, want [kalu haluk] got %v", d.Withdrawn)

@@ -275,6 +275,10 @@ export function OutingDetailPage() {
         </div>
     )
 }
-function requestSummary(req:JoinRequest){
-    return `You asked as a ${req.role}${req.role==='driver'?` with ${req.seats_offered} ${req.seats_offered===1?"seat":"seats"}`:''}, bringing ${req.guests===0?'no':req.guests} ${req.guests===1?"guest":"guests"}`
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+function requestSummary(req: JoinRequest): string {
+    const seats  = req.role === 'driver' ? ` with ${plural(req.seats_offered, 'seat')}` : ''
+    const guests = req.guests === 0 ? 'no guests' : plural(req.guests, 'guest')
+    return `You asked as a ${req.role}${seats}, bringing ${guests}`
 }

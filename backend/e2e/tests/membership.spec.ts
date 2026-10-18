@@ -301,6 +301,12 @@ test.describe("membership", ()=> {
       const reqs = await unwrap<JoinRequestViewResponse[]>(listOutingRequests(host.ctx, o.id), 200)
       expect(reqs.length).toBe(3)
       expect(ids(reqs)).toEqual([j3.id, j1.id, j2.id])
+
+      await unwrap<JoinRequestResponse[]>(listOutingRequests(h2.ctx, o.id), 403)
+      const details = await unwrap<DetailResponse>(getDetail(h2.ctx, o.id), 200)
+      const names = details.waiting.map(w => w.name)
+      expect(names).toEqual([d1.user.name, h1.user.name, h2.user.name])
+
   });
   test("edit ask more", async() => {
       const host = await asUser(BASE)
