@@ -28,6 +28,7 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 | Request history and restore (PR #45) | the host's requests list takes `?status=` (requested, declined, removed; anything else is 400); declined and removed requests can be restored to the queue at their original `requested_at`, host-only and only before the outing starts; the hiker gets a `join_request_restored` notification; the outing page shows Waiting, Declined and Removed tabs with a Restore button on history rows |
 | Change password (PR #46) | the profile page sends the signed-in user the existing reset link; there is no in-app password form. Completing a reset now revokes every refresh token on every platform, so no session that knew the old password survives. Dev: air live-reload (`make dev`); `main` requires a pull request |
 | Edit pending request (PR #47) | `PATCH /api/outings/{id}/requests/me` lets a hiker change role, seats, guests or note on a pending request; nil fields keep their value and the merged result passes the same validation as a new request. An edit that asks the outing for more — more guests, fewer seats offered, or driver → rider — moves the request to the back (`requested_at = now`); anything else keeps its place. The host gets a `join_request_updated` notification on role, seats or guests changes; note-only edits are silent. Drivers now lead the queue everywhere: both the host's list and the outing page's waiting chips order by role, then `requested_at`. The outing page shows what you asked for, an Edit button, and a live warning when the change would move you back |
+| Passwordless login (PR #48) | A second door on the login page: `POST /api/auth/login-code` mails a six-digit code, `POST /api/auth/login-code/verify` exchanges it for the same session a password login mints. The request endpoint answers 200 whether or not the email exists and whether or not a code was sent (30 s resend window), so the response reveals nothing. A code lives 10 minutes, dies on the fifth wrong try, is burned by a resend, and works once; every rejection is the same 401. An unverified account can ask for a code and is marked verified on success, since the code proves the inbox. Codes are hashed with the hiker id so two hikers drawing the same six digits cannot collide on the unique hash column. Login page: password → request → verify modes with a countdown on resend; one browser spec plants a code through the DB helper |
 
 ---
 
@@ -35,12 +36,11 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 
 In this order. Items can be added.
 
-1. **Passwordless login with an emailed code.**
-2. **Waiting list uplift on the outing page.** Show three names and a count, with the full ordered list behind a tap; make the viewer's own position obvious.
-3. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
-4. **Pagination.** Browse first, with keyset pagination. Then chat, then the Past tab. Server-side phase filtering comes with it.
-5. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
-6. **One real hike organized through Muster.** v1 is done when boots hit dirt.
+1. **Waiting list uplift on the outing page.** Show three names and a count, with the full ordered list behind a tap; make the viewer's own position obvious.
+2. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
+3. **Pagination.** Browse first, with keyset pagination. Then chat, then the Past tab. Server-side phase filtering comes with it.
+4. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
+5. **One real hike organized through Muster.** v1 is done when boots hit dirt.
 
 Also open from the original v1 list: `capacity_state` served by the API, so the client stops deriving it.
 
@@ -85,6 +85,14 @@ Also open from the original v1 list: `capacity_state` served by the API, so the 
 - Bare `tsc` in `frontend/` reports ~98 narrowing errors; `tsc -b` is clean. Find out which config the bare command reads. A frontend `make check` (tsc -b, eslint, build) would make this moot.
 - Two `uuid.UUID` parameters side by side (`hikerID, requestID`) were swapped twice this month; typed ids (`type RequestID uuid.UUID`) would make it a compile error.
 - Reset-password page should clear the access token and query cache on success, since every session is revoked.
+- Login handlers hardcode `PlatformWeb`; the mobile client will need platform in the body or a header, for password and code login alike.
+- `"invalid platform"` is written four times in `hiker/service.go`; one `validatePlatform` helper.
+- The login page carries the 30 s resend window and "10 minutes" as literals mirrored from the server; a `retry_after` and `expires_in` on the request response would give them one home.
+- `mintLoginCode` and the sha256 mirror of `authtoken.hashCode` exist twice, in `backend/e2e/db.ts` and `frontend/e2e/fixtures/db.ts`; the browser suite should import the API suite's helper.
+- Password field: a show/hide eye toggle on the login and signup forms.
+- A `GET /api/dev/login-code/{hiker}` route in dev/test would let specs read a real minted code instead of planting one; the hash mirror then goes away.
+- "could not delete refresh tokens" 500 shows up as a flake under the full browser suite (117 specs, parallel logins) and never in 60 isolated runs; check pool size and contention on the `refresh_tokens` delete.
+- Two `authtoken` fakes (`authtoken/fake_store_test.go` keyed by id, `hiker/fake_token_store_test.go` keyed by hash); a shared `authtokentest` package was tried and dropped.
 
 ---
 
