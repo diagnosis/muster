@@ -1,7 +1,17 @@
 import { test, expect } from '@playwright/test';
 import {asUnverifiedUser, asUser, BASE} from '../fixtures'
 import {unwrap, unwrapError} from "../envelope";
-import {forgotPassword, getMe, login, logout, refresh, resetPassword, signup, verifyEmail} from "../api";
+import {
+  forgotPassword,
+  getMe,
+  login,
+  logout,
+  refresh,
+  requestLoginCode,
+  resetPassword,
+  signup,
+  verifyEmail, verifyLoginCode
+} from "../api";
 import {
   ApiErrorBody,
   CODE_EMAIL_NOT_VERIFIED, FORGOT_SENTENCE, ForgotPasswordResponse,
@@ -9,7 +19,7 @@ import {
   RegisterRequest, ResetPasswordResponse,
   VerifyEmailResponse
 } from "../types";
-import {mintVerificationToken} from "../db";
+import {liveLoginCodeAttempts, mintLoginCode, mintVerificationToken} from "../db";
 
 
 
@@ -193,6 +203,44 @@ test.describe('auth', ()=>{
     await unwrap(refresh(h1.ctx), 401)
     await unwrap(refresh(h2.ctx), 200)
     await unwrap(login(h1.ctx, {email:h1.user.email, password:"Secure123"}), 200)
+
+  })
+  test("login code: happy", async() => {
+    const hiker = await asUser(BASE)
+    const code = await mintLoginCode(hiker.id)
+    await unwrap(verifyLoginCode(hiker.ctx, {email:hiker.user.email, code:code}), 200)
+    await unwrap<MeResponse>(getMe(hiker.ctx), 200)
+  })
+  test("login code : unknow email", async()=>{
+    const hiker = await asUser(BASE)
+    await unwrap(requestLoginCode(hiker.ctx, {email:"unknown@gmail.com"}), 200)
+  })
+  test("login code : first wrong code then right code", async ()=>{
+    const hiker = await asUser(BASE)
+    const code = await mintLoginCode(hiker.id)
+    await unwrap(verifyLoginCode(hiker.ctx, {email:hiker.user.email, code:"123456"}), 401)
+    expect(await liveLoginCodeAttempts(hiker.id)).toBe(1)
+    await unwrap(verifyLoginCode(hiker.ctx, {email:hiker.user.email, code:code}), 200)
+    await unwrap<MeResponse>(getMe(hiker.ctx), 200)
+  })
+  test("login code : unverified account", async () => {
+    const hiker = await asUnverifiedUser(BASE)
+    const code = await mintLoginCode(hiker.id)
+    await unwrap(verifyLoginCode(hiker.ctx, {email:hiker.user.email, code:code}), 200)
+    const me = await unwrap<MeResponse>(getMe(hiker.ctx), 200)
+    expect(me.verified_at).toBeTruthy()
+    await unwrap(logout(hiker.ctx), 200)
+    await unwrap(login(hiker.ctx, {email:hiker.user.email, password:hiker.user.password}), 200)
+    await unwrap<MeResponse>(getMe(hiker.ctx), 200)
+  })
+  test("login code: newest live code wins, and a code works once", async () => {
+    const hiker = await asUnverifiedUser(BASE)
+    const code1 = await mintLoginCode(hiker.id)
+    const code2 = await mintLoginCode(hiker.id)
+    await unwrap(verifyLoginCode(hiker.ctx, {email:hiker.user.email, code:code1}), 401)
+    expect(await liveLoginCodeAttempts(hiker.id)).toBe(1)
+    await unwrap(verifyLoginCode(hiker.ctx, {email:hiker.user.email, code:code2}), 200)
+    await unwrap(verifyLoginCode(hiker.ctx, {email:hiker.user.email, code:code2}), 401)
 
   })
 

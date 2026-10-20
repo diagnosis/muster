@@ -34,4 +34,5 @@ type Token struct {
 	CreatedAt time.Time
 	ExpiresAt time.Time
 	UsedAt    *time.Time
+	Attempts  int
 }

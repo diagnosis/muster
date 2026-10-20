@@ -244,13 +244,13 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 }
 
-type forgotPasswordInput struct {
+type emailInput struct {
 	Email string `json:"email"`
 }
 
 func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	correlationID, _ := logger.GetCorrelationID(r.Context())
-	var in forgotPasswordInput
+	var in emailInput
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	err := dec.Decode(&in)
@@ -309,6 +309,67 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	responder.JSON(w, http.StatusOK, map[string]string{
 		"message": "Password was changed successfully!",
 	}, correlationID)
+}
+
+func (s *Server) handleRequestLoginCode(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	var in emailInput
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&in)
+	if err != nil {
+		responder.Error(w, apperr.BadRequest("invalid request body", "json decode failed", err), correlationID)
+		return
+	}
+
+	email := strings.TrimSpace(in.Email)
+	if email == "" {
+		responder.Error(w, apperr.BadRequest("invalid email", "email cannot be empty"), correlationID)
+		return
+	}
+
+	err = s.hikers.RequestLoginCode(r.Context(), email)
+	if err != nil {
+		logger.Warn(r.Context(), "failed to generate login code", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	responder.JSON(w, http.StatusOK, map[string]string{
+		"message": "If that email is registered, a login code is on its way.",
+	}, correlationID)
+
+}
+
+type loginWithCodeInput struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
+func (s *Server) handleVerifyLoginCode(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	var in loginWithCodeInput
+	if err := decodeJSON(r, &in); err != nil {
+		responder.Error(w, apperr.BadRequest("invalid request body", "json decode failed", err), correlationID)
+		return
+	}
+	email := strings.TrimSpace(in.Email)
+	if email == "" {
+		responder.Error(w, apperr.BadRequest("invalid email", "email cannot be empty"), correlationID)
+		return
+	}
+	code := strings.TrimSpace(in.Code)
+	if code == "" {
+		responder.Error(w, apperr.BadRequest("invalid code", "code cannot be empty"), correlationID)
+		return
+	}
+
+	sess, err := s.hikers.LoginWithCode(r.Context(), email, code, hiker.PlatformWeb)
+	if err != nil {
+		responder.Error(w, err, correlationID)
+		return
+	}
+	s.setSessionCookies(w, sess)
+	responder.JSON(w, http.StatusOK, sess.Hiker, correlationID)
 }
 
 func (s *Server) setSessionCookies(w http.ResponseWriter, sess *hiker.Session) {

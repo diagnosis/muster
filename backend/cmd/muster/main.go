@@ -81,14 +81,18 @@ func run() error {
 		m = mailer.NewResendMailer(cfg.Resend.APIKey, cfg.Resend.EmailFrom)
 	}
 	hikerServiceConfig := hiker.ServiceConfig{
-		Store:     hikerStore,
-		Token:     tokenService,
-		Mail:      m,
-		JWT:       signer,
-		BaseURL:   cfg.App.BaseURL,
-		VerifyTTL: 24 * time.Hour,
+		Store:        hikerStore,
+		Token:        tokenService,
+		Mail:         m,
+		JWT:          signer,
+		BaseURL:      cfg.App.BaseURL,
+		VerifyTTL:    24 * time.Hour,
+		LoginCodeTTL: cfg.App.LoginCodeTTL,
 	}
-	hikers := hiker.NewService(hikerServiceConfig)
+	hikers, err := hiker.NewService(hikerServiceConfig)
+	if err != nil {
+		return fmt.Errorf("hiker service error:%v", err)
+	}
 
 	dispatcher := notification.NewDispatcher(notificationStore, m, cfg.App.DispatcherInterval, cfg.App.BaseURL)
 	hub := events.NewHub()
