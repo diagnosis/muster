@@ -467,7 +467,6 @@ func (s *Service) RequestLoginCode(ctx context.Context, userEmail string) error 
 	if err != nil {
 		return err
 	}
-
 	content := email.Content{
 		Subject: "Your Muster login code",
 		Heading: "Your login code",

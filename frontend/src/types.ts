@@ -159,6 +159,9 @@ export interface ResendEmailResponse{
 export interface ForgotPasswordResponse{
     message: string
 }
+export interface RequestLoginCodeResponse{
+    message: string
+}
 
 export interface ResetPasswordResponse{
     message: string
