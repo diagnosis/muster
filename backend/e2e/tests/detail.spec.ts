@@ -61,12 +61,36 @@ test.describe("detail", ()=>{
 
         const stranger = await asUser(BASE)
         const detail = await unwrap<DetailResponse>(getDetail(stranger.ctx, o.id), 200)
-        expect(detail.waiting).toEqual([{ name: m1.user.name }, { name: m2.user.name }])
-        expect(detail.withdrawn).toEqual([{ name: m3.user.name }])
+        expect(detail.waiting).toMatchObject([{name: m1.user.name, role:'rider' }, { name: m2.user.name }])
+        expect(detail.withdrawn).toMatchObject([{ name: m3.user.name }])
 
         const ctxAnonymous = await request.newContext({baseURL:BASE})
         const anon = await unwrap<DetailResponse>(getDetail(ctxAnonymous, o.id), 200)
         expect(anon.waiting).toEqual([])
         expect(anon.withdrawn).toEqual([])
+
+        const m1Views = await unwrap<DetailResponse>(getDetail(m1.ctx, o.id), 200)
+        expect(m1Views.waiting[0].is_me).toBe(true)
+        expect(m1Views.waiting[1].is_me).toBe(false)
+    });
+
+    test("waiting rows carry role, seats, guests and is_me", async () => {
+        const host = await asUser(BASE)
+        const d1 = await asUser(BASE)
+        const r1 = await asUser(BASE)
+
+        const o = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+        // rider asks first, driver second — driver still leads the queue
+        await unwrap(requestJoin(r1.ctx, o.id, { role: 'rider', guests: 2 }), 201)
+        await unwrap(requestJoin(d1.ctx, o.id, { role: 'driver', seats_offered: 3 }), 201)
+
+        const asRider = await unwrap<DetailResponse>(getDetail(r1.ctx, o.id), 200)
+        expect(asRider.waiting).toEqual([
+            { name: d1.user.name, role: 'driver', seats_offered: 3, guests: 0, is_me: false },
+            { name: r1.user.name, role: 'rider',  seats_offered: 0, guests: 2, is_me: true },
+        ])
+
+        const asHost = await unwrap<DetailResponse>(getDetail(host.ctx, o.id), 200)
+        expect(asHost.waiting.map(w => w.is_me)).toEqual([false, false])
     })
 })

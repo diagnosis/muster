@@ -603,7 +603,7 @@ func (s *OutingStore) HostMember(ctx context.Context, hikerID uuid.UUID) (*outin
 // WaitingNames returns the names of hikers with a pending request, in queue order.
 func (s *OutingStore) WaitingNames(ctx context.Context, outingID uuid.UUID) ([]outing.ListedHiker, error) {
 	q := `
-		SELECT h.name FROM hikers h 
+		SELECT jr.hiker_id, h.name, jr.role, jr.seats_offered, jr.guests FROM hikers h 
 		    JOIN join_requests jr ON jr.hiker_id = h.id 
 		    WHERE jr.outing_id = $1 AND jr.status = 'requested'
 		ORDER BY jr.role = 'driver' DESC, jr.requested_at, jr.id
@@ -617,8 +617,8 @@ func (s *OutingStore) WaitingNames(ctx context.Context, outingID uuid.UUID) ([]o
 
 	listedHikers := []outing.ListedHiker{}
 	for rows.Next() {
-		lh := outing.ListedHiker{}
-		err = rows.Scan(&lh.Name)
+		var lh outing.ListedHiker
+		lh, err = scanListed(rows)
 		if err != nil {
 			return nil, apperr.Database("failed to load waiting list", "failed to scan hiker name", err)
 		}
@@ -634,7 +634,7 @@ func (s *OutingStore) WaitingNames(ctx context.Context, outingID uuid.UUID) ([]o
 // WithdrawnNames returns the names of hikers who withdrew, most recent first.
 func (s *OutingStore) WithdrawnNames(ctx context.Context, outingID uuid.UUID) ([]outing.ListedHiker, error) {
 	q := `
-		SELECT h.name FROM hikers h 
+		SELECT jr.hiker_id, h.name, jr.role, jr.seats_offered, jr.guests FROM hikers h 
 		    JOIN join_requests jr ON jr.hiker_id = h.id
 		WHERE jr.outing_id = $1 AND jr.status = 'withdrawn'
 		ORDER BY jr.updated_at DESC, jr.id
@@ -647,8 +647,8 @@ func (s *OutingStore) WithdrawnNames(ctx context.Context, outingID uuid.UUID) ([
 
 	listedHikers := []outing.ListedHiker{}
 	for rows.Next() {
-		lh := outing.ListedHiker{}
-		err = rows.Scan(&lh.Name)
+		var lh outing.ListedHiker
+		lh, err = scanListed(rows)
 		if err != nil {
 			return nil, apperr.Database("failed to load withdrawn list", "failed to scan hiker name", err)
 		}
@@ -659,6 +659,18 @@ func (s *OutingStore) WithdrawnNames(ctx context.Context, outingID uuid.UUID) ([
 	}
 
 	return listedHikers, nil
+}
+
+func scanListed(row pgx.Row) (outing.ListedHiker, error) {
+	l := outing.ListedHiker{}
+	err := row.Scan(
+		&l.HikerID,
+		&l.Name,
+		&l.Role,
+		&l.SeatsOffered,
+		&l.Guests,
+	)
+	return l, err
 }
 
 func scanMember(row pgx.Row) (*outing.Member, error) {

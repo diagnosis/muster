@@ -81,6 +81,10 @@ export interface MemberResponse {
 
 export interface ListHiker {
    name:string
+    role:'driver'|'rider'
+    seats_offered: number
+    guests: number
+    is_me: boolean
 }
 
 export interface DetailResponse {

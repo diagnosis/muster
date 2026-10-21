@@ -751,6 +751,14 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 		}
 		detail.Roster = roster
 	}
+	if viewerID != nil {
+		for i := range detail.Waiting {
+			detail.Waiting[i].IsMe = detail.Waiting[i].HikerID == *viewerID
+		}
+		for i := range detail.Withdrawn {
+			detail.Withdrawn[i].IsMe = detail.Withdrawn[i].HikerID == *viewerID
+		}
+	}
 
 	return detail, nil
 }
