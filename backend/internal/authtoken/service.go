@@ -155,8 +155,8 @@ func (s *Service) ConsumeCode(ctx context.Context, hikerID uuid.UUID, code strin
 	if tok.ExpiresAt.Before(s.now()) {
 		return ErrBadCode
 	}
-	isCodeOk := secure.VerifyOTP(hikerID.String()+code, tok.Hash)
-	if !isCodeOk {
+
+	if !verifyCode(hikerID, code, tok.Hash) {
 		if err = s.store.IncrementAttempts(ctx, tok.ID); err != nil {
 			return err
 		}
@@ -176,4 +176,8 @@ func (s *Service) ConsumeCode(ctx context.Context, hikerID uuid.UUID, code strin
 
 func hashCode(hikerID uuid.UUID, raw string) string {
 	return secure.HashOTP(hikerID.String() + raw)
+}
+
+func verifyCode(hikerID uuid.UUID, code, hash string) bool {
+	return secure.VerifyOTP(hikerID.String()+code, hash)
 }

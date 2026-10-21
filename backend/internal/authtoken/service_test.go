@@ -284,28 +284,30 @@ func Test_RequestCodesBackToBack(t *testing.T) {
 	f := newFakeStore()
 	svc := NewService(f)
 	hiker := uuid.New()
-	clock := time.Now()
-	svc.now = func() time.Time {
-		return clock
-	}
+	mintedAt := time.Now()
+	clock := mintedAt
+	svc.now = func() time.Time { return clock }
+
 	_, err := svc.MintCode(context.Background(), hiker, 10*time.Minute)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-	clock = clock.Add(25 * time.Second)
+
+	clock = mintedAt.Add(25 * time.Second) // inside the window
 	_, err = svc.MintCode(context.Background(), hiker, 10*time.Minute)
 	if !errors.Is(err, ErrTooSoon) {
-		t.Errorf("expected to get ErrTooSoon got %v", err)
+		t.Errorf("expected ErrTooSoon got %v", err)
 	}
 	if len(f.tokens) != 1 {
-		t.Errorf("expected 1 token got %v", len(f.tokens))
+		t.Errorf("expected 1 token got %d", len(f.tokens))
 	}
-	clock = clock.Add(31 * time.Second)
+
+	clock = mintedAt.Add(resendWindow + time.Second) // one past it
 	_, err = svc.MintCode(context.Background(), hiker, 10*time.Minute)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
 	if len(f.tokens) != 2 {
-		t.Errorf("expected 1 token got %v", len(f.tokens))
+		t.Errorf("expected 2 tokens got %d", len(f.tokens))
 	}
 }
