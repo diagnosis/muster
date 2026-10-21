@@ -83,7 +83,7 @@ func (s *AuthTokenStore) LiveByHiker(ctx context.Context, hikerID uuid.UUID, pur
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperr.NotFound("token not found", "token not found")
 		}
-		return nil, apperr.Database("failed get live token", "failed to scan token")
+		return nil, apperr.Database("failed get live token", "failed to scan token", err)
 	}
 	return t, nil
 

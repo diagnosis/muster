@@ -101,7 +101,7 @@ func (s *Service) MintCode(ctx context.Context, hikerID uuid.UUID, ttl time.Dura
 		}
 
 	} else {
-		if tok.CreatedAt.After(s.now().Add(-30 * time.Second)) {
+		if tok.CreatedAt.After(s.now().Add(-resendWindow)) {
 			return "", ErrTooSoon
 		}
 		if err = s.store.MarkUsed(ctx, tok.ID); err != nil {
@@ -132,6 +132,9 @@ func (s *Service) MintCode(ctx context.Context, hikerID uuid.UUID, ttl time.Dura
 }
 
 const maxCodeAttempts = 5
+
+// resendWindow is how long a hiker must wait after a login code before asking for another.
+const resendWindow = 30 * time.Second
 
 // ErrBadCode is the single answer for every rejected login code — missing,
 // expired, wrong, or burned — so a caller cannot tell which.

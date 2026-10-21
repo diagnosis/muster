@@ -292,7 +292,7 @@ func Test_RequestCodesBackToBack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-	clock = time.Now().Add(25 * time.Second)
+	clock = clock.Add(25 * time.Second)
 	_, err = svc.MintCode(context.Background(), hiker, 10*time.Minute)
 	if !errors.Is(err, ErrTooSoon) {
 		t.Errorf("expected to get ErrTooSoon got %v", err)
@@ -300,7 +300,7 @@ func Test_RequestCodesBackToBack(t *testing.T) {
 	if len(f.tokens) != 1 {
 		t.Errorf("expected 1 token got %v", len(f.tokens))
 	}
-	clock = time.Now().Add(31 * time.Second)
+	clock = clock.Add(31 * time.Second)
 	_, err = svc.MintCode(context.Background(), hiker, 10*time.Minute)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
