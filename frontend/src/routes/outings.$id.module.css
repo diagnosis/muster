@@ -238,3 +238,27 @@
     line-height: var(--leading-label);
     color: var(--color-text-muted);
 }
+
+/* waiting summary: stacked avatars, names, See all */
+.waitingSummary{
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+.avatarStack{
+    display: flex;
+}
+.avatarStack .chipAvatar + .chipAvatar{
+    margin-left: -8px;
+}
+.avatarStack .chipAvatar{
+    border: 2px solid var(--surface-raised);
+}
+.waitingNames{
+    margin: 0;
+    font-size: var(--text-label);
+}
+.waitingSummary .btn-outline{
+    margin-left: auto;
+}

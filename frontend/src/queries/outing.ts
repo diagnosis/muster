@@ -122,3 +122,39 @@ export function useEditMyRequestMutation(outingId:string){
 
     })
 }
+
+export function useWithdrawMutation(id:string){
+    const qc = useQueryClient()
+    return useMutation({
+        mutationFn: async () => {
+            const res = await apiClient.del(`/api/outings/${id}/requests/me`)
+            if (res.ok){
+                return res.data
+            }
+            throw new ApiRequestError(res.error, res.httpStatus)
+        },
+        onSuccess : () => {
+            qc.invalidateQueries({queryKey:['outing', id]})
+            qc.invalidateQueries({queryKey: ['my-outings']})
+            qc.invalidateQueries({queryKey:['outing-join-requests', id]})
+        }
+    })
+}
+
+export function useRemoveMemberMutation(id:string){
+    const qc = useQueryClient()
+    return useMutation({
+        mutationFn: async(requestId: string) => {
+            const res = await apiClient.del(`/api/requests/${requestId}/member`)
+            if (res.ok){
+                return res.data
+            }
+            throw new ApiRequestError(res.error, res.httpStatus)
+        },
+        onSuccess: () =>{
+            qc.invalidateQueries({queryKey:['outing', id]})
+            qc.invalidateQueries({queryKey: ['my-outings']})
+            qc.invalidateQueries({queryKey:['outing-join-requests', id]})
+        }
+    })
+}
