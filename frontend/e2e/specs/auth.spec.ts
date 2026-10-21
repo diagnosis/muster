@@ -151,6 +151,7 @@ test.describe("auth flow", ()=> {
         await page.getByRole('textbox', {name:'email'}).fill(hiker.user.email)
         await page.getByRole('button', {name:'Send me a code'}).click()
         await expect(page.getByRole('heading', {name:'Check your email'})).toBeVisible()
+        await expect(page.getByRole('button', {name: /Send again/})).toBeDisabled()
         const code = await mintLoginCode(hiker.hikerID)
         await page.getByRole('textbox', {name:'Six-digit code'}).fill(code)
         await page.getByRole('button', {name: 'Log in'}).click()

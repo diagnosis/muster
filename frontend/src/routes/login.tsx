@@ -12,6 +12,7 @@ import {
     useLoginWithCodeMutation,
     useResendMutation, useRequestLoginCodeMutation
 } from "@/queries/auth.ts";
+import {PasswordInput} from "@/components/PasswordInput.tsx";
 
 export const Route = createFileRoute('/login')({
     beforeLoad: async ({context}) => requireGuest(context.queryClient),
@@ -52,7 +53,7 @@ export function LoginPage(){
                 return loginWithPasswordMutation.mutate({email, password}, {onSuccess: ()=> navigate({to:'/'})});
             }
             case "request":{
-                return requestLoginCodeMutation.mutate({email}, {onSuccess: ()=>setMode('verify')})
+                return sendCode(() => setMode('verify'))
             }
             case "verify": {
                 return loginWithCodeMutation.mutate({email, code}, {onSuccess: ()=> navigate({to:'/'})})
@@ -82,11 +83,7 @@ export function LoginPage(){
 
             {mode === 'password' &&
                 <label className={styles.label}>Password
-                    <input
-                        type="password"
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                    />
+                    <PasswordInput value={password} onChange={e => setPassword(e.target.value)}/>
                 </label>}
 
             {mode === 'verify' &&

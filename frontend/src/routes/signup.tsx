@@ -7,6 +7,7 @@ import type {Experience, MeResponse, RegisterRequest} from "@/types.ts";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import styles from "@/routes/form.module.css"
 import {requireGuest} from "@/queries.ts";
+import {PasswordInput} from "@/components/PasswordInput.tsx";
 
 export const Route = createFileRoute('/signup')({
     beforeLoad: async ({context}) => requireGuest(context.queryClient),
@@ -65,11 +66,7 @@ export function SignupPage() {
             {details?.email && <p className={styles.fieldError}>{details.email}</p>}
             <label className={styles.label}>
                 Password
-                <input
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                />
+                <PasswordInput value={password} onChange={e => setPassword(e.target.value)}/>
             </label>
             {details?.password && <p className={styles.fieldError}>{details.password}</p>}
             <fieldset className={styles.fieldset}>
