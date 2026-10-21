@@ -27,6 +27,23 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: backend } }
+    # Throwaway Postgres beside the job; nothing in CI touches the hosted DB.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: muster
+          POSTGRES_PASSWORD: muster
+          POSTGRES_DB: muster
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U muster"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # One home: every step below inherits this.
+      DATABASE_URL: postgres://muster:muster@localhost:5432/muster?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -35,22 +52,11 @@ jobs:
         with: { node-version: 'lts/*' }
       - run: go install github.com/pressly/goose/v3/cmd/goose@latest
 
-      - name: Create Neon branch
-        id: neon
-        uses: neondatabase/create-branch-action@v5
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          parent: main
-          branch_name: ci-${{ github.run_id }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-          username: neondb_owner
-
       - name: Migrate
-        run: goose -dir ./migrations postgres "${{ steps.neon.outputs.db_url_with_pooler }}" up
+        run: goose -dir ./migrations postgres "$DATABASE_URL" up
 
       - name: Boot server
         env:
-          DATABASE_URL: ${{ steps.neon.outputs.db_url_with_pooler }}
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           APP_DISPATCHER_INTERVAL: 3s
@@ -70,8 +76,6 @@ jobs:
         if: inputs.suite != 'frontend'
         env:
           BASE_URL: "http://localhost:8088"
-          DATABASE_URL: ${{ steps.neon.outputs.db_url_with_pooler }}
-
         run: make e2e
 
       - name: Install e2e frontend deps
@@ -101,8 +105,6 @@ jobs:
         if: inputs.suite != 'backend'
         run: npm run e2e
         working-directory: frontend
-        env:
-          DATABASE_URL: ${{ steps.neon.outputs.db_url_with_pooler }}
 
       - name: Upload Playwright report
         if: failure()
@@ -113,11 +115,3 @@ jobs:
             frontend/playwright-report/
             frontend/test-results/
           retention-days: 7
-
-      - name: Delete Neon branch
-        if: always()
-        uses: neondatabase/delete-branch-action@v3
-        with:
-          project_id: ${{ secrets.NEON_PROJECT_ID }}
-          branch: ci-${{ github.run_id }}
-          api_key: ${{ secrets.NEON_API_KEY }}

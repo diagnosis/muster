@@ -168,3 +168,8 @@ export const restoreRequest = (ctx: APIRequestContext, jrid:string) =>
     ctx.post(`/api/requests/${jrid}/restore`)
 export const editJoinRequest = (ctx: APIRequestContext, outingID:string, edit:EditJoinRequestInput)=>
     ctx.patch(`/api/outings/${outingID}/requests/me`, {data:edit})
+
+export const verifyLoginCode = (ctx:APIRequestContext,input:{email:string, code:string}) =>
+    ctx.post('/api/auth/login-code/verify', {data:input})
+export const requestLoginCode = (ctx:APIRequestContext, input:{email:string}) =>
+    ctx.post('/api/auth/login-code', {data:input})

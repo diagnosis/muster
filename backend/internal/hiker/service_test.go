@@ -46,14 +46,18 @@ func newTestService(t *testing.T, fm *fakeMailer) (*Service, *fakeStore, *tokenF
 	tf := newTokenFakeStore()
 	ts := authtoken.NewService(tf)
 	cfg := ServiceConfig{
-		Store:     f,
-		Token:     ts,
-		Mail:      fm,
-		JWT:       jwt,
-		BaseURL:   "http://test.com",
-		VerifyTTL: 24 * time.Hour,
+		Store:        f,
+		Token:        ts,
+		Mail:         fm,
+		JWT:          jwt,
+		BaseURL:      "http://test.com",
+		VerifyTTL:    24 * time.Hour,
+		LoginCodeTTL: 10 * time.Minute,
 	}
-	svc := NewService(cfg)
+	svc, err := NewService(cfg)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
 	return svc, f, tf
 }
 
@@ -245,14 +249,18 @@ func Test_Register_MintFails(t *testing.T) {
 	ts := authtoken.NewService(tf)
 	fm := &fakeMailer{}
 	cfg := ServiceConfig{
-		Store:     f,
-		Token:     ts,
-		Mail:      fm,
-		JWT:       jwt,
-		BaseURL:   "http://test.com",
-		VerifyTTL: 24 * time.Hour,
+		Store:        f,
+		Token:        ts,
+		Mail:         fm,
+		JWT:          jwt,
+		BaseURL:      "http://test.com",
+		VerifyTTL:    24 * time.Hour,
+		LoginCodeTTL: 10 * time.Minute,
 	}
-	svc := NewService(cfg)
+	svc, err := NewService(cfg)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
 	h, err := svc.Register(context.Background(), RegisterInput{
 		Email:      "test@test.com",
 		Password:   "Password123",
@@ -466,6 +474,7 @@ func Test_Login_EmailVerified(t *testing.T) {
 }
 
 func registerAndVerify(t *testing.T, in RegisterInput, svc *Service, fm *fakeMailer) (*Hiker, string) {
+	t.Helper()
 	h, err := svc.Register(context.Background(), in)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
@@ -479,6 +488,18 @@ func registerAndVerify(t *testing.T, in RegisterInput, svc *Service, fm *fakeMai
 		t.Fatalf("expected no error got %v", err)
 	}
 	return h, raw
+}
+func register(t *testing.T, in RegisterInput, svc *Service, fm *fakeMailer) *Hiker {
+	t.Helper()
+	fm.sent = nil
+	h, err := svc.Register(context.Background(), in)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fm.sent) != 1 {
+		t.Fatalf("expected 1 got %d mail", len(fm.sent))
+	}
+	return h
 }
 
 // forgot password
@@ -834,5 +855,328 @@ func Test_ResetPasswordDoesNotClearOtherHikersSessTokens(t *testing.T) {
 		if rt.HikerID != h2.ID {
 			t.Errorf("expected hikerID: %v got %v", h2.ID, rt.HikerID)
 		}
+	}
+}
+
+func Test_RequestLoginCode(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, ft := newTestService(t, fm)
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+	fm.sent = nil
+	err := svc.RequestLoginCode(context.Background(), h1.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+
+	_ = requestedCode(t, ft, fm, h1)
+}
+
+func Test_RequestLoginCode_UnknownEmail(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, ft := newTestService(t, fm)
+	_, _ = registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+	other := "other@test.com"
+	fm.sent = nil
+	err := svc.RequestLoginCode(context.Background(), other)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if len(fm.sent) != 0 {
+		t.Fatalf("expect len 0 got %v", len(fm.sent))
+	}
+
+	for _, tok := range ft.tokens {
+		if tok.Purpose == authtoken.PurposeLoginCode {
+			t.Fatalf("expected no login code for an unknown email, found one for %v", tok.HikerID)
+		}
+	}
+
+}
+
+func Test_RequestLoginCode_UnverifiedHikersGetsACode(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, ft := newTestService(t, fm)
+	h1 := register(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+	fm.sent = nil
+	err := svc.RequestLoginCode(context.Background(), h1.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_ = requestedCode(t, ft, fm, h1)
+
+}
+
+func requestedCode(t *testing.T, ft *tokenFakeStore, fm *fakeMailer, h *Hiker) string {
+	t.Helper()
+
+	found := 0
+	for _, tok := range ft.tokens {
+		if tok.HikerID == h.ID && tok.Purpose == authtoken.PurposeLoginCode {
+			if tok.UsedAt != nil {
+				t.Errorf("expected token is not consumed but consumed")
+			}
+			found++
+		}
+	}
+	if found != 1 {
+		t.Errorf("expected 1 live login code for hiker, got %d", found)
+	}
+	if len(fm.sent) != 1 {
+		t.Fatalf("expected len 1 got %v", len(fm.sent))
+	}
+	to := fm.sent[0].to[0]
+	body := fm.sent[0].body
+	if to != h.Email {
+		t.Errorf("expected %v got %v", h.Email, to)
+	}
+	code := regexp.MustCompile(`\b\d{6}\b`).FindString(body)
+	if code == "" {
+		t.Fatalf("expected a 6-digit code in the mail body, got %q", body)
+	}
+	return code
+}
+
+func Test_RequestLoginCode_TooSoon(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, ft := newTestService(t, fm)
+
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+	fm.sent = nil
+	err := svc.RequestLoginCode(context.Background(), h1.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	err = svc.RequestLoginCode(context.Background(), h1.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_ = requestedCode(t, ft, fm, h1)
+}
+
+func Test_LoginWithCode_Happy(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, ft := newTestService(t, fm)
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+	fm.sent = nil
+	err := svc.RequestLoginCode(context.Background(), h1.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	code := requestedCode(t, ft, fm, h1)
+
+	sess, err := svc.LoginWithCode(context.Background(), h1.Email, code, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	wantSession(t, sess, h1)
+	_, err = svc.LoginWithCode(context.Background(), h1.Email, code, PlatformWeb)
+	wantStatus(t, err, apperr.CodeUnauthorized)
+
+}
+
+func Test_LoginWithCode_UnverifiedAccountWillBeVerified(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, f, ft := newTestService(t, fm)
+	h1 := register(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+	if h1.VerifiedAt != nil {
+		t.Fatalf("expected hiker is not verified got verfied")
+	}
+	fm.sent = nil
+	err := svc.RequestLoginCode(context.Background(), h1.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	code := requestedCode(t, ft, fm, h1)
+	_, err = svc.LoginWithCode(context.Background(), h1.Email, code, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	storedHiker := f.hikers[h1.ID]
+	if storedHiker.VerifiedAt == nil {
+		t.Errorf("expected to be verified")
+	}
+}
+func Test_LoginWithCode_CodeForH1WillNotWorkForH2(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, ft := newTestService(t, fm)
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test1@test.com",
+		Password:   "Password123",
+		Name:       "Hale",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+	h2, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test2@test.com",
+		Password:   "Password123",
+		Name:       "Jale",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+	fm.sent = nil
+	err := svc.RequestLoginCode(context.Background(), h1.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	code1 := requestedCode(t, ft, fm, h1)
+	fm.sent = nil
+	err = svc.RequestLoginCode(context.Background(), h2.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_ = requestedCode(t, ft, fm, h2)
+	_, err = svc.LoginWithCode(context.Background(), h2.Email, code1, PlatformWeb)
+	wantStatus(t, err, apperr.CodeUnauthorized)
+	_, err = svc.LoginWithCode(context.Background(), h1.Email, code1, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+
+}
+
+func Test_LoginWithCode_InvalidPlatform(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, ft := newTestService(t, fm)
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+	fm.sent = nil
+	err := svc.RequestLoginCode(context.Background(), h1.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	code := requestedCode(t, ft, fm, h1)
+
+	_, err = svc.LoginWithCode(context.Background(), h1.Email, code, "toaster")
+	wantStatus(t, err, apperr.CodeBadRequest)
+
+	_, err = svc.LoginWithCode(context.Background(), h1.Email, code, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+}
+
+func Test_LoginWithCode_PasswordWorks(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, ft := newTestService(t, fm)
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+	fm.sent = nil
+	err := svc.RequestLoginCode(context.Background(), h1.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	code := requestedCode(t, ft, fm, h1)
+
+	sess, err := svc.LoginWithCode(context.Background(), h1.Email, code, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	wantSession(t, sess, h1)
+	fm.sent = nil
+	sess, err = svc.Login(context.Background(), h1.Email, "Password123", PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	wantSession(t, sess, h1)
+
+}
+func Test_LoginWithCode_UnknownEmail(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, ft := newTestService(t, fm)
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   nil,
+		Bio:        nil,
+		Gender:     nil,
+	}, svc, fm)
+	fm.sent = nil
+	err := svc.RequestLoginCode(context.Background(), h1.Email)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	code := requestedCode(t, ft, fm, h1)
+
+	_, err = svc.LoginWithCode(context.Background(), "toaster@toast.toast", code, PlatformWeb)
+	wantStatus(t, err, apperr.CodeUnauthorized)
+}
+
+func wantSession(t *testing.T, sess *Session, h *Hiker) {
+	if sess.Hiker.ID != h.ID {
+		t.Errorf("expected %v got %v", h.ID, sess.Hiker.ID)
+	}
+	if sess.RefreshToken == "" {
+		t.Error("expected refresh token is not empty got empty")
+	}
+	if sess.AccessToken == "" {
+		t.Error("expected access token is not empty got empty")
 	}
 }

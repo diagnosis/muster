@@ -66,6 +66,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/auth/verify-email", s.handleVerifyEmail)
 	mux.HandleFunc("POST /api/auth/resend-verification", s.handleResendVerification)
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
+	mux.HandleFunc("POST /api/auth/login-code", s.handleRequestLoginCode)
+	mux.HandleFunc("POST /api/auth/login-code/verify", s.handleVerifyLoginCode)
 	mux.HandleFunc("POST /api/auth/refresh", s.handleRefresh)
 	mux.HandleFunc("POST /api/auth/forgot-password", s.handleForgotPassword)
 	mux.HandleFunc("POST /api/auth/reset-password", s.handleResetPassword)

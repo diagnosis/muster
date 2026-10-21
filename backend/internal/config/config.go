@@ -27,6 +27,7 @@ type AppConfig struct {
 	CORSOrigins        []string
 	CookieSameSite     http.SameSite
 	DispatcherInterval time.Duration
+	LoginCodeTTL       time.Duration
 }
 
 // DatabaseConfig holds connection settings and pool tuning for Postgres.
@@ -121,6 +122,10 @@ func loadAppConfig() (*AppConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+	loginCodeTTL, err := getEnvDuration("APP_LOGIN_CODE_TTL", 10*time.Minute)
+	if err != nil {
+		return nil, err
+	}
 
 	return &AppConfig{
 		Env:                env,
@@ -130,6 +135,7 @@ func loadAppConfig() (*AppConfig, error) {
 		CORSOrigins:        corsOrigins,
 		CookieSameSite:     cookieSameSite,
 		DispatcherInterval: dispatcherInterval,
+		LoginCodeTTL:       loginCodeTTL,
 	}, nil
 }
 

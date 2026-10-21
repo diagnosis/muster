@@ -2,6 +2,7 @@ package hiker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -34,30 +35,36 @@ type Storage interface {
 
 // ServiceConfig provides deps for extending services
 type ServiceConfig struct {
-	Store     Storage
-	Token     *authtoken.Service
-	Mail      mailer.Mailer
-	JWT       *secure.JWTSigner
-	BaseURL   string
-	VerifyTTL time.Duration
+	Store        Storage
+	Token        *authtoken.Service
+	Mail         mailer.Mailer
+	JWT          *secure.JWTSigner
+	BaseURL      string
+	VerifyTTL    time.Duration
+	LoginCodeTTL time.Duration
 }
 
 // Service implements hiker business rules over a Storage.
 type Service struct {
-	store     Storage
-	tokens    *authtoken.Service
-	mail      mailer.Mailer
-	jwt       *secure.JWTSigner
-	baseURL   string
-	verifyTTL time.Duration
+	store        Storage
+	tokens       *authtoken.Service
+	mail         mailer.Mailer
+	jwt          *secure.JWTSigner
+	baseURL      string
+	verifyTTL    time.Duration
+	loginCodeTTL time.Duration
 }
 
 // NewService returns a Service backed by store, minting tokens with jwt.
-func NewService(cfg ServiceConfig) *Service {
+func NewService(cfg ServiceConfig) (*Service, error) {
+	if cfg.LoginCodeTTL <= 0 {
+		return nil, errors.New("hiker: LoginCodeTTL must be set")
+	}
+
 	return &Service{
 		store: cfg.Store, tokens: cfg.Token, mail: cfg.Mail, jwt: cfg.JWT,
-		baseURL: cfg.BaseURL, verifyTTL: cfg.VerifyTTL,
-	}
+		baseURL: cfg.BaseURL, verifyTTL: cfg.VerifyTTL, loginCodeTTL: cfg.LoginCodeTTL,
+	}, nil
 }
 
 // RegisterInput carries the fields required to create a new hiker.
@@ -440,4 +447,65 @@ func (s *Service) sendPasswordResetEmail(ctx context.Context, hikerID uuid.UUID,
 		return apperr.Internal("internal error", "could not send reset email", err)
 	}
 	return nil
+}
+
+// RequestLoginCode mails a login code to the hiker registered under
+// userEmail. Unknown emails and resends inside the throttle window return nil
+// with no mail, so the response never reveals whether an account exists.
+func (s *Service) RequestLoginCode(ctx context.Context, userEmail string) error {
+	h, err := s.store.GetHikerByEmail(ctx, userEmail)
+	if err != nil {
+		if se, ok := apperr.AsStatusErr(err); !ok || se.Status != apperr.CodeNotFound {
+			return err
+		}
+		return nil
+	}
+	raw, err := s.tokens.MintCode(ctx, h.ID, s.loginCodeTTL)
+	if errors.Is(err, authtoken.ErrTooSoon) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	content := email.Content{
+		Subject: "Your Muster login code",
+		Heading: "Your login code",
+		Body:    fmt.Sprintf("Enter this code to sign in: %s. It expires in %d minutes.", raw, int(s.loginCodeTTL.Minutes())),
+	}
+	html, err := email.Render(content)
+	if err != nil {
+		logger.Warn(ctx, "failed to render email content", "err", err)
+		return apperr.Internal("internal error", "failed to render email content", err)
+	}
+	err = s.mail.Send(ctx, []string{h.Email}, content.Subject, html)
+	if err != nil {
+		logger.Warn(ctx, "failed to send login code", "err", err)
+	}
+	return nil
+}
+
+// LoginWithCode exchanges a mailed login code for a session. The platform is
+// validated before the code is consumed; a hiker who logs in this way is
+// marked verified if they were not already.
+func (s *Service) LoginWithCode(ctx context.Context, email, code string, platform Platform) (*Session, error) {
+	if !platform.Valid() {
+		return nil, apperr.BadRequest("invalid platform", "invalid platform")
+	}
+	h, err := s.store.GetHikerByEmail(ctx, email)
+	if err != nil {
+		if se, ok := apperr.AsStatusErr(err); ok && se.Status == apperr.CodeNotFound {
+			return nil, authtoken.ErrBadCode
+		}
+		return nil, err
+	}
+	err = s.tokens.ConsumeCode(ctx, h.ID, code)
+	if err != nil {
+		return nil, err
+	}
+	if h.VerifiedAt == nil {
+		if err = s.store.SetVerified(ctx, h.ID); err != nil {
+			return nil, err
+		}
+	}
+	return s.mintSession(ctx, h, platform)
 }

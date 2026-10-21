@@ -1,6 +1,6 @@
 import {test, expect} from '@playwright/test'
 import {WEB_URL} from "../fixtures/config.ts";
-import {actorInBrowser, createActor, uniqueIdentity} from "../fixtures/actor.ts";
+import {actorInBrowser, createActor, createUnverifiedActor, uniqueIdentity} from "../fixtures/actor.ts";
 import {expectLoggedIn, expectLoggedOut, expectNavClosed, openNav} from "../fixtures/assertions.ts";
 import {
     EMAIL_EXISTS,
@@ -9,6 +9,7 @@ import {
     SHORT_PASSWORD,
     VALIDATION_FAILED,
 } from "../fixtures/copy.ts";
+import {mintLoginCode} from "../fixtures/db.ts";
 
 
 
@@ -142,6 +143,18 @@ test.describe("auth flow", ()=> {
         await page.reload()
         await expectLoggedOut(page)
 
+    });
+    test("login with code", async ({page}) =>{
+        const hiker = await createUnverifiedActor()
+        await page.goto("/login")
+        await page.getByRole('button', {name:'Email me a login code instead'}).click()
+        await page.getByRole('textbox', {name:'email'}).fill(hiker.user.email)
+        await page.getByRole('button', {name:'Send me a code'}).click()
+        await expect(page.getByRole('heading', {name:'Check your email'})).toBeVisible()
+        const code = await mintLoginCode(hiker.hikerID)
+        await page.getByRole('textbox', {name:'Six-digit code'}).fill(code)
+        await page.getByRole('button', {name: 'Log in'}).click()
+        await expectLoggedIn(page, hiker.user.name)
     })
 })
 

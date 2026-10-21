@@ -17,7 +17,7 @@ function hashToken(raw: string): string {
     return createHash('sha256').update(raw).digest('hex')
 }
 
-type MintOverrides = {purpose?: string, ttlHours?: number}
+type MintOverrides = {purpose?: string, ttlHours?: number, ttlMins?:number}
 export async function mintVerificationToken(hikerID: string, overrides: Partial<MintOverrides> = {}): Promise<string>{
     const raw = randomBytes(32).toString('hex')
     await getPool().query(
@@ -26,6 +26,26 @@ export async function mintVerificationToken(hikerID: string, overrides: Partial<
         [hikerID, hashToken(raw), overrides.purpose ?? 'email_verification', overrides.ttlHours ?? 24],
     )
     return raw
+}
+
+export async function mintLoginCode(hikerID:string, overrides:Partial<MintOverrides> = {}){
+    // mirrors authtoken.hashCode: sha256(hikerID + code)
+    const raw = String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')
+    await getPool().query(
+        `INSERT INTO auth_tokens (id, hiker_id, token_hash, purpose, created_at, expires_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, now(), now() + make_interval(mins => $4))`,
+        [hikerID, hashToken(hikerID+raw), overrides.purpose ?? 'login_code', overrides.ttlMins ?? 10],
+    )
+    return raw
+}
+export async function liveLoginCodeAttempts(hikerID: string): Promise<number> {
+    const { rows } = await getPool().query(
+        `SELECT attempts FROM auth_tokens
+         WHERE hiker_id = $1 AND purpose = 'login_code' AND used_at IS NULL
+         ORDER BY created_at DESC LIMIT 1`,
+        [hikerID],
+    )
+    return rows[0].attempts
 }
 
 export async function getNotificationsFor(hikerID: string): Promise<{payload:Record<string, any>,kind: string, emailed_at: string|null}[]> {
