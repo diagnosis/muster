@@ -41,7 +41,10 @@ export function useLoginWithCodeMutation() {
             }
             throw new ApiRequestError(res.error, res.httpStatus)
         },
-        onSuccess: () => qc.invalidateQueries({queryKey:['me']})
+        onSuccess: () => {
+            qc.setQueryData(['me'], null)
+            qc.removeQueries({ predicate: q => q.queryKey[0] !== 'me' })
+        }
     })
 }
 
@@ -55,7 +58,10 @@ export function useLoginWithPasswordMutation() {
             }
             throw new ApiRequestError(res.error, res.httpStatus)
         },
-        onSuccess: () => qc.invalidateQueries({queryKey:['me']})
+        onSuccess: () => {
+            qc.setQueryData(['me'], null)
+            qc.removeQueries({ predicate: q => q.queryKey[0] !== 'me' })
+        }
     })
 }
 

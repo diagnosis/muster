@@ -19,7 +19,7 @@ export async function invalidateFresh(qc: QueryClient, filters?: InvalidateQuery
 
 
 export const  getMe = async () => {
- const res =  await apiClient.get<MeResponse>("/api/auth/me")
+ const res =  await apiClient.probe<MeResponse>("/api/auth/me")
     if (res.ok){
         return res.data
     }else{

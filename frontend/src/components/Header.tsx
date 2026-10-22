@@ -28,7 +28,8 @@ export function Header(){
             throw new ApiRequestError(res.error, res.httpStatus)
         },
         onSettled : () => {
-            queryClient.invalidateQueries({queryKey:['me']})
+            queryClient.setQueryData(['me'], null)
+            queryClient.removeQueries({ predicate: q => q.queryKey[0] !== 'me' })
             navigate({to:'/'})
             setOpen(false)
         }
