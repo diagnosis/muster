@@ -10,6 +10,7 @@ import {
     VALIDATION_FAILED,
 } from "../fixtures/copy.ts";
 import {mintLoginCode} from "../fixtures/db.ts";
+import {createOuting} from "../fixtures/outingApiHelper.ts";
 
 
 
@@ -176,6 +177,27 @@ test.describe("auth flow", ()=> {
         await tab1.reload()
         await expect(tab1).toHaveURL(/\/login/)
         await expect(tab1.getByRole('link', {name: hiker.user.name})).toHaveCount(0)
+    });
+    test('expired access token refreshes in place', async ({page, context}) => {
+        const hiker = await createActor()
+        await actorInBrowser(hiker, context)
+        await page.goto('/me/outings')
+        await expectLoggedIn(page, hiker.user.name)
+
+        await context.clearCookies({name: 'access_token'})   // the name your server sets
+        const refreshed = page.waitForResponse(r => r.url().endsWith('/api/auth/refresh') && r.status() === 200)
+        await page.reload()
+        await refreshed
+        await expectLoggedIn(page, hiker.user.name)
+    })
+    test('a guest on a public page is never bounced to login', async ({page}) => {
+        const host = await createActor()
+        const o = await createOuting(host)
+
+        await page.goto(`/outings/${o.id}`)
+        await page.waitForLoadState('networkidle')
+        await expect(page).toHaveURL(new RegExp(`/outings/${o.id}$`))
+        await expect(page.getByRole('heading', {name: o.title})).toBeVisible()
     })
 })
 
