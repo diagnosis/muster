@@ -49,7 +49,11 @@ export interface Outing{
     is_discussion_open: boolean
 }
 export interface ListedHiker {
-    name:string
+    name: string
+    role: 'driver' | 'rider'
+    seats_offered: number
+    guests: number
+    is_me: boolean
 }
 
 export interface Detail{

@@ -344,7 +344,13 @@ func (f *fakeStore) WaitingNames(ctx context.Context, outingID uuid.UUID) ([]Lis
 	names := []ListedHiker{}
 	for _, r := range jrs {
 		if h, ok := f.hikers[r.HikerID]; ok {
-			names = append(names, ListedHiker{Name: h.Name})
+			names = append(names, ListedHiker{
+				HikerID:      r.HikerID,
+				Name:         h.Name,
+				Role:         r.Role,
+				SeatsOffered: r.SeatsOffered,
+				Guests:       r.Guests,
+			})
 		}
 	}
 	return names, nil
@@ -366,7 +372,13 @@ func (f *fakeStore) WithdrawnNames(ctx context.Context, outingID uuid.UUID) ([]L
 	names := []ListedHiker{}
 	for _, r := range jr {
 		if h, ok := f.hikers[r.HikerID]; ok {
-			names = append(names, ListedHiker{Name: h.Name})
+			names = append(names, ListedHiker{
+				HikerID:      r.HikerID,
+				Name:         h.Name,
+				Role:         r.Role,
+				SeatsOffered: r.SeatsOffered,
+				Guests:       r.Guests,
+			})
 		}
 	}
 	return names, nil

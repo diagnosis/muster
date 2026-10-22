@@ -1,7 +1,6 @@
 import {createFileRoute, Link, useNavigate} from '@tanstack/react-router'
-import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import type {Detail, JoinRequest, Member} from "@/types.ts";
-import {useMutation, useQueryClient} from "@tanstack/react-query";
+import {useQueryClient} from "@tanstack/react-query";
 import {useMeQuery} from "@/queries.ts";
 import {useEffect, useState} from "react";
 import {JoinForm} from "@/components/JoinForm.tsx";
@@ -15,7 +14,9 @@ import {useEvents} from "@/events/EventProvider.tsx";
 import {useStartDM} from "@/queries/conversation.ts";
 import {CalendarIcon, FlagIcon, MessageIcon, PinIcon, TrashIcon} from "@/components/Icons.tsx";
 import {outingRange} from "@/utils/date.ts";
-import {useOuting} from "@/queries/outing.ts";
+import {useOuting, useRemoveMemberMutation, useWithdrawMutation} from "@/queries/outing.ts";
+import {initial, listNames, ordinal} from "@/lib/format.ts";
+import {WaitingListModal} from "@/components/WaitingListModal.tsx";
 
 
 export const Route = createFileRoute('/outings/$id')({
@@ -31,6 +32,7 @@ export function OutingDetailPage() {
     const {data:detail, isPending, error} = useOuting(id)
     const startDM = useStartDM()
     const [memberToRemove, setMemberToRemove] = useState<Member|null>(null)
+    const [showWaiting, setShowWaiting] = useState(false)
     const { subscribe } = useEvents()
     useEffect(()=> {
         return subscribe('notification.created', (data)=>{
@@ -44,35 +46,9 @@ export function OutingDetailPage() {
         })
     }, [subscribe, qc, id])
 
-    const withdrawMutation = useMutation({
-        mutationFn: async () => {
-            const res = await apiClient.del(`/api/outings/${id}/requests/me`)
-            if (res.ok){
-                return res.data
-            }
-            throw new ApiRequestError(res.error, res.httpStatus)
-        },
-        onSuccess : () => {
-            qc.invalidateQueries({queryKey:['outing', id]})
-            qc.invalidateQueries({queryKey: ['my-outings']})
-            qc.invalidateQueries({queryKey:['outing-join-requests', id]})
-        }
-    })
-    const removeMemberMutation = useMutation({
-        mutationFn: async(requestId: string) => {
-            const res = await apiClient.del(`/api/requests/${requestId}/member`)
-            if (res.ok){
-                return res.data
-            }
-            throw new ApiRequestError(res.error, res.httpStatus)
-        },
-        onSuccess: () =>{
-            qc.invalidateQueries({queryKey:['outing', id]})
-            qc.invalidateQueries({queryKey: ['my-outings']})
-            qc.invalidateQueries({queryKey:['outing-join-requests', id]})
-            setMemberToRemove(null)
-        }
-    })
+    const withdrawMutation = useWithdrawMutation(id)
+    const removeMemberMutation = useRemoveMemberMutation(id)
+
     function handleOnClose(){
         setShowForm(false)
     }
@@ -162,13 +138,14 @@ export function OutingDetailPage() {
     const canSeeStartDmBtn = me && (me.id === detail.host.hiker_id || detail.roster.some(r => r.hiker_id === me.id))
     const canSeeChat =canSeeStartDmBtn && !!detail.outing.conversation_id
     const isHost = me?.id === detail.outing.host_id
-    const initial = (name: string) => name.charAt(0).toUpperCase()
     const totalSpots = detail.people_count + detail.spots_left
     const filledPct = totalSpots > 0 ? Math.round((detail.people_count / totalSpots) * 100) : 0
     const chatLink = canSeeChat &&
         <Link className={'btn btn-primary'} to={'/conversations/$id'} params={{id: detail.outing.conversation_id}}>Outing chat</Link>
     const rosterLocked = detail.outing.phase !== 'upcoming'
     const othersGoing = detail.people_count - 1
+    const myWaitingIndex = detail.waiting.findIndex(w => w.is_me)
+    const waitingPreview = detail.waiting.slice(0,3)
     const messageBtn = (hikerId: string, name: string) => (
         <button className="icon-btn"
                 aria-label={`Message ${name}`}
@@ -238,14 +215,25 @@ export function OutingDetailPage() {
 
                     {detail.waiting.length > 0 && <>
                         <h3 className={styles.groupLabel}>Waiting ({detail.waiting.length})</h3>
-                        <ol className={styles.chips}>
-                            {detail.waiting.map((w, i) => <li className={styles.chip} key={i}>
-                                <span className={styles.chipAvatar} aria-hidden="true">{initial(w.name)}</span>
-                                {w.name}
-                            </li>)}
-                        </ol>
+                        <div className={styles.waitingBlock}>
+                            <div className={styles.waitingSummary}>
+                                <div className={styles.avatarStack} aria-hidden="true">
+                                    {waitingPreview.map((w, i) => <span className={styles.chipAvatar} key={i}>{initial(w.name)}</span>)}
+                                </div>
+                                <p className={styles.waitingNames}>
+                                    {listNames(waitingPreview.map(w => w.name))}
+                                    {detail.waiting.length > 3 && <> and <strong>{detail.waiting.length - 3} more</strong></>}
+                                </p>
+                                {detail.waiting.length > 3 &&
+                                    <button type="button" className="btn-outline" onClick={() => setShowWaiting(true)}>See all</button>}
+                            </div>
+                            {myWaitingIndex >= 0 &&
+                                <p className={formStyles.notice} role="status">
+                                    You're <strong>{ordinal(myWaitingIndex + 1)} of {detail.waiting.length}</strong> — drivers go first, then in the order people asked.
+                                </p>}
+                        </div>
                     </>}
-
+                    {showWaiting && <WaitingListModal waiting={detail.waiting} onClose={() => setShowWaiting(false)}/>}
                     {detail.withdrawn.length > 0 && <>
                         <h3 className={styles.groupLabel}>Withdrew ({detail.withdrawn.length})</h3>
                         <p className={styles.withdrawn}>{detail.withdrawn.map(w => w.name).join(', ')}</p>
@@ -256,7 +244,9 @@ export function OutingDetailPage() {
                     <p>This removes them from the roster and frees their seats. They won't be able to request again.</p>
                     <div className={styles.actions}>
                         <button className="btn-danger"
-                                onClick={() => memberToRemove.request_id && removeMemberMutation.mutate(memberToRemove.request_id)}>Yes, remove</button>
+                                onClick={() => memberToRemove.request_id && removeMemberMutation.mutate(memberToRemove.request_id, {onSuccess:()=>{
+                                        setMemberToRemove(null)
+                                    }})}>Yes, remove</button>
                         <button className={formStyles.quietBtn}
                                 onClick={() => setMemberToRemove(null)}>Never mind</button>
                     </div>

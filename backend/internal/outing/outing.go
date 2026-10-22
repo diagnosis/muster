@@ -250,5 +250,10 @@ type MyOutings struct {
 // ListedHiker is a hiker shown by name only, on the waiting and
 // withdrawn lists.
 type ListedHiker struct {
-	Name string `json:"name"`
+	HikerID      uuid.UUID `json:"-"`
+	Name         string    `json:"name"`
+	Role         Role      `json:"role"`
+	SeatsOffered int       `json:"seats_offered"`
+	Guests       int       `json:"guests"`
+	IsMe         bool      `json:"is_me"`
 }

@@ -1,6 +1,6 @@
 # Muster — Roadmap
 
-*As of 2026-10-18 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #47 merged) and confirmed by Safa. Replaces the 2026-08-07 roadmap.*
+*As of 2026-10-21 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #49 merged) and the `feat/waiting-list-uplift` branch and confirmed by Safa. Replaces the 2026-08-07 roadmap.*
 
 *Doc hierarchy: roadmap = why and when · spec = what · engineering notes = how.*
 
@@ -10,7 +10,7 @@
 
 Muster is live at muster.safadev.app. Backend and frontend are on `main`, gated by CI (`ci.yml`) and deployed by `deploy.yml`. Migrations run before the new binary, so schema changes are expand-only.
 
-Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec files) that proves the real SQL and JSON, and a Playwright browser suite (22 spec files).
+Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec files) that proves the real SQL and JSON, and a Playwright browser suite (22 spec files). CI runs both against a throwaway Postgres service container; nothing in CI touches the hosted database.
 
 ### Shipped
 
@@ -28,7 +28,8 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 | Request history and restore (PR #45) | the host's requests list takes `?status=` (requested, declined, removed; anything else is 400); declined and removed requests can be restored to the queue at their original `requested_at`, host-only and only before the outing starts; the hiker gets a `join_request_restored` notification; the outing page shows Waiting, Declined and Removed tabs with a Restore button on history rows |
 | Change password (PR #46) | the profile page sends the signed-in user the existing reset link; there is no in-app password form. Completing a reset now revokes every refresh token on every platform, so no session that knew the old password survives. Dev: air live-reload (`make dev`); `main` requires a pull request |
 | Edit pending request (PR #47) | `PATCH /api/outings/{id}/requests/me` lets a hiker change role, seats, guests or note on a pending request; nil fields keep their value and the merged result passes the same validation as a new request. An edit that asks the outing for more — more guests, fewer seats offered, or driver → rider — moves the request to the back (`requested_at = now`); anything else keeps its place. The host gets a `join_request_updated` notification on role, seats or guests changes; note-only edits are silent. Drivers now lead the queue everywhere: both the host's list and the outing page's waiting chips order by role, then `requested_at`. The outing page shows what you asked for, an Edit button, and a live warning when the change would move you back |
-| Passwordless login (PR #48) | A second door on the login page: `POST /api/auth/login-code` mails a six-digit code, `POST /api/auth/login-code/verify` exchanges it for the same session a password login mints. The request endpoint answers 200 whether or not the email exists and whether or not a code was sent (30 s resend window), so the response reveals nothing. A code lives 10 minutes, dies on the fifth wrong try, is burned by a resend, and works once; every rejection is the same 401. An unverified account can ask for a code and is marked verified on success, since the code proves the inbox. Codes are hashed with the hiker id so two hikers drawing the same six digits cannot collide on the unique hash column. Login page: password → request → verify modes with a countdown on resend; one browser spec plants a code through the DB helper |
+| Passwordless login (PR #48, #49) | A second door on the login page: `POST /api/auth/login-code` mails a six-digit code, `POST /api/auth/login-code/verify` exchanges it for the same session a password login mints. The request endpoint answers 200 whether or not the email exists and whether or not a code was sent (30 s resend window), so the response reveals nothing. A code lives 10 minutes, dies on the fifth wrong try, is burned by a resend, and works once; every rejection is the same 401. An unverified account can ask for a code and is marked verified on success, since the code proves the inbox. Codes are hashed with the hiker id so two hikers drawing the same six digits cannot collide on the unique hash column. Login page: password → request → verify modes with a countdown on resend; one browser spec plants a code through the DB helper  Follow-ups (#49): show/hide eye on password fields; the first send starts the resend countdown |
+| Waiting list uplift (PR #50) | Waiting and withdrawn rows now carry `role`, `seats_offered`, `guests` and `is_me`; the hiker id stays server-side and the service marks the viewer's own row. The outing page shows the first three names with a count and a "See all" button, and an amber line with the viewer's place ("You're 3rd of 7") when they are in the queue. The modal lists the whole queue in host order: position, driver tag with seats, "+n guests", the viewer's row highlighted in place |
 
 ---
 
@@ -36,13 +37,16 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 
 In this order. Items can be added.
 
-1. **Waiting list uplift on the outing page.** Show three names and a count, with the full ordered list behind a tap; make the viewer's own position obvious.
-2. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
-3. **Pagination.** Browse first, with keyset pagination. Then chat, then the Past tab. Server-side phase filtering comes with it.
-4. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
-5. **One real hike organized through Muster.** v1 is done when boots hit dirt.
+1. **Capacity on the outing card.** The browse list sends `people_count`, `max_size` and a waiting count so the card can say "10 of 20 going · 5 waiting"; this is the old `capacity_state` item, served by the API at last. Same PR: the two difficulty chips read as a duplicate when both say "moderate" — label them (terrain, pace) or give pace its own words.
+2. **Outing page live for everyone on it.** Pokes ride on notifications today, so a waiter whose place changes because someone ahead withdrew learns nothing until the tab regains focus. One `outing.changed {outing_id}` event on every join-request transition and roster change, to every open page of that outing; the page refetches detail on it.
+3. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
+4. **Pagination.** Browse first, with keyset pagination. Then chat, then the Past tab. Server-side phase filtering comes with it.
+5. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
+6. **One real hike organized through Muster.** v1 is done when boots hit dirt.
 
-Also open from the original v1 list: `capacity_state` served by the API, so the client stops deriving it.
+### Known bugs
+
+- **Outing page turns into the stranger view after a while.** Logged in, request sent, page open; some minutes later the page shows "Request to join" again and submitting it gets the server's 409 ("you already have an active request"). The server is right; the client's `detail` refetch came back at the logged-out level. Suspect the access-token expiry: a refetch that goes out before the shared refresh lands is answered anonymously and never retried. Check whether `useOuting` retries after a 401, and whether the first-load race applies.
 
 ### Polish ledger (not blocking v1; do in batches)
 
@@ -85,6 +89,13 @@ Also open from the original v1 list: `capacity_state` served by the API, so the 
 - Bare `tsc` in `frontend/` reports ~98 narrowing errors; `tsc -b` is clean. Find out which config the bare command reads. A frontend `make check` (tsc -b, eslint, build) would make this moot.
 - Two `uuid.UUID` parameters side by side (`hikerID, requestID`) were swapped twice this month; typed ids (`type RequestID uuid.UUID`) would make it a compile error.
 - Reset-password page should clear the access token and query cache on success, since every session is revoked.
+- The prod connection string lives in two places: `/etc/muster/env` on the droplet (pooled, for the server) and the `NEON_PROD_URL` secret (direct, for goose in deploy). One source; the Neon move was slowed by updating one and not the other.
+- `make migrate-up` needs the direct (non-pooled) URL; goose's prepared statements fail through PgBouncer. A `MIGRATE_URL` or a note in the Makefile.
+- Delete the unused `NEON_API_KEY` and `NEON_PROJECT_ID` repo secrets.
+- Hosting: Neon free (100 CU-hours/month, scale-to-zero) is enough with CI off it. When real hikers arrive: a Postgres on the DO droplet never pauses; Supabase free pauses after 7 idle days; Neon Launch is ~$19.
+- The waiting-list summary shows "See all" only past three names, so a queue of two or three never reveals roles or guests; consider showing the button always.
+- The "(you)" marker sits beside a name that may truncate on a phone; the amber row carries the meaning, but check it.
+- `listNames` and the page both add "and" when a "more" count follows; join with commas when there is a count.
 - Login handlers hardcode `PlatformWeb`; the mobile client will need platform in the body or a header, for password and code login alike.
 - `"invalid platform"` is written four times in `hiker/service.go`; one `validatePlatform` helper.
 - The login page carries the 30 s resend window and "10 minutes" as literals mirrored from the server; a `retry_after` and `expires_in` on the request response would give them one home.

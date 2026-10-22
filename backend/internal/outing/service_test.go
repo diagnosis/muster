@@ -1883,6 +1883,83 @@ func Test_EditRequest_Conflicts(t *testing.T) {
 	}
 
 }
+
+func Test_Detail_IsMe(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	hostID := uuid.New()
+	h1, h2 := uuid.New(), uuid.New()
+	o := seedOuting(6, 3, StatusOpen, hostID, f)
+	seedMember(hostID, "sevket", "beginner", f)
+	seedMember(h1, "salih", "beginner", f)
+	seedMember(h2, "hale", "experienced", f)
+	_ = seedJoinRequest(o.ID, h1, RequestStatusRequested, RoleRider, f, 0)
+	_ = seedJoinRequest(o.ID, h2, RequestStatusRequested, RoleRider, f, 1)
+
+	// as a waiter: exactly one row is me, and it is mine
+	detail, err := svc.Detail(context.Background(), o.ID, &h1)
+	if err != nil {
+		t.Fatalf("detail as h1: %v", err)
+	}
+	if len(detail.Waiting) != 2 {
+		t.Fatalf("expected 2 waiting got %d", len(detail.Waiting))
+	}
+	for _, w := range detail.Waiting {
+		want := w.HikerID == h1
+		if w.IsMe != want {
+			t.Errorf("%s: IsMe = %v, want %v", w.Name, w.IsMe, want)
+		}
+	}
+
+	// as the host: nobody is me
+	detail, err = svc.Detail(context.Background(), o.ID, &hostID)
+	if err != nil {
+		t.Fatalf("detail as host: %v", err)
+	}
+	for _, w := range detail.Waiting {
+		if w.IsMe {
+			t.Errorf("%s: IsMe should be false for the host", w.Name)
+		}
+	}
+}
+
+func Test_Detail_IsMe_Withdrawn(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	hostID := uuid.New()
+	h1, h2 := uuid.New(), uuid.New()
+	o := seedOuting(6, 3, StatusOpen, hostID, f)
+	seedMember(hostID, "sevket", "beginner", f)
+	seedMember(h1, "salih", "beginner", f)
+	seedMember(h2, "hale", "experienced", f)
+	_ = seedJoinRequest(o.ID, h1, RequestStatusWithdrawn, RoleRider, f, 0)
+	_ = seedJoinRequest(o.ID, h2, RequestStatusWithdrawn, RoleRider, f, 1)
+
+	// as a waiter: exactly one row is me, and it is mine
+	detail, err := svc.Detail(context.Background(), o.ID, &h1)
+	if err != nil {
+		t.Fatalf("detail as h1: %v", err)
+	}
+	if len(detail.Withdrawn) != 2 {
+		t.Fatalf("expected 2 withdrawn got %d", len(detail.Withdrawn))
+	}
+	for _, w := range detail.Withdrawn {
+		want := w.HikerID == h1
+		if w.IsMe != want {
+			t.Errorf("%s: IsMe = %v, want %v", w.Name, w.IsMe, want)
+		}
+	}
+
+	// as the host: nobody is me
+	detail, err = svc.Detail(context.Background(), o.ID, &hostID)
+	if err != nil {
+		t.Fatalf("detail as host: %v", err)
+	}
+	for _, w := range detail.Withdrawn {
+		if w.IsMe {
+			t.Errorf("%s: IsMe should be false for the host", w.Name)
+		}
+	}
+}
+
 func ptr[T any](v T) *T {
 	return &v
 }
