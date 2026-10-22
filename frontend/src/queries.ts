@@ -2,7 +2,7 @@
 
 
 import type { MeResponse, NotificationsResponse } from "@/types.ts";
-import {apiClient, ApiRequestError} from "@/lib/api.ts";
+import {apiClient, ApiRequestError, refreshSession} from "@/lib/api.ts";
 import {type InvalidateQueryFilters, type QueryClient, useQuery} from "@tanstack/react-query";
 import {redirect} from "@tanstack/react-router";
 
@@ -18,17 +18,14 @@ export async function invalidateFresh(qc: QueryClient, filters?: InvalidateQuery
 }
 
 
-export const  getMe = async () => {
- const res =  await apiClient.probe<MeResponse>("/api/auth/me")
-    if (res.ok){
-        return res.data
-    }else{
-        if (res.httpStatus === 401){
-            return null
-        }else{
-            throw new ApiRequestError(res.error, res.httpStatus)
-        }
+export const getMe = async () => {
+    let res = await apiClient.probe<MeResponse>("/api/auth/me")
+    if (!res.ok && res.httpStatus === 401 && await refreshSession() === 200) {
+        res = await apiClient.probe<MeResponse>("/api/auth/me")
     }
+    if (res.ok) return res.data
+    if (res.httpStatus === 401) return null
+    throw new ApiRequestError(res.error, res.httpStatus)
 }
 
 export const meQueryOptions = () =>({
@@ -55,6 +52,9 @@ export async function requireGuest(queryClient: QueryClient){
     if (me) throw redirect({to:'/'})
 }
 
+export function forgetUserData(qc: QueryClient) {
+    qc.removeQueries({ predicate: q => q.queryKey[0] !== 'me' })
+}
 
 export function useNotifications() {
     return useQuery({
@@ -66,4 +66,5 @@ export function useNotifications() {
         },
     })
 }
+
 

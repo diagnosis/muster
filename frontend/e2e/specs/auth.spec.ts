@@ -157,6 +157,26 @@ test.describe("auth flow", ()=> {
         await page.getByRole('button', {name: 'Log in'}).click()
         await expectLoggedIn(page, hiker.user.name)
     })
+    test("logging out in one tab signs the other tab out too", async ({context}) => {
+        const hiker = await createActor()
+        await actorInBrowser(hiker, context)
+
+        const tab1 = await context.newPage()
+        await tab1.goto('/me/outings')
+        await expectLoggedIn(tab1, hiker.user.name)
+
+        const tab2 = await context.newPage()
+        await tab2.goto('/')
+        await openNav(tab2)
+        await tab2.getByRole('button', {name: 'Log out'}).click()
+        await expect(tab2).toHaveURL('/')
+
+        // tab 1 learns on its next request
+        await tab1.bringToFront()
+        await tab1.reload()
+        await expect(tab1).toHaveURL(/\/login/)
+        await expect(tab1.getByRole('link', {name: hiker.user.name})).toHaveCount(0)
+    })
 })
 
 

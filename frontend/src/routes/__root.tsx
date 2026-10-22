@@ -6,7 +6,7 @@ import {Header} from "@/components/Header.tsx";
 import styles from "@/routes/Layout.module.css"
 import {NotFound} from "@/components/NotFound.tsx";
 import {EventsProvider} from "@/events/EventProvider.tsx";
-import {useMeQuery} from "@/queries.ts";
+import {forgetUserData, useMeQuery} from "@/queries.ts";
 import {useEffect} from "react";
 import {setOnSignedOut} from "@/lib/api.ts";
 
@@ -24,7 +24,7 @@ export function RouteComponent(){
     useEffect(() => {
         setOnSignedOut(() => {
             queryClient.setQueryData(['me'], null)
-            queryClient.removeQueries({ predicate: q => q.queryKey[0] !== 'me' })
+            forgetUserData(queryClient)
             navigate({to: '/login'})
         })
     }, [queryClient, navigate])

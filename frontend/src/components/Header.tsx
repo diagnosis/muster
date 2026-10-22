@@ -1,5 +1,5 @@
 
-import {invalidateFresh, useMeQuery} from "@/queries.ts";
+import {forgetUserData, invalidateFresh, useMeQuery} from "@/queries.ts";
 import {Link, useNavigate} from "@tanstack/react-router";
 import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
@@ -29,7 +29,7 @@ export function Header(){
         },
         onSettled : () => {
             queryClient.setQueryData(['me'], null)
-            queryClient.removeQueries({ predicate: q => q.queryKey[0] !== 'me' })
+            forgetUserData(queryClient)
             navigate({to:'/'})
             setOpen(false)
         }
