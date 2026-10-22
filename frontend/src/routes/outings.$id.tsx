@@ -215,21 +215,23 @@ export function OutingDetailPage() {
 
                     {detail.waiting.length > 0 && <>
                         <h3 className={styles.groupLabel}>Waiting ({detail.waiting.length})</h3>
-                        <div className={styles.waitingSummary}>
-                            <div className={styles.avatarStack} aria-hidden="true">
-                                {waitingPreview.map((w, i) => <span className={styles.chipAvatar} key={i}>{initial(w.name)}</span>)}
+                        <div className={styles.waitingBlock}>
+                            <div className={styles.waitingSummary}>
+                                <div className={styles.avatarStack} aria-hidden="true">
+                                    {waitingPreview.map((w, i) => <span className={styles.chipAvatar} key={i}>{initial(w.name)}</span>)}
+                                </div>
+                                <p className={styles.waitingNames}>
+                                    {listNames(waitingPreview.map(w => w.name))}
+                                    {detail.waiting.length > 3 && <> and <strong>{detail.waiting.length - 3} more</strong></>}
+                                </p>
+                                {detail.waiting.length > 3 &&
+                                    <button type="button" className="btn-outline" onClick={() => setShowWaiting(true)}>See all</button>}
                             </div>
-                            <p className={styles.waitingNames}>
-                                {listNames(waitingPreview.map(w => w.name))}
-                                {detail.waiting.length > 3 && <> and <strong>{detail.waiting.length - 3} more</strong></>}
-                            </p>
-                            {detail.waiting.length > 3 &&
-                                <button type="button" className="btn-outline" onClick={() => setShowWaiting(true)}>See all</button>}
+                            {myWaitingIndex >= 0 &&
+                                <p className={formStyles.notice} role="status">
+                                    You're <strong>{ordinal(myWaitingIndex + 1)} of {detail.waiting.length}</strong> — drivers go first, then in the order people asked.
+                                </p>}
                         </div>
-                        {myWaitingIndex >= 0 &&
-                            <p className={styles.notice} role="status">
-                                You're <strong>{ordinal(myWaitingIndex + 1)} of {detail.waiting.length}</strong> — drivers go first, then in the order people asked.
-                            </p>}
                     </>}
                     {showWaiting && <WaitingListModal waiting={detail.waiting} onClose={() => setShowWaiting(false)}/>}
                     {detail.withdrawn.length > 0 && <>

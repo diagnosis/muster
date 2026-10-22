@@ -29,9 +29,8 @@ test.describe("waiting and withdraw list", ()=>{
         await page.goto(`/outings/${o.id}`)
         await expect(page.getByRole('heading', {name: 'Waiting (2)'})).toBeVisible()
 
-        // waiting: the two chips, in queue order
-        const waiting = page.getByRole('list').filter({hasText: hikerA.user.name}).getByRole('listitem')
-        await expect(waiting).toContainText([hikerA.user.name, hikerB.user.name])
+        const summary = page.getByText(`${hikerA.user.name} and ${hikerB.user.name}`, {exact: true})
+        await expect(summary).toBeVisible()
 
         // withdrew
         await expect(page.getByRole('heading', {name: 'Withdrew (1)'})).toBeVisible()
@@ -105,14 +104,54 @@ test.describe("waiting and withdraw list", ()=>{
         await actorInBrowser(hiker1, context)
         await page.goto(`/outings/${o.id}`)
         await expect(page.getByText("You asked as a rider, bringing 1 guest", {exact:true})).toBeVisible()
+        await expect(page.getByText("You're 2nd of 3", {exact: false})).toBeVisible()
         await page.getByRole('button', { name: 'Edit request' }).click()
         await page.getByRole('spinbutton', { name: 'Guests' }).fill("2")
         await expect(page.getByText('Saving this moves you to the back of the waiting list.')).toBeVisible()
         await page.getByRole('button', { name: 'Save changes' }).click()
         await expect(page.getByText("You asked as a rider, bringing 2 guests", {exact:true})).toBeVisible()
+
+        await expect(page.getByText("You're 3rd of 3", {exact: false})).toBeVisible()
         const jrws = await listOutingRequests(host, o.id, "requested")
         const ids = jrws.map(jrw => jrw.id)
         expect(ids).toEqual([j3.id,j2.id,j1.id])
 
     })
+    test("waiting hiker sees the full queue with their place", async ({page, context}) => {
+        const host = await createActor()
+        const driver = await createActor()
+        const r1 = await createActor()
+        const me = await createActor()
+        const r3 = await createActor()
+        const o = await createOuting(host, {host_seats: 1, max_size: 8})   // nobody gets accepted
+        await joinRequest(r1, o.id)
+        await joinRequest(me, o.id, {guests: 1})
+        await joinRequest(r3, o.id)
+        await joinRequest(driver, o.id, {role: 'driver', seats_offered: 2})   // asks last, leads anyway
+
+        await actorInBrowser(me, context)
+        await page.goto(`/outings/${o.id}`)
+
+        // summary: three names and the rest as a count
+        await expect(page.getByRole('heading', {name: 'Waiting (4)'})).toBeVisible()
+        await expect(page.getByText('and 1 more')).toBeVisible()
+        await expect(page.getByRole('status')).toContainText("You're 3rd of 4")
+
+        // the modal: ordered, tagged, me marked
+        await page.getByRole('button', {name: 'See all'}).click()
+        const dialog = page.getByRole('dialog', {name: 'Waiting (4)'})
+        await expect(dialog).toBeVisible()
+        const rows = dialog.getByRole('listitem')
+        await expect(rows).toHaveCount(4)
+        await expect(rows.nth(0)).toContainText(driver.user.name)
+        await expect(rows.nth(0)).toContainText('Driver · 2 seats')
+        await expect(rows.nth(2)).toContainText(me.user.name)
+        await expect(rows.nth(2)).toContainText('(you)')
+        await expect(rows.nth(2)).toContainText('+1 guest')
+        await expect(rows.nth(2)).toHaveAttribute('aria-current', 'true')
+
+        await dialog.getByRole('button', {name: 'Close'}).click()
+        await expect(dialog).toHaveCount(0)
+    })
+
 })

@@ -14,7 +14,7 @@ export function WaitingListModal({waiting, onClose}: {waiting: ListedHiker[], on
                         <span className={styles.position}>{i + 1}</span>
                         <span className={styles.avatar} aria-hidden="true">{initial(w.name)}</span>
                         <span className={styles.name}>
-                            {w.name}{w.is_me && <span className={styles.you}> (you)</span>}
+                           {w.is_me && <span className={styles.you}> (you)</span>} {w.name}
                         </span>
                         {w.role === 'driver' &&
                             <span className={styles.driverTag}>Driver · {w.seats_offered} {w.seats_offered === 1 ? 'seat' : 'seats'}</span>}
