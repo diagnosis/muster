@@ -1,8 +1,9 @@
 // src/queries/auth.ts
 
-import {useMutation, useQueryClient} from "@tanstack/react-query";
+import { useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import type {ForgotPasswordResponse, MeResponse, RequestLoginCodeResponse, ResendEmailResponse} from "@/types.ts";
+import {forgetUserData} from "@/queries.ts";
 
 export function useForgotPasswordMutation(){
  return   useMutation(
@@ -41,7 +42,10 @@ export function useLoginWithCodeMutation() {
             }
             throw new ApiRequestError(res.error, res.httpStatus)
         },
-        onSuccess: () => qc.invalidateQueries({queryKey:['me']})
+        onSuccess: () => {
+            forgetUserData(qc)
+            qc.invalidateQueries({queryKey: ['me']})
+        }
     })
 }
 
@@ -55,7 +59,10 @@ export function useLoginWithPasswordMutation() {
             }
             throw new ApiRequestError(res.error, res.httpStatus)
         },
-        onSuccess: () => qc.invalidateQueries({queryKey:['me']})
+        onSuccess: () => {
+            forgetUserData(qc)
+            qc.invalidateQueries({queryKey: ['me']})
+        }
     })
 }
 

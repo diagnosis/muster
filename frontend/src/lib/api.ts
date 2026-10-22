@@ -3,6 +3,10 @@ const API_BASE = import.meta.env.VITE_API_URL ?? ''
 import type {ApiError, ApiResponse} from '../types'
 
 
+let onSignedOut: (() => void) | null = null
+let signingOut = false
+export const setOnSignedOut = (fn: () => void) => { onSignedOut = fn }
+
 let refreshInFlight: Promise<number> | null = null
 
 export const refreshSession = (): Promise<number> => {
@@ -26,6 +30,10 @@ const request = async <T>(endpoint:string, init?: RequestInit):Promise<ApiRespon
     if(refresh === 200){
         return bareRequest<T>(endpoint, init)
     }
+    if (refresh === 401 && !signingOut) {
+        signingOut = true
+        try { onSignedOut?.() } finally { signingOut = false }
+    }
     return res
 }
 
@@ -48,6 +56,7 @@ const bareRequest = async <T>(endpoint:string, init?: RequestInit): Promise<ApiR
 
 export const apiClient = {
     get :  <T>(endpoint:string) =>  request<T>(endpoint),
+    probe: <T>(endpoint:string) => bareRequest<T>(endpoint),
     post:  <T>(endpoint:string, body?:unknown) =>
        request<T>(endpoint, {
            method:'POST',

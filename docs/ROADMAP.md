@@ -30,6 +30,7 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 | Edit pending request (PR #47) | `PATCH /api/outings/{id}/requests/me` lets a hiker change role, seats, guests or note on a pending request; nil fields keep their value and the merged result passes the same validation as a new request. An edit that asks the outing for more — more guests, fewer seats offered, or driver → rider — moves the request to the back (`requested_at = now`); anything else keeps its place. The host gets a `join_request_updated` notification on role, seats or guests changes; note-only edits are silent. Drivers now lead the queue everywhere: both the host's list and the outing page's waiting chips order by role, then `requested_at`. The outing page shows what you asked for, an Edit button, and a live warning when the change would move you back |
 | Passwordless login (PR #48, #49) | A second door on the login page: `POST /api/auth/login-code` mails a six-digit code, `POST /api/auth/login-code/verify` exchanges it for the same session a password login mints. The request endpoint answers 200 whether or not the email exists and whether or not a code was sent (30 s resend window), so the response reveals nothing. A code lives 10 minutes, dies on the fifth wrong try, is burned by a resend, and works once; every rejection is the same 401. An unverified account can ask for a code and is marked verified on success, since the code proves the inbox. Codes are hashed with the hiker id so two hikers drawing the same six digits cannot collide on the unique hash column. Login page: password → request → verify modes with a countdown on resend; one browser spec plants a code through the DB helper  Follow-ups (#49): show/hide eye on password fields; the first send starts the resend countdown |
 | Waiting list uplift (PR #50) | Waiting and withdrawn rows now carry `role`, `seats_offered`, `guests` and `is_me`; the hiker id stays server-side and the service marks the viewer's own row. The outing page shows the first three names with a count and a "See all" button, and an amber line with the viewer's place ("You're 3rd of 7") when they are in the queue. The modal lists the whole queue in host order: position, driver tag with seats, "+n guests", the viewer's row highlighted in place |
+| Signed-out tabs (PR #51) | When a request's refresh fails with 401, the client forgets the user and lands on `/login` — one callback registered at the root, guarded against re-entry. `/api/auth/me` is a probe: a 401 means "guest", with one quiet refresh attempt and never a sign-out. Login refetches `me` and drops every other cached query; logout nulls `me` and drops the rest (`forgetUserData`). Two-tab, expired-access and guest-page browser specs |
 
 ---
 
@@ -46,7 +47,7 @@ In this order. Items can be added.
 
 ### Known bugs
 
-- **Outing page turns into the stranger view after a while.** Logged in, request sent, page open; some minutes later the page shows "Request to join" again and submitting it gets the server's 409 ("you already have an active request"). The server is right; the client's `detail` refetch came back at the logged-out level. Suspect the access-token expiry: a refetch that goes out before the shared refresh lands is answered anonymously and never retried. Check whether `useOuting` retries after a 401, and whether the first-load race applies.
+None open. (The "stranger view after a while" bug was the cookie going away in another tab; fixed in PR #51.)
 
 ### Polish ledger (not blocking v1; do in batches)
 
@@ -93,6 +94,9 @@ In this order. Items can be added.
 - `make migrate-up` needs the direct (non-pooled) URL; goose's prepared statements fail through PgBouncer. A `MIGRATE_URL` or a note in the Makefile.
 - Delete the unused `NEON_API_KEY` and `NEON_PROJECT_ID` repo secrets.
 - Hosting: Neon free (100 CU-hours/month, scale-to-zero) is enough with CI off it. When real hikers arrive: a Postgres on the DO droplet never pauses; Supabase free pauses after 7 idle days; Neon Launch is ~$19.
+- Login in one tab doesn't reach the others until they reload; a `BroadcastChannel` or `storage` event would. Logout already propagates on the next request.
+- The `signingOut` re-entry guard in `api.ts` has no test; the frontend has no unit runner. Decide on vitest for `lib/`, or accept it as untested plumbing.
+- `me` staleTime is 5 minutes; a stale identity hid the two-tab bug for a week. 30 s, or `refetchOnWindowFocus` for `me` alone.
 - The waiting-list summary shows "See all" only past three names, so a queue of two or three never reveals roles or guests; consider showing the button always.
 - The "(you)" marker sits beside a name that may truncate on a phone; the amber row carries the meaning, but check it.
 - `listNames` and the page both add "and" when a "more" count follows; join with commas when there is a count.
