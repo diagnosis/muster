@@ -109,7 +109,7 @@ _:
 func Test_AddComment_CancelledAndPassedOutingReturnConflict(t *testing.T) {
 	svc, f, _, _ := newTestService(t)
 	host1ID, host2ID, hikerID := uuid.New(), uuid.New(), uuid.New()
-	o1 := seedOutingWithStartTime(5, 3, StatusOpen, host1ID, f, time.Now().Add(-8*24*time.Hour))
+	o1 := seedOuting(5, 3, StatusOpen, host1ID, f, withStart(time.Now().Add(-8*24*time.Hour)))
 	o2 := seedOuting(7, 3, StatusCancelled, host2ID, f)
 
 	_ = seedJoinRequest(o1.ID, hikerID, RequestStatusAccepted, "rider", f, 0)
@@ -485,7 +485,7 @@ func Test_Comment_WithinEffectiveEnd(t *testing.T) {
 	svc, f, _, _ := newTestService(t)
 	hostID, hikerID := uuid.New(), uuid.New()
 	endsAt := time.Now().Add(-68 * time.Hour)
-	o := seedOutingWithStartAndEndTime(8, 4, StatusOpen, hostID, f, time.Now().Add(-78*time.Hour), &endsAt)
+	o := seedOuting(8, 4, StatusOpen, hostID, f, withStart(time.Now().Add(-78*time.Hour)), withEnd(&endsAt))
 
 	_ = seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "driver", f, 0)
 	seedMember(hikerID, "mane", "beginner", f)
@@ -522,7 +522,7 @@ func Test_AddComment_DiscussionWindow(t *testing.T) {
 
 	for _, cc := range cases {
 		t.Run(cc.name, func(t *testing.T) {
-			o := seedOutingWithStartAndEndTime(8, 4, StatusOpen, hostID, f, cc.starts, cc.ends)
+			o := seedOuting(8, 4, StatusOpen, hostID, f, withStart(cc.starts), withEnd(cc.ends))
 			seedJoinRequest(o.ID, hikerID, RequestStatusAccepted, "rider", f, 0)
 
 			c, err := svc.AddComment(context.Background(), hikerID, o.ID, "hello", nil)
