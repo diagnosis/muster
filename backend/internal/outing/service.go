@@ -272,12 +272,9 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 	if err != nil {
 		return nil, err
 	}
-	peopleCount := 1
-
-	for _, r := range acceptedRequests {
-		peopleCount += 1 + r.Guests
-	}
-	if o.MaxSize < peopleCount {
+	acceptedPeople, _ := acceptedSums(acceptedRequests)
+	c := capacityOf(o, acceptedPeople, 0, 0)
+	if o.MaxSize < c.PeopleCount {
 		return nil, apperr.Conflict(
 			"cannot reduce group size below current committed members",
 			"update: max_size below people count",
@@ -708,34 +705,25 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 	}
 
 	o.stamp(time.Now())
-	peopleCount := 1
-	seatCapacity := o.HostSeats
-	for _, r := range acceptedRequests {
-		if r.Role == RoleDriver {
-			seatCapacity += r.SeatsOffered
-		}
-		peopleCount += 1 + r.Guests
+
+	acceptedPeople, driverSeats := acceptedSums(acceptedRequests)
+
+	waiting, err := s.store.WaitingNames(ctx, outingID)
+	if err != nil {
+		return nil, err
 	}
-	seatsShort := max(0, peopleCount-seatCapacity)
-	spotsLeft := max(0, min(seatCapacity, o.MaxSize)-peopleCount)
 	detail := &Detail{
-		Outing:       *o,
-		Host:         *host,
-		Roster:       []Member{},
-		Waiting:      []ListedHiker{},
-		Withdrawn:    []ListedHiker{},
-		MyRequest:    myReq,
-		SeatCapacity: seatCapacity,
-		PeopleCount:  peopleCount,
-		SeatsShort:   seatsShort,
-		SpotsLeft:    spotsLeft,
+		Outing:    *o,
+		Host:      *host,
+		Roster:    []Member{},
+		Waiting:   []ListedHiker{},
+		Withdrawn: []ListedHiker{},
+		MyRequest: myReq,
+		Capacity:  capacityOf(o, acceptedPeople, driverSeats, len(waiting)),
 	}
 	level := levelOf(o, viewerID, myReq)
 	if level >= viewerLoggedIn {
-		detail.Waiting, err = s.store.WaitingNames(ctx, outingID)
-		if err != nil {
-			return nil, err
-		}
+		detail.Waiting = waiting
 		detail.Withdrawn, err = s.store.WithdrawnNames(ctx, outingID)
 		if err != nil {
 			return nil, err
@@ -1008,4 +996,15 @@ func (s *Service) isAudience(ctx context.Context, outing *Outing, hikerID uuid.U
 
 	return false, nil
 
+}
+
+// acceptedSums totals people (member + guests) and drivers' seats across accepted requests.
+func acceptedSums(accepted []JoinRequestView) (people, driverSeats int) {
+	for _, r := range accepted {
+		people += 1 + r.Guests
+		if r.Role == RoleDriver {
+			driverSeats += r.SeatsOffered
+		}
+	}
+	return people, driverSeats
 }

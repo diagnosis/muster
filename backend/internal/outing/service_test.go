@@ -1960,6 +1960,126 @@ func Test_Detail_IsMe_Withdrawn(t *testing.T) {
 	}
 }
 
+func Test_CapacityOf(t *testing.T) {
+	tests := []struct {
+		name                                 string
+		maxSize, hostSeats                   int
+		acceptedPeople, driverSeats, waiting int
+		want                                 Capacity
+	}{
+		{
+			name: "host alone", maxSize: 6, hostSeats: 4, acceptedPeople: 0, driverSeats: 0,
+			want: Capacity{
+				PeopleCount:  1,
+				SeatCapacity: 4,
+				SeatsShort:   0,
+				SpotsLeft:    3,
+				WaitingCount: 0,
+			},
+		},
+		{
+			name: "seats bind", maxSize: 12, hostSeats: 4, acceptedPeople: 3, driverSeats: 0, waiting: 0,
+			want: Capacity{PeopleCount: 4, SeatCapacity: 4, SeatsShort: 0, SpotsLeft: 0, WaitingCount: 0},
+		},
+		{
+			name: "seats short", maxSize: 12, hostSeats: 2, acceptedPeople: 4, driverSeats: 0, waiting: 0,
+			want: Capacity{
+				PeopleCount:  5,
+				SeatCapacity: 2,
+				SeatsShort:   3,
+				SpotsLeft:    0,
+				WaitingCount: 0,
+			},
+		},
+		{
+			name: "driver opens seat", maxSize: 12, hostSeats: 2, acceptedPeople: 3, driverSeats: 4, waiting: 0,
+			want: Capacity{
+				PeopleCount:  4,
+				SeatCapacity: 6,
+				SeatsShort:   0,
+				SpotsLeft:    2,
+				WaitingCount: 0,
+			},
+		},
+		{
+			name:    "max_size binds",
+			maxSize: 5, hostSeats: 4, acceptedPeople: 3, driverSeats: 4, waiting: 0,
+			want: Capacity{
+				PeopleCount:  4,
+				SeatCapacity: 8,
+				SeatsShort:   0,
+				SpotsLeft:    1,
+				WaitingCount: 0,
+			},
+		},
+		{
+			name: "waiting passes through", maxSize: 6, hostSeats: 4, acceptedPeople: 0, driverSeats: 0, waiting: 5,
+			want: Capacity{
+				PeopleCount:  1,
+				SeatCapacity: 4,
+				SeatsShort:   0,
+				SpotsLeft:    3,
+				WaitingCount: 5,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			o := &Outing{MaxSize: tc.maxSize, HostSeats: tc.hostSeats}
+			got := capacityOf(o, tc.acceptedPeople, tc.driverSeats, tc.waiting)
+			if got != tc.want {
+				t.Errorf("got %+v, want %+v", got, tc.want)
+			}
+
+		})
+	}
+}
+
+func Test_Detail_Capacity(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	hostID := uuid.New()
+	h1, h2, d1 := uuid.New(), uuid.New(), uuid.New()
+
+	o := seedOuting(6, 2, StatusOpen, hostID, f) // max 6, host seats 2
+	seedMember(hostID, "sevket", "beginner", f)
+	seedMember(h1, "salih", "beginner", f)
+	seedMember(h2, "hale", "experienced", f)
+	seedMember(d1, "jale", "intermediate", f)
+	seedJoinRequest(o.ID, h1, RequestStatusAccepted, RoleRider, f, 2)                     // 3 people
+	seedJoinRequestWithSeatsOffered(o.ID, d1, RequestStatusAccepted, RoleDriver, f, 1, 3) // 2 people, 3 seats
+	seedJoinRequest(o.ID, h2, RequestStatusRequested, RoleRider, f, 0)                    // waiting
+
+	want := Capacity{PeopleCount: 6, SeatCapacity: 5, SeatsShort: 1, SpotsLeft: 0, WaitingCount: 1}
+
+	viewers := []struct {
+		name   string
+		viewer *uuid.UUID
+	}{
+		{"host", &hostID},
+		{"logged out", nil},
+	}
+	for _, v := range viewers {
+		t.Run(v.name, func(t *testing.T) {
+			detail, err := svc.Detail(context.Background(), o.ID, v.viewer)
+			if err != nil {
+				t.Fatalf("detail: %v", err)
+			}
+			if detail.Capacity != want {
+				t.Errorf("capacity: got %+v, want %+v", detail.Capacity, want)
+			}
+		})
+	}
+
+	// the count is public, the names are not
+	detail, err := svc.Detail(context.Background(), o.ID, nil)
+	if err != nil {
+		t.Fatalf("detail as guest: %v", err)
+	}
+	if len(detail.Waiting) != 0 {
+		t.Errorf("guest saw %d waiting names, want 0", len(detail.Waiting))
+	}
+}
+
 func ptr[T any](v T) *T {
 	return &v
 }
