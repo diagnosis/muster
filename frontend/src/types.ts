@@ -47,7 +47,17 @@ export interface Outing{
     ends_at: string | null
     phase: Phase
     is_discussion_open: boolean
+    capacity?:Capacity
 }
+export type CapacityTone = 'open' | 'short' | 'full'
+export interface Capacity{
+    people_count: number
+    seat_capacity: number
+    seats_short: number
+    spots_left: number
+    waiting_count: number
+}
+
 export interface ListedHiker {
     name: string
     role: 'driver' | 'rider'
