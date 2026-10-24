@@ -101,7 +101,6 @@ test.describe("auth flow", ()=> {
         await page.getByRole('textbox', {name:'Email'}).fill("test@test.com")
         await page.getByRole('textbox', {name:'Password'}).fill("WrongPassword123!")
         await page.getByRole('button', {name:"Log in"}).click()
-        await page.pause()
         await expect(page.getByText(INVALID_LOGIN)).toBeVisible()
 
         await page.getByRole('textbox', {name:'Email'}).fill("wrong@test.com")
