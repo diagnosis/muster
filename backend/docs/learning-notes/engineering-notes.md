@@ -393,3 +393,25 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 - **Guard the callback.** Two queries that 401 in the same tick both reach the sign-out branch; a `signingOut` flag makes the second a no-op. Untested today — the frontend has no unit runner — and in the ledger.
 - **Fixing the probe broke the reload.** `successful refresh` went red: with `me` as a pure probe, a fresh page load with an expired access token had nothing that refreshed. The browser suite caught it in the same run that proved the fix. Every auth path that the client can be in now has a spec: expired access with a good refresh, failed refresh, logout in another tab, guest on a public page.
 - **Headless pages don't get focus.** `window.dispatchEvent(new Event('focus'))` does nothing when `document.visibilityState` is `hidden`, which it is for a background page in Playwright. `reload()` is the honest trigger.
+
+## Lessons from card capacity (PR #52)
+
+**`capacityOf` was meant to be one home and found two squatters.** The point of the helper was that `Detail`, `Update` and the lists all compute room the same way. Writing it exposed that `Detail` and `Update` each passed `len(acceptedRequests)` where people were wanted. A request is one row; a person is `1 + guests`. The same bug twice, in two homes, is the argument for one home.
+
+**`=` where `+=` was meant hides behind map order.** `acceptedSums` first wrote `people = 1 + guests` inside the loop, so the sum was whichever request the fake's map handed back last. With one accepted request every test is green; the sabotage that drops the driver gate was what turned four red. An accumulator that is correct for n=1 is not tested until n=2.
+
+**Fake keyed by the wrong thing.** The fake `CapacityStats` first looked up `f.requests[outingID]`, a map keyed by request id, and returned nothing for every outing. Fakes mirror the store's *shape*: scan every request, filter by `OutingID`, group by `OutingID`. The store's `GROUP BY outing_id` is the same loop in SQL.
+
+**Counts are public, names are private.** `Detail` fetches the waiting list above the login gate and assigns names below it. First cut set `WaitingCount` inside the gate (guests saw 0), second cut moved the whole block up (guests saw names). The test that checks a nil viewer gets `waiting_count` *and* no `waiting` entries is the one that holds both halves.
+
+**The fourth state was found by a fixture, not by design.** The spreadsheet had three states: short, full, open. The browser fixture with `host_seats 1` + a driver with 1 seat + max 8 rendered "full" for 3 people, and that was wrong: a driver would open five spots. `spots_left == 0 && people < max_size` is its own sentence. Spreadsheets enumerate what you thought of; fixtures enumerate what the system does.
+
+**The server refuses the state you want to test.** Accept returns 409 past capacity, so "seats short" cannot be built by accepting one too many. It's a post-hoc state: accept, then shrink `host_seats` via PATCH. Reading the service's rules told us how the fixture had to be built.
+
+**The bar measures against the binding ceiling.** `people / max_size` showed 3 of 8 as 37% while the sentence said "no seats left". The bar is full when any ceiling is hit; otherwise `people / (people + spots_left)`. Two readouts of the same number must agree.
+
+**Four `if`s, one chain.** `capacityLine` went through a template-literal version with the branch order reversed from the `if` chain and a `false` leaking into the string. One `if/else if` chain, returning `{text, tone}`, read top to bottom in the same order as the spreadsheet.
+
+**StrictMode is a test environment of its own.** `verify-email` consumes the token in an effect; dev StrictMode runs it twice, the second call 409s and overwrites the success copy. `CI=1` builds pass because StrictMode is off. A once-only guard belongs in the page; until then the suite runs with `CI=1` and the roadmap says why.
+
+**`page.pause()` is a breakpoint, not a line.** One left in `auth.spec.ts` after headed debugging would hang CI forever with no failure message. Grep for it before pushing; the browser suite can't catch it because it is the thing that stops the suite.
