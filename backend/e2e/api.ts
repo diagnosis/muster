@@ -173,3 +173,5 @@ export const verifyLoginCode = (ctx:APIRequestContext,input:{email:string, code:
     ctx.post('/api/auth/login-code/verify', {data:input})
 export const requestLoginCode = (ctx:APIRequestContext, input:{email:string}) =>
     ctx.post('/api/auth/login-code', {data:input})
+export const listOutings = (ctx:APIRequestContext) =>
+    ctx.get('api/outings')

@@ -49,6 +49,8 @@ type Storage interface {
 
 	WaitingNames(ctx context.Context, outingID uuid.UUID) ([]ListedHiker, error)
 	WithdrawnNames(ctx context.Context, outingID uuid.UUID) ([]ListedHiker, error)
+
+	CapacityStats(ctx context.Context, outingIDs []uuid.UUID) (map[uuid.UUID]CapacityStats, error)
 }
 
 const maxOutingDuration = 14 * 24 * time.Hour
@@ -522,8 +524,38 @@ func (s *Service) ListUpcoming(ctx context.Context) ([]Outing, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err = s.attachCapacity(ctx, outings); err != nil {
+		return nil, err
+	}
+
 	stampAll(outings, now)
 	return outings, nil
+}
+
+// attachCapacity sets Capacity on every outing in the given slices with one store call.
+func (s *Service) attachCapacity(ctx context.Context, lists ...[]Outing) error {
+	ids := []uuid.UUID{}
+	for i := range lists {
+		for j := range lists[i] {
+			ids = append(ids, lists[i][j].ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	stats, err := s.store.CapacityStats(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for i := range lists {
+		for j := range lists[i] {
+			cs := stats[lists[i][j].ID]
+			cc := capacityOf(&lists[i][j], cs.AcceptedPeople, cs.DriverSeats, cs.Waiting)
+			lists[i][j].Capacity = &cc
+		}
+	}
+	return nil
 }
 
 // JoinRequests returns the outing's join requests, filters by RequestStatus
@@ -549,6 +581,10 @@ func (s *Service) MyOutings(ctx context.Context, hikerID uuid.UUID) (*MyOutings,
 	if err != nil {
 		return nil, err
 	}
+	if err = s.attachCapacity(ctx, mine.Hosting, mine.Joined); err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	stampAll(mine.Joined, now)
 	stampAll(mine.Hosting, now)

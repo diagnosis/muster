@@ -136,6 +136,7 @@ type Outing struct {
 	EndsAt           *time.Time `json:"ends_at"`
 	Phase            Phase      `json:"phase"`
 	IsDiscussionOpen bool       `json:"is_discussion_open"`
+	Capacity         *Capacity  `json:"capacity,omitempty"`
 }
 
 // Phase is where an outing sits in time: before it starts, under way, or over.
@@ -257,6 +258,13 @@ func capacityOf(o *Outing, acceptedPeople, driverSeats, waiting int) Capacity {
 		SpotsLeft:    max(0, min(seatCapacity, o.MaxSize)-peopleCount),
 		WaitingCount: waiting,
 	}
+}
+
+// CapacityStats is the raw per-outing input to capacityOf, summed in one query.
+type CapacityStats struct {
+	AcceptedPeople int // Σ (1 + guests) over accepted requests
+	DriverSeats    int // Σ seats_offered over accepted drivers
+	Waiting        int // count of requested
 }
 
 // MyOutings groups the outings a hiker hosts and the ones they joined.

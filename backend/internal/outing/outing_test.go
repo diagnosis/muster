@@ -436,3 +436,74 @@ func Test_CreateAndUpdate_Phase(t *testing.T) {
 		t.Fatalf("expected %s got %s", PhaseUpcoming, u.Phase)
 	}
 }
+
+func Test_ListUpcoming_Capacity(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	a := seedOuting(6, 2, StatusOpen, host, f)
+	b := seedOuting(8, 4, StatusOpen, host, f)
+	seedJoinRequest(a.ID, uuid.New(), RequestStatusAccepted, RoleRider, f, 1)
+	seedJoinRequest(a.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 0)
+
+	got, err := svc.ListUpcoming(context.Background())
+	if err != nil {
+		t.Fatalf("ListUpcoming: %v", err)
+	}
+
+	want := map[uuid.UUID]Capacity{
+		// host + rider + guest = 3 in 2 host seats: one short, no spots, one waiting
+		a.ID: {PeopleCount: 3, SeatCapacity: 2, SeatsShort: 1, SpotsLeft: 0, WaitingCount: 1},
+		// host alone: 4 seats, max 8, so 3 spots
+		b.ID: {PeopleCount: 1, SeatCapacity: 4, SeatsShort: 0, SpotsLeft: 3, WaitingCount: 0},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d outings, got %d", len(want), len(got))
+	}
+	for _, o := range got {
+		if o.Capacity == nil {
+			t.Errorf("%s: capacity is nil", o.ID)
+			continue
+		}
+		if *o.Capacity != want[o.ID] {
+			t.Errorf("%s: got %+v, want %+v", o.ID, *o.Capacity, want[o.ID])
+		}
+	}
+}
+
+func Test_MyOutings_Capacity(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	hiker := uuid.New()
+	a := seedOuting(6, 2, StatusOpen, host, f)
+	b := seedOuting(8, 4, StatusOpen, host, f)
+	c := seedOuting(10, 4, StatusOpen, hiker, f)
+
+	seedJoinRequest(a.ID, hiker, RequestStatusRequested, RoleDriver, f, 0, withSeats(2)) // pending: not in Joined
+	seedJoinRequest(b.ID, hiker, RequestStatusAccepted, RoleRider, f, 1)
+	seedJoinRequest(c.ID, uuid.New(), RequestStatusAccepted, RoleRider, f, 1)
+	seedJoinRequest(c.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 0) // makes c differ from b
+
+	mine, err := svc.MyOutings(context.Background(), hiker)
+	if err != nil {
+		t.Fatalf("MyOutings: %v", err)
+	}
+	if len(mine.Hosting) != 1 || len(mine.Joined) != 1 {
+		t.Fatalf("expected 1 hosting and 1 joined, got %d and %d", len(mine.Hosting), len(mine.Joined))
+	}
+
+	want := map[uuid.UUID]Capacity{
+		// hosting: host + rider + guest = 3 in 4 seats, max 10; one waiting
+		c.ID: {PeopleCount: 3, SeatCapacity: 4, SeatsShort: 0, SpotsLeft: 1, WaitingCount: 1},
+		// joined: host + me + my guest = 3 in 4 seats, max 8
+		b.ID: {PeopleCount: 3, SeatCapacity: 4, SeatsShort: 0, SpotsLeft: 1, WaitingCount: 0},
+	}
+	for _, o := range append(mine.Hosting, mine.Joined...) {
+		if o.Capacity == nil {
+			t.Errorf("%s: capacity is nil", o.ID)
+			continue
+		}
+		if *o.Capacity != want[o.ID] {
+			t.Errorf("%s: got %+v, want %+v", o.ID, *o.Capacity, want[o.ID])
+		}
+	}
+}
