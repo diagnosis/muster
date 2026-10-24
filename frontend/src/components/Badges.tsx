@@ -10,8 +10,8 @@ export function Badges({outing}: BadgesProps){
     const seat_cost = `$${(outing.cost_per_seat_cents / 100).toFixed(2)}/seat`
     return  <div className={styles.badges}>
         {outing.status==="cancelled" && <span className={`${styles.badge} ${styles.cancelled}`}>cancelled</span>}
-        <span className={styles.badge}><span className={styles.badgeLabel}>terrain</span>{outing.difficulty}</span>
-        <span className={styles.badge}><span className={styles.badgeLabel}>pace</span>{outing.pace}</span>
+        <span className={styles.badge}><span className={styles.badgeLabel}>terrain</span>{' '}{outing.difficulty}</span>
+        <span className={styles.badge}><span className={styles.badgeLabel}>pace</span>{' '}{outing.pace}</span>
         {outing.cost_per_seat_cents > 0 && <span className={`${styles.badge} ${styles.badgeCost}`}>{seat_cost}</span>}
     </div>
 

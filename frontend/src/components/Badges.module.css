@@ -35,8 +35,7 @@
     font-weight: 600;
 }
 
-/* the quite word in front of a value: "terrain moderate", "pace relaxed" */
+
 .badgeLabel{
-    font-weight: 400;
-    margin-right: 0.35rem;
+    font-weight: 600;
 }
