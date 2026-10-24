@@ -4,6 +4,7 @@ import styles from '@/components/OutingCard.module.css'
 import {Badges} from "@/components/Badges.tsx";
 import {outingRange} from "@/utils/date.ts";
 import {CalendarIcon, FlagIcon, PinIcon} from "@/components/Icons.tsx";
+import {CapacityLine} from "@/components/CapacityLine.tsx";
 interface OutingCardProps {
    outing: Outing
     label?: string
@@ -25,6 +26,7 @@ export function OutingCard({outing, label}: OutingCardProps) {
             <li className={styles.metaItem}><PinIcon size={16}/> {outing.destination}</li>
             <li className={styles.metaItem}><FlagIcon size={16}/> {outing.meet_label}</li>
         </ul>
+        {outing.capacity && <CapacityLine capacity={outing.capacity} maxSize={outing.max_size}/>}
         <Badges outing={outing}/>
     </div>
 }

@@ -49,6 +49,8 @@ type Storage interface {
 
 	WaitingNames(ctx context.Context, outingID uuid.UUID) ([]ListedHiker, error)
 	WithdrawnNames(ctx context.Context, outingID uuid.UUID) ([]ListedHiker, error)
+
+	CapacityStats(ctx context.Context, outingIDs []uuid.UUID) (map[uuid.UUID]CapacityStats, error)
 }
 
 const maxOutingDuration = 14 * 24 * time.Hour
@@ -272,12 +274,9 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 	if err != nil {
 		return nil, err
 	}
-	peopleCount := 1
-
-	for _, r := range acceptedRequests {
-		peopleCount += 1 + r.Guests
-	}
-	if o.MaxSize < peopleCount {
+	acceptedPeople, _ := acceptedSums(acceptedRequests)
+	c := capacityOf(o, acceptedPeople, 0, 0)
+	if o.MaxSize < c.PeopleCount {
 		return nil, apperr.Conflict(
 			"cannot reduce group size below current committed members",
 			"update: max_size below people count",
@@ -525,8 +524,38 @@ func (s *Service) ListUpcoming(ctx context.Context) ([]Outing, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err = s.attachCapacity(ctx, outings); err != nil {
+		return nil, err
+	}
+
 	stampAll(outings, now)
 	return outings, nil
+}
+
+// attachCapacity sets Capacity on every outing in the given slices with one store call.
+func (s *Service) attachCapacity(ctx context.Context, lists ...[]Outing) error {
+	ids := []uuid.UUID{}
+	for i := range lists {
+		for j := range lists[i] {
+			ids = append(ids, lists[i][j].ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	stats, err := s.store.CapacityStats(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for i := range lists {
+		for j := range lists[i] {
+			cs := stats[lists[i][j].ID]
+			cc := capacityOf(&lists[i][j], cs.AcceptedPeople, cs.DriverSeats, cs.Waiting)
+			lists[i][j].Capacity = &cc
+		}
+	}
+	return nil
 }
 
 // JoinRequests returns the outing's join requests, filters by RequestStatus
@@ -552,6 +581,10 @@ func (s *Service) MyOutings(ctx context.Context, hikerID uuid.UUID) (*MyOutings,
 	if err != nil {
 		return nil, err
 	}
+	if err = s.attachCapacity(ctx, mine.Hosting, mine.Joined); err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	stampAll(mine.Joined, now)
 	stampAll(mine.Hosting, now)
@@ -708,34 +741,25 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 	}
 
 	o.stamp(time.Now())
-	peopleCount := 1
-	seatCapacity := o.HostSeats
-	for _, r := range acceptedRequests {
-		if r.Role == RoleDriver {
-			seatCapacity += r.SeatsOffered
-		}
-		peopleCount += 1 + r.Guests
+
+	acceptedPeople, driverSeats := acceptedSums(acceptedRequests)
+
+	waiting, err := s.store.WaitingNames(ctx, outingID)
+	if err != nil {
+		return nil, err
 	}
-	seatsShort := max(0, peopleCount-seatCapacity)
-	spotsLeft := max(0, min(seatCapacity, o.MaxSize)-peopleCount)
 	detail := &Detail{
-		Outing:       *o,
-		Host:         *host,
-		Roster:       []Member{},
-		Waiting:      []ListedHiker{},
-		Withdrawn:    []ListedHiker{},
-		MyRequest:    myReq,
-		SeatCapacity: seatCapacity,
-		PeopleCount:  peopleCount,
-		SeatsShort:   seatsShort,
-		SpotsLeft:    spotsLeft,
+		Outing:    *o,
+		Host:      *host,
+		Roster:    []Member{},
+		Waiting:   []ListedHiker{},
+		Withdrawn: []ListedHiker{},
+		MyRequest: myReq,
+		Capacity:  capacityOf(o, acceptedPeople, driverSeats, len(waiting)),
 	}
 	level := levelOf(o, viewerID, myReq)
 	if level >= viewerLoggedIn {
-		detail.Waiting, err = s.store.WaitingNames(ctx, outingID)
-		if err != nil {
-			return nil, err
-		}
+		detail.Waiting = waiting
 		detail.Withdrawn, err = s.store.WithdrawnNames(ctx, outingID)
 		if err != nil {
 			return nil, err
@@ -1008,4 +1032,15 @@ func (s *Service) isAudience(ctx context.Context, outing *Outing, hikerID uuid.U
 
 	return false, nil
 
+}
+
+// acceptedSums totals people (member + guests) and drivers' seats across accepted requests.
+func acceptedSums(accepted []JoinRequestView) (people, driverSeats int) {
+	for _, r := range accepted {
+		people += 1 + r.Guests
+		if r.Role == RoleDriver {
+			driverSeats += r.SeatsOffered
+		}
+	}
+	return people, driverSeats
 }

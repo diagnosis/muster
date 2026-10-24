@@ -1,6 +1,6 @@
 # Muster — Roadmap
 
-*As of 2026-10-21 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #49 merged) and the `feat/waiting-list-uplift` branch and confirmed by Safa. Replaces the 2026-08-07 roadmap.*
+*As of 2026-10-24 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #51 merged) and the `feat/card-capacity` branch, confirmed by Safa. Replaces the 2026-08-07 roadmap.*
 
 *Doc hierarchy: roadmap = why and when · spec = what · engineering notes = how.*
 
@@ -31,6 +31,7 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 | Passwordless login (PR #48, #49) | A second door on the login page: `POST /api/auth/login-code` mails a six-digit code, `POST /api/auth/login-code/verify` exchanges it for the same session a password login mints. The request endpoint answers 200 whether or not the email exists and whether or not a code was sent (30 s resend window), so the response reveals nothing. A code lives 10 minutes, dies on the fifth wrong try, is burned by a resend, and works once; every rejection is the same 401. An unverified account can ask for a code and is marked verified on success, since the code proves the inbox. Codes are hashed with the hiker id so two hikers drawing the same six digits cannot collide on the unique hash column. Login page: password → request → verify modes with a countdown on resend; one browser spec plants a code through the DB helper  Follow-ups (#49): show/hide eye on password fields; the first send starts the resend countdown |
 | Waiting list uplift (PR #50) | Waiting and withdrawn rows now carry `role`, `seats_offered`, `guests` and `is_me`; the hiker id stays server-side and the service marks the viewer's own row. The outing page shows the first three names with a count and a "See all" button, and an amber line with the viewer's place ("You're 3rd of 7") when they are in the queue. The modal lists the whole queue in host order: position, driver tag with seats, "+n guests", the viewer's row highlighted in place |
 | Signed-out tabs (PR #51) | When a request's refresh fails with 401, the client forgets the user and lands on `/login` — one callback registered at the root, guarded against re-entry. `/api/auth/me` is a probe: a 401 means "guest", with one quiet refresh attempt and never a sign-out. Login refetches `me` and drops every other cached query; logout nulls `me` and drops the rest (`forgetUserData`). Two-tab, expired-access and guest-page browser specs |
+| Capacity on the card (PR #52) | The browse and My-outings lists carry `capacity` per outing (`people_count`, `seat_capacity`, `seats_short`, `spots_left`, `waiting_count`), computed by one `capacityOf` that `Detail` and `Update` now share; the store returns raw per-outing sums in one grouped query. The card gains a fill bar and one sentence in four states, in priority order: seats short ("3 seats short, a driver would help"), no seats left under the max ("a driver would open more"), full, open; waiting appended in any state. The second state was found by a fixture, not designed: 3 people in 3 seats with max 8 read "full" and hid that a driver would change everything. Difficulty and pace chips gain quiet labels ("terrain moderate · pace moderate"). `Detail` gains `waiting_count`, public like the other four numbers |
 
 ---
 
@@ -38,16 +39,15 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 
 In this order. Items can be added.
 
-1. **Capacity on the outing card.** The browse list sends `people_count`, `max_size` and a waiting count so the card can say "10 of 20 going · 5 waiting"; this is the old `capacity_state` item, served by the API at last. Same PR: the two difficulty chips read as a duplicate when both say "moderate" — label them (terrain, pace) or give pace its own words.
-2. **Outing page live for everyone on it.** Pokes ride on notifications today, so a waiter whose place changes because someone ahead withdrew learns nothing until the tab regains focus. One `outing.changed {outing_id}` event on every join-request transition and roster change, to every open page of that outing; the page refetches detail on it.
-3. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
-4. **Pagination.** Browse first, with keyset pagination. Then chat, then the Past tab. Server-side phase filtering comes with it.
-5. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
-6. **One real hike organized through Muster.** v1 is done when boots hit dirt.
+1. **Outing page live for everyone on it.** Pokes ride on notifications today, so a waiter whose place changes because someone ahead withdrew learns nothing until the tab regains focus. One `outing.changed {outing_id}` event on every join-request transition and roster change, to every open page of that outing; the page refetches detail on it.
+2. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
+3. **Pagination.** Browse first, with keyset pagination. The browse-card capacity spec creates its own outings and expects them on the page it opens; it will need a page-one guarantee or a filter when this lands. Then chat, then the Past tab. Server-side phase filtering comes with it.
+4. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
+5. **One real hike organized through Muster.** v1 is done when boots hit dirt.
 
 ### Known bugs
 
-None open. (The "stranger view after a while" bug was the cookie going away in another tab; fixed in PR #51.)
+- **`verify-email` shows "expired or already used" on a fresh link in dev.** React StrictMode runs the page's effect twice, the first call consumes the token, the second gets a 409 and overwrites the success message. CI builds (no StrictMode) pass, so the suite is run with `CI=1`. Fix: make the verify call fire once (a ref guard or a mutation keyed on the token).
 
 ### Polish ledger (not blocking v1; do in batches)
 
@@ -97,6 +97,12 @@ None open. (The "stranger view after a while" bug was the cookie going away in a
 - Login in one tab doesn't reach the others until they reload; a `BroadcastChannel` or `storage` event would. Logout already propagates on the next request.
 - The `signingOut` re-entry guard in `api.ts` has no test; the frontend has no unit runner. Decide on vitest for `lib/`, or accept it as untested plumbing.
 - `me` staleTime is 5 minutes; a stale identity hid the two-tab bug for a week. 30 s, or `refetchOnWindowFocus` for `me` alone.
+- My outings shows only accepted outings under Joined; pending requests appear nowhere. A "Requested" bucket, or a status label on Joined, so a hiker can find what they've asked for.
+- Browse grid on desktop: tried in #52 and reverted. Two 22rem cards don't fit the 44rem shell, and the chips wrap at that width. If it comes back: widen the shell for list pages only and let width decide the columns; never a per-row setting.
+- `CapacityLine` on the detail page too: its "4 going · 1 spot left" block and bar are the same thing in a bigger font. One component, one home.
+- `Detail` serves capacity flat (`people_count` at the top level) while the lists nest it under `capacity`. Tolerable; flatten or nest both when the detail page adopts `CapacityLine`.
+- SQL study week (from 2026-10-25): `CapacityStats` is day 3's exercise, rewritten from scratch against the dev DB; `EXPLAIN` on `= ANY($1)` is day 7's.
+- Bare `tsc` reads a different config from `tsc -b` and reports ~98 narrowing errors (`verify-email.tsx` first); `npx tsc -b` is the one the build and Playwright use.
 - The waiting-list summary shows "See all" only past three names, so a queue of two or three never reveals roles or guests; consider showing the button always.
 - The "(you)" marker sits beside a name that may truncate on a phone; the amber row carries the meaning, but check it.
 - `listNames` and the page both add "and" when a "more" count follows; join with commas when there is a count.

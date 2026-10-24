@@ -1,0 +1,31 @@
+/* src/components/CapacityLine.module.css */
+
+.line{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bar{
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--border-subtle);
+    overflow: hidden;
+}
+.fill{
+    height: 100%;
+    background: var(--color-primary);
+}
+
+.text{
+    margin: 0;
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
+    color: var(--color-text);
+}
+
+/* tone follows the server's numbers: short is amber, full is grey */
+.short .fill{ background: var(--color-warning); }
+.short .text{ color: var(--color-warning); }
+.full .fill{ background: var(--color-text-muted); }
+.full .text{ color: var(--color-text-muted); }

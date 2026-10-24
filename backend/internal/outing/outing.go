@@ -136,6 +136,7 @@ type Outing struct {
 	EndsAt           *time.Time `json:"ends_at"`
 	Phase            Phase      `json:"phase"`
 	IsDiscussionOpen bool       `json:"is_discussion_open"`
+	Capacity         *Capacity  `json:"capacity,omitempty"`
 }
 
 // Phase is where an outing sits in time: before it starts, under way, or over.
@@ -229,16 +230,41 @@ type Member struct {
 //	SeatsShort   = max(0, PeopleCount − SeatCapacity)
 //	SpotsLeft    = max(0, min(SeatCapacity, MaxSize) − PeopleCount)
 type Detail struct {
-	Outing       Outing        `json:"outing"`
-	Host         Member        `json:"host"`
-	Roster       []Member      `json:"roster"` // accepted only; host NOT included
-	MyRequest    *JoinRequest  `json:"my_request,omitempty"`
-	SeatCapacity int           `json:"seat_capacity"`
-	PeopleCount  int           `json:"people_count"`
-	SeatsShort   int           `json:"seats_short"`
-	SpotsLeft    int           `json:"spots_left"`
-	Waiting      []ListedHiker `json:"waiting"`
-	Withdrawn    []ListedHiker `json:"withdrawn"`
+	Outing    Outing        `json:"outing"`
+	Host      Member        `json:"host"`
+	Roster    []Member      `json:"roster"` // accepted only; host NOT included
+	MyRequest *JoinRequest  `json:"my_request,omitempty"`
+	Waiting   []ListedHiker `json:"waiting"`
+	Withdrawn []ListedHiker `json:"withdrawn"`
+	Capacity                // embedded, untagged: people_count, seat_capacity, seats_short, spots_left, waiting_count stay top-level
+}
+
+// Capacity is what an outing can hold and how much of it is spoken for.
+type Capacity struct {
+	PeopleCount  int `json:"people_count"`
+	SeatCapacity int `json:"seat_capacity"`
+	SeatsShort   int `json:"seats_short"`
+	SpotsLeft    int `json:"spots_left"`
+	WaitingCount int `json:"waiting_count"`
+}
+
+func capacityOf(o *Outing, acceptedPeople, driverSeats, waiting int) Capacity {
+	peopleCount := 1 + acceptedPeople
+	seatCapacity := o.HostSeats + driverSeats
+	return Capacity{
+		PeopleCount:  peopleCount,
+		SeatCapacity: seatCapacity,
+		SeatsShort:   max(0, peopleCount-seatCapacity),
+		SpotsLeft:    max(0, min(seatCapacity, o.MaxSize)-peopleCount),
+		WaitingCount: waiting,
+	}
+}
+
+// CapacityStats is the raw per-outing input to capacityOf, summed in one query.
+type CapacityStats struct {
+	AcceptedPeople int // Σ (1 + guests) over accepted requests
+	DriverSeats    int // Σ seats_offered over accepted drivers
+	Waiting        int // count of requested
 }
 
 // MyOutings groups the outings a hiker hosts and the ones they joined.

@@ -10,14 +10,6 @@ import (
 	"github.com/google/uuid"
 )
 
-func newTestService(t *testing.T) (*Service, *fakeStore, *fakeNotificationStore, *fakeBroadcaster) {
-	t.Helper()
-	f := newFakeStore()
-	fn := &fakeNotificationStore{}
-	fb := newFakeBroadcaster()
-	return NewService(f, fn, fb), f, fn, fb
-}
-
 func Test_Decline_NotifiesRequester(t *testing.T) {
 	svc, f, fn, fb := newTestService(t)
 
@@ -188,7 +180,7 @@ func Test_CancelOuting_NotifiesEachMember(t *testing.T) {
 
 	o := seedOuting(6, 4, StatusOpen, hostID, f)
 	_ = seedJoinRequest(o.ID, hiker1ID, RequestStatusAccepted, RoleRider, f, 1)
-	_ = seedJoinRequestWithSeatsOffered(o.ID, hiker2ID, RequestStatusAccepted, RoleDriver, f, 0, 3)
+	_ = seedJoinRequest(o.ID, hiker2ID, RequestStatusAccepted, RoleDriver, f, 0, withSeats(3))
 	_ = seedJoinRequest(o.ID, hiker3ID, RequestStatusRequested, RoleRider, f, 1)
 	seedMember(hiker1ID, "mahmut", "experienced", f)
 	seedMember(hiker2ID, "celal", "beginner", f)
@@ -227,7 +219,7 @@ func Test_UpdateOuting_NotifiesEachMember(t *testing.T) {
 
 	o := seedOuting(6, 4, StatusOpen, hostID, f)
 	_ = seedJoinRequest(o.ID, hiker1ID, RequestStatusAccepted, RoleRider, f, 1)
-	_ = seedJoinRequestWithSeatsOffered(o.ID, hiker2ID, RequestStatusAccepted, RoleDriver, f, 0, 3)
+	_ = seedJoinRequest(o.ID, hiker2ID, RequestStatusAccepted, RoleDriver, f, 0, withSeats(3))
 	_ = seedJoinRequest(o.ID, hiker3ID, RequestStatusRequested, RoleRider, f, 1)
 	seedMember(hiker1ID, "mahmut", "experienced", f)
 	seedMember(hiker2ID, "celal", "beginner", f)

@@ -19,6 +19,36 @@ type OutingStore struct {
 	pool *pgxpool.Pool
 }
 
+// CapacityStats returns raw accepted/driver/waiting sums per outing; outings with no requests are absent
+func (s *OutingStore) CapacityStats(ctx context.Context, outingIDs []uuid.UUID) (map[uuid.UUID]outing.CapacityStats, error) {
+	q := `SELECT outing_id,
+      			COALESCE(SUM(1 + guests)    FILTER (WHERE status = 'accepted'), 0)                      AS accepted_people,
+       			COALESCE(SUM(seats_offered) FILTER (WHERE status = 'accepted' AND role = 'driver'), 0)  AS driver_seats,
+       			COUNT(*)                    FILTER (WHERE status = 'requested')                         AS waiting
+		FROM join_requests
+		WHERE outing_id = ANY($1)
+		GROUP BY outing_id`
+	rows, err := s.pool.Query(ctx, q, outingIDs)
+	if err != nil {
+		return nil, apperr.Database("failed to get capacity stats", "failed to select rows for capacity stats", err)
+	}
+	defer rows.Close()
+	stats := make(map[uuid.UUID]outing.CapacityStats)
+
+	for rows.Next() {
+		id := uuid.UUID{}
+		cs := outing.CapacityStats{}
+		if err = rows.Scan(&id, &cs.AcceptedPeople, &cs.DriverSeats, &cs.Waiting); err != nil {
+			return nil, apperr.Database("failed to get capacity stats", "failed to scan capacity stats", err)
+		}
+		stats[id] = cs
+	}
+	if err = rows.Err(); err != nil {
+		return nil, apperr.Database("failed to get capacity stats", "iterate capacity stats failed", err)
+	}
+	return stats, nil
+}
+
 // CreateComment inserts comment into comments table.
 func (s *OutingStore) CreateComment(ctx context.Context, c *outing.Comment) error {
 	q := `

@@ -115,3 +115,9 @@ export async function listOutingRequests(actor:Actor, outingId: string, status:R
     const res = await  actor.api.get(`/api/outings/${outingId}/requests${status ? `?status=${status}` : ""}`)
     return unwrap<JoinRequestViewResponse[]>(res, 'list requests')
 }
+
+export async function updateOuting(actor: Actor, outingId: string, patch: Partial<Outing>) {
+    const res = await actor.api.patch(`/api/outings/${outingId}`, {data: patch})
+    if (!res.ok()) throw new Error(`update outing failed: ${res.status()} ${await res.text()}`)
+    return (await res.json()).data as Outing
+}

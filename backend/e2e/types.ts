@@ -46,6 +46,14 @@ export interface OutingResponse {
     conversation_id: string
     ends_at?: string
     phase: string
+    capacity: Capacity
+}
+export interface Capacity{
+    people_count: number
+    seat_capacity: number
+    seats_short: number
+    spots_left: number
+    waiting_count: number
 }
 
 export type RequestStatus = 'requested'|'accepted'|'declined'|'withdrawn'|'removed' | 'banana'

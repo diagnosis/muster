@@ -32,6 +32,31 @@ func newFakeStore() *fakeStore {
 
 var _ Storage = (*fakeStore)(nil)
 
+func (f *fakeStore) CapacityStats(ctx context.Context, outingIDs []uuid.UUID) (map[uuid.UUID]CapacityStats, error) {
+	wanted := map[uuid.UUID]bool{}
+	for _, id := range outingIDs {
+		wanted[id] = true
+	}
+	stats := map[uuid.UUID]CapacityStats{}
+	for _, r := range f.requests {
+		if !wanted[r.OutingID] {
+			continue
+		}
+		s := stats[r.OutingID]
+		switch r.Status {
+		case RequestStatusAccepted:
+			s.AcceptedPeople += 1 + r.Guests
+			if r.Role == RoleDriver {
+				s.DriverSeats += r.SeatsOffered
+			}
+		case RequestStatusRequested:
+			s.Waiting++
+		}
+		stats[r.OutingID] = s
+	}
+	return stats, nil
+}
+
 func (f *fakeStore) GetOuting(ctx context.Context, id uuid.UUID) (*Outing, error) {
 	o, ok := f.outings[id]
 	if !ok {

@@ -1,7 +1,7 @@
-import {expect, test} from '@playwright/test'
+import {expect, request, test} from '@playwright/test'
 import {asUser,BASE} from "../fixtures";
-import {accept, createOuting, getDetail, requestJoin} from "../api";
-import {DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
+import {accept, createOuting, getDetail, listOutings, login, requestJoin} from "../api";
+import {Capacity, DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
 import {unwrap} from "../envelope";
 
 
@@ -112,6 +112,41 @@ test.describe('capacity', ()=> {
         expect(res.status()).toBe(409);
 
     });
+
+    test('browse list carries each outing\'s capacity, for a logged-out viewer', async () => {
+        const host = await asUser(BASE)
+        const rider = await asUser(BASE)
+        const driver = await asUser(BASE)
+        const waiter = await asUser(BASE)
+
+        // o1: max 6, host seats 4; an accepted rider with a guest, an accepted driver with 2 seats, one waiting
+        const o1 = await unwrap<OutingResponse>(createOuting(host.ctx, {max_size: 6, host_seats: 4}), 201)
+        const j1 = await unwrap<JoinRequestResponse>(requestJoin(rider.ctx, o1.id, {guests: 1}), 201)
+        const j2 = await unwrap<JoinRequestResponse>(requestJoin(driver.ctx, o1.id, {role: 'driver', seats_offered: 2}), 201)
+        await unwrap(requestJoin(waiter.ctx, o1.id), 201)
+        await unwrap(accept(host.ctx, j1.id), 200)
+        await unwrap(accept(host.ctx, j2.id), 200)
+
+        // o2: max 6, host seats 2; nobody asked
+        const o2 = await unwrap<OutingResponse>(createOuting(host.ctx, {max_size: 6, host_seats: 2}), 201)
+
+        const anon = await request.newContext({baseURL: BASE})
+        const list = await unwrap<OutingResponse[]>(listOutings(anon), 200)
+
+        const got1 = list.find(o => o.id === o1.id)
+        expect(got1).toBeDefined()
+        // host + rider + guest + driver = 4 people; 4 + 2 = 6 seats; min(6, 6) - 4 = 2 spots
+        expect(got1!.capacity).toEqual({
+            people_count: 4, seat_capacity: 6, seats_short: 0, spots_left: 2, waiting_count: 1,
+        })
+
+        const got2 = list.find(o => o.id === o2.id)
+        expect(got2).toBeDefined()
+        // host alone: 2 seats, 1 spot
+        expect(got2!.capacity).toEqual({
+            people_count: 1, seat_capacity: 2, seats_short: 0, spots_left: 1, waiting_count: 0,
+        })
+    })
 
 
 
