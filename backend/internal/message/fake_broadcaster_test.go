@@ -11,7 +11,8 @@ type sent struct {
 }
 
 type fakeBroadcaster struct {
-	sent []sent
+	sent      []sent
+	broadcast []events.Event
 }
 
 func newFakeBroadcaster() *fakeBroadcaster {
@@ -30,6 +31,9 @@ func (f *fakeBroadcaster) sentTo(hikerID uuid.UUID) []events.Event {
 		}
 	}
 	return me
+}
+func (f *fakeBroadcaster) Broadcast(e events.Event) {
+	f.broadcast = append(f.broadcast, e)
 }
 
 var _ events.Broadcaster = (*fakeBroadcaster)(nil)

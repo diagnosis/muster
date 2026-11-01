@@ -229,3 +229,34 @@ func Test_Hub_Unregister(t *testing.T) {
 		t.Fatalf("expected count 0 got %d", h.Count(hiker))
 	}
 }
+
+func Test_Hub_Broadcast(t *testing.T) {
+	h := NewHub()
+	clients := []*Client{
+		{HikerID: uuid.New(), Send: make(chan Event, 1)},
+		{HikerID: uuid.New(), Send: make(chan Event, 1)},
+		{HikerID: uuid.New(), Send: make(chan Event, 1)},
+	}
+	for _, c := range clients {
+		h.Register(c)
+	}
+	gone := &Client{HikerID: uuid.New(), Send: make(chan Event, 1)}
+	h.Register(gone)
+	h.Unregister(gone)
+
+	h.Broadcast(Event{Type: "outing.changed", Data: "X"})
+
+	for i, c := range clients {
+		select {
+		case e := <-c.Send:
+			if e.Type != "outing.changed" {
+				t.Fatalf("client %d: expected outing.changed, got %s", i, e.Type)
+			}
+		default:
+			t.Fatalf("client %d received nothing", i)
+		}
+	}
+	if e, ok := <-gone.Send; ok {
+		t.Errorf("unregistered client received %v", e)
+	}
+}
