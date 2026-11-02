@@ -6,7 +6,7 @@ const API_BASE = import.meta.env.VITE_API_URL ?? ''
 type Handler = (data:string) => void
 
 
-export const EVENT_TYPES =["message.created", "message.deleted", "notification.created", "dm.requested", "dm.accepted", "dm.declined", "dm.reopened"]
+export const EVENT_TYPES =["message.created", "message.deleted", "notification.created", "dm.requested", "dm.accepted", "dm.declined", "dm.reopened", "outing.changed"]
 
 const Ctx = createContext<{subscribe: (type: string, h:Handler) => () => void} | null >(null)
 
