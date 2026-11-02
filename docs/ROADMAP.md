@@ -1,6 +1,6 @@
 # Muster — Roadmap
 
-*As of 2026-10-24 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #51 merged) and the `feat/card-capacity` branch, confirmed by Safa. Replaces the 2026-08-07 roadmap.*
+*As of 2026-11-01 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #53 merged) and the `feat/outing-changed` branch, confirmed by Safa. Replaces the 2026-08-07 roadmap.*
 
 *Doc hierarchy: roadmap = why and when · spec = what · engineering notes = how.*
 
@@ -32,6 +32,7 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 | Waiting list uplift (PR #50) | Waiting and withdrawn rows now carry `role`, `seats_offered`, `guests` and `is_me`; the hiker id stays server-side and the service marks the viewer's own row. The outing page shows the first three names with a count and a "See all" button, and an amber line with the viewer's place ("You're 3rd of 7") when they are in the queue. The modal lists the whole queue in host order: position, driver tag with seats, "+n guests", the viewer's row highlighted in place |
 | Signed-out tabs (PR #51) | When a request's refresh fails with 401, the client forgets the user and lands on `/login` — one callback registered at the root, guarded against re-entry. `/api/auth/me` is a probe: a 401 means "guest", with one quiet refresh attempt and never a sign-out. Login refetches `me` and drops every other cached query; logout nulls `me` and drops the rest (`forgetUserData`). Two-tab, expired-access and guest-page browser specs |
 | Capacity on the card (PR #52) | The browse and My-outings lists carry `capacity` per outing (`people_count`, `seat_capacity`, `seats_short`, `spots_left`, `waiting_count`), computed by one `capacityOf` that `Detail` and `Update` now share; the store returns raw per-outing sums in one grouped query. The card gains a fill bar and one sentence in four states, in priority order: seats short ("3 seats short, a driver would help"), no seats left under the max ("a driver would open more"), full, open; waiting appended in any state. The second state was found by a fixture, not designed: 3 people in 3 seats with max 8 read "full" and hid that a driver would change everything. Difficulty and pace chips gain quiet labels ("terrain moderate · pace moderate"). `Detail` gains `waiting_count`, public like the other four numbers |
+| Live outing pages (PR #54) | One SSE event, `outing.changed {outing_id}`, broadcast to **every** open connection (`Hub.Broadcast`, no rooms, no audience) after each of nine service transitions: Update, Cancel, RequestJoin, EditJoinRequest, Withdraw, Accept, Decline, RemoveMember, RestoreRequest. Comments don't emit. The outing page filters by id and refetches detail + join requests; browse and My-outings refetch their list on any poke. The page dropped its `notification.created` subscription — one signal per concern. Design with numbered decisions in `backend/docs/events/outing-changed.md`. Anonymous viewers still refetch on focus (the stream is authenticated) |
 
 ---
 
@@ -39,11 +40,10 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 
 In this order. Items can be added.
 
-1. **Outing page live for everyone on it.** Pokes ride on notifications today, so a waiter whose place changes because someone ahead withdrew learns nothing until the tab regains focus. One `outing.changed {outing_id}` event on every join-request transition and roster change, to every open page of that outing; the page refetches detail on it.
-2. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
-3. **Pagination.** Browse first, with keyset pagination. The browse-card capacity spec creates its own outings and expects them on the page it opens; it will need a page-one guarantee or a filter when this lands. Then chat, then the Past tab. Server-side phase filtering comes with it.
-4. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
-5. **One real hike organized through Muster.** v1 is done when boots hit dirt.
+1. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
+2. **Pagination.** Browse first, with keyset pagination. The browse-card capacity spec and both `live.spec.ts` tests create their own outings and expect them on the page they open; they will need a page-one guarantee or a filter when this lands. Then chat, then the Past tab. Server-side phase filtering comes with it.
+3. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
+4. **One real hike organized through Muster.** v1 is done when boots hit dirt.
 
 ### Known bugs
 
@@ -97,6 +97,11 @@ In this order. Items can be added.
 - Login in one tab doesn't reach the others until they reload; a `BroadcastChannel` or `storage` event would. Logout already propagates on the next request.
 - The `signingOut` re-entry guard in `api.ts` has no test; the frontend has no unit runner. Decide on vitest for `lib/`, or accept it as untested plumbing.
 - `me` staleTime is 5 minutes; a stale identity hid the two-tab bug for a week. 30 s, or `refetchOnWindowFocus` for `me` alone.
+- `isAudience` includes the host, `notifyOutingAudience` doesn't: two homes for "who belongs to this outing" that disagree. One `audience(ctx, outing)` helper for both, with a test (host + 2 accepted + 1 pending + 1 declined → 4 ids). Found while designing #54; not fixed there.
+- `Hub.Broadcast` sends every outing change to every signed-in tab. Fine at tens of connections; if it ever shows in a profile, the next step is outing rooms in the hub, not audience fan-out.
+- Double poke: the subject of a transition gets `notification.created` (bell) and `outing.changed` (page). Two listeners, one refetch each; React Query dedupes. Acceptable, watch the network tab if it ever looks like more.
+- A wiring test in `internal/api`: register a client on the real hub, POST a join through the router, read one `outing.changed` from the channel. Twenty lines; the only seam #54 left untested by code.
+- Login cross-tab broadcast: same hub, `login` event to the user's other tabs, so a sign-in on one tab lifts the signed-out state on another.
 - My outings shows only accepted outings under Joined; pending requests appear nowhere. A "Requested" bucket, or a status label on Joined, so a hiker can find what they've asked for.
 - Browse grid on desktop: tried in #52 and reverted. Two 22rem cards don't fit the 44rem shell, and the chips wrap at that width. If it comes back: widen the shell for list pages only and let width decide the columns; never a per-row setting.
 - `CapacityLine` on the detail page too: its "4 going · 1 spot left" block and bar are the same thing in a bigger font. One component, one home.
