@@ -24,6 +24,7 @@ type Client struct {
 // Broadcaster is the single hub method the service uses; *events.Hub satisfies it.
 type Broadcaster interface {
 	BroadcastToUser(hikerID uuid.UUID, e Event)
+	Broadcast(e Event)
 }
 
 // Hub is the registry of open connections keyed by hiker. It holds no roster
@@ -79,6 +80,22 @@ func (h *Hub) BroadcastToUser(hikerID uuid.UUID, e Event) {
 		select {
 		case c.Send <- e:
 		default:
+		}
+	}
+}
+
+// Broadcast delivers e to every registered client of every hiker. Like
+// BroadcastToUser it never blocks: a client whose Send buffer is full is
+// skipped (D3: pokes are idempotent, the client refetches on reconnect/focus).
+func (h *Hub) Broadcast(e Event) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, set := range h.clients {
+		for c := range set {
+			select {
+			case c.Send <- e:
+			default:
+			}
 		}
 	}
 }

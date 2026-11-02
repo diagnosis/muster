@@ -3,6 +3,9 @@ import {createFileRoute, Link} from '@tanstack/react-router'
 import {OutingCard} from "@/components/OutingCard.tsx";
 import styles from "@/routes/index.module.css"
 import {useOutings} from "@/queries/outing.ts";
+import {useEffect} from "react";
+import {useEvents} from "@/events/EventProvider.tsx";
+import {useQueryClient} from "@tanstack/react-query";
 
 
 
@@ -14,6 +17,14 @@ export function OutingsPage() {
 
     //using tanstack query
     const {data: outings, isPending, error} = useOutings()
+    const qc = useQueryClient()
+    const { subscribe } = useEvents()
+    useEffect(()=> {
+        return subscribe('outing.changed', ()=>{
+                qc.invalidateQueries({ queryKey: ['outings'] })
+        })
+    }, [subscribe, qc])
+
     if (isPending){
         return <div>Loading outings...</div>
     }

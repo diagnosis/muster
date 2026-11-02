@@ -3,8 +3,10 @@ import {requireAuth} from "@/queries.ts";
 import {OutingCard} from "@/components/OutingCard.tsx";
 import styles from "@/routes/me.outings.module.css"
 import type {Phase} from "@/types.ts";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {useMyOutings} from "@/queries/outing.ts";
+import {useQueryClient} from "@tanstack/react-query";
+import {useEvents} from "@/events/EventProvider.tsx";
 
 
 
@@ -16,7 +18,13 @@ export const Route = createFileRoute('/me/outings')({
 export function MeOutingsPage() {
     const {data, isPending, error} = useMyOutings()
     const [tab, setTab] = useState<Phase>("upcoming")
-
+    const qc = useQueryClient()
+    const { subscribe } = useEvents()
+    useEffect(()=> {
+        return subscribe('outing.changed', ()=>{
+            qc.invalidateQueries({ queryKey: ['my-outings'] })
+        })
+    }, [subscribe, qc])
     if (isPending) return <div>Outings loading...</div>
     if (error) return <div>{error.message}</div>
 

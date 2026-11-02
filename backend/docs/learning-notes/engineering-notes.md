@@ -415,3 +415,27 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 **StrictMode is a test environment of its own.** `verify-email` consumes the token in an effect; dev StrictMode runs it twice, the second call 409s and overwrites the success copy. `CI=1` builds pass because StrictMode is off. A once-only guard belongs in the page; until then the suite runs with `CI=1` and the roadmap says why.
 
 **`page.pause()` is a breakpoint, not a line.** One left in `auth.spec.ts` after headed debugging would hang CI forever with no failure message. Grep for it before pushing; the browser suite can't catch it because it is the thing that stops the suite.
+
+## Lessons from outing.changed (PR #54)
+
+**Design against the people the feature is for, not the people who have the data.** The first design fanned `outing.changed` out to the outing's audience, because that list already existed. Safa asked whether the browse page could refetch too, and the answer exposed it: the browse page is for hikers who are *not yet* on any outing, so audience fan-out would never reach them. `Broadcast` to every connection deleted two decisions (audience, subject) and a helper, and covers the stranger on the page as a side effect.
+
+**A deferred `CloseAll` inside `Broadcast`.** The first `Broadcast` draft had `defer h.CloseAll()` after `defer h.mu.RUnlock()`. Two bugs in one line: `CloseAll` disconnects every client (a poke that kicks everyone off), and defers run last-in-first-out, so `CloseAll` would take the write lock while this goroutine still held the read lock — a deadlock that hangs the test rather than failing it. "Borrow the loop shape" is not "call the method".
+
+**Lock the map you're walking, not just the thing you found in it.** The second draft locked inside the inner loop. The outer `range h.clients` ran unlocked, so `Register` could write the map mid-iteration: concurrent map read/write, a runtime panic under load. One `RLock` at the top, `defer RUnlock`, both loops inside. Every other `Hub` method already looked like that; the new one should too.
+
+**A `select` with an empty `default` is a test that can't fail.** `Test_Hub_Broadcast` first read each channel with `default: {}`. A `Broadcast` that sends to nobody passed. The `default` branch is exactly where the failure belongs. Same test also started `Broadcast` in a goroutine and read immediately — nothing ordered the send before the read. `Broadcast` never blocks, so it needs no goroutine; call it, then read.
+
+**A fake records calls; it doesn't deliver.** The fake `Broadcast` was first written as a copy of `sentTo` (walking the other method's history) and then as an empty body. Neither records the call. The hub's delivery was proven in `events`; the service test only needs to know `Broadcast` was called with the right event. One slice, one append, one getter. And in the package that never broadcasts (`message`), the empty body is right — a recorder nobody reads is noise.
+
+**One fresh outing per row beats one fresh service per row.** The ten-row table shares one service and fake; each row seeds its own outing and counts only the `outing.changed` events that carry that outing's id. No cross-row leakage, no per-row setup, and `len(broadcasts) == 1` — the order-coupled assertion — never gets written.
+
+**Follow the code, not the table.** `RequestJoin` has two success paths (fresh request, re-request after withdraw); the design table had one row. Both got the emit because the call sites were placed by reading the function, not by ticking the table.
+
+**A gate beside a gate.** `EditJoinRequest` notifies the host only when seats, guests or role changed. The emit first sat outside that `if`, poking every tab for a note-only edit. Harmless (idempotent refetch) but two adjacent lines disagreeing about what counts as a change is the smell. Inside the `if`.
+
+**IDE "Move file" is a text refactor.** Moving `docs/outing/outing-changed.md` to `docs/events/` with GoLand's refactor renamed the word `outing` to `events` across 37 files, including SQL migrations. The first symptom was an e2e assertion expecting "events has to be at least 24 hours in advance". `git restore .` and redo the three real edits by hand was faster than untangling. `git mv` moves a file and nothing else.
+
+**The second `plural` was back.** `outings.$id.tsx` had its own `plural` under `lib/format`'s. The grammar bug from #52 was fixed in one of them. Import, don't redeclare.
+
+**Prove the stream, not focus.** A browser spec that waits for a card to change can go green on React Query's refetch-on-focus if Playwright fires a focus event. The sabotage — comment out the `useEffect` that subscribes — is the only proof the spec measures the stream.

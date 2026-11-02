@@ -31,5 +31,8 @@ func (f *fakeBroadcaster) sentTo(hikerID uuid.UUID) []events.Event {
 	}
 	return me
 }
+func (f *fakeBroadcaster) Broadcast(e events.Event) {
+
+}
 
 var _ events.Broadcaster = (*fakeBroadcaster)(nil)

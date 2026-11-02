@@ -15,7 +15,7 @@ import {useStartDM} from "@/queries/conversation.ts";
 import {CalendarIcon, FlagIcon, MessageIcon, PinIcon, TrashIcon} from "@/components/Icons.tsx";
 import {outingRange} from "@/utils/date.ts";
 import {useOuting, useRemoveMemberMutation, useWithdrawMutation} from "@/queries/outing.ts";
-import {initial, listNames, ordinal} from "@/lib/format.ts";
+import {initial, listNames, ordinal, plural} from "@/lib/format.ts";
 import {WaitingListModal} from "@/components/WaitingListModal.tsx";
 
 
@@ -35,12 +35,10 @@ export function OutingDetailPage() {
     const [showWaiting, setShowWaiting] = useState(false)
     const { subscribe } = useEvents()
     useEffect(()=> {
-        return subscribe('notification.created', (data)=>{
+        return subscribe('outing.changed', (data)=>{
             const poke = JSON.parse(data)
             if(poke.outing_id === id){
-                qc.invalidateQueries({ queryKey: ['outings'] })
                 qc.invalidateQueries({ queryKey: ['outing', id] })
-                qc.invalidateQueries({ queryKey: ['my-outings'] })
                 qc.invalidateQueries({ queryKey: ['outing-join-requests', id] })
             }
         })
@@ -265,7 +263,7 @@ export function OutingDetailPage() {
         </div>
     )
 }
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+
 
 function requestSummary(req: JoinRequest): string {
     const seats  = req.role === 'driver' ? ` with ${plural(req.seats_offered, 'seat')}` : ''
