@@ -292,7 +292,7 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 
 	o.stamp(time.Now())
 	s.notifyOutingAudience(ctx, o, notification.KindOutingUpdated)
-	s.broadcastOutingChanged(ctx, outingID)
+	s.broadcastOutingChanged(outingID)
 	return o, nil
 }
 
@@ -316,7 +316,7 @@ func (s *Service) Cancel(ctx context.Context, hostID, outingID uuid.UUID) error 
 		return err
 	}
 	s.notifyOutingAudience(ctx, o, notification.KindOutingCancelled)
-	s.broadcastOutingChanged(ctx, outingID)
+	s.broadcastOutingChanged(outingID)
 	return nil
 }
 
@@ -384,7 +384,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 				return nil, err
 			}
 			s.notify(ctx, o.HostID, o, notification.KindJoinRequestCreated)
-			s.broadcastOutingChanged(ctx, outingID)
+			s.broadcastOutingChanged(outingID)
 			return joinRequest, nil
 		}
 		return nil, err
@@ -403,7 +403,7 @@ func (s *Service) RequestJoin(ctx context.Context, hikerID, outingID uuid.UUID, 
 			return nil, err
 		}
 		s.notify(ctx, o.HostID, o, notification.KindJoinRequestCreated)
-		s.broadcastOutingChanged(ctx, outingID)
+		s.broadcastOutingChanged(outingID)
 		return joinRequest, nil
 	case RequestStatusDeclined:
 		return nil, apperr.Conflict("your request to this outing was declined", "declined is terminal")
@@ -454,7 +454,7 @@ func (s *Service) Accept(ctx context.Context, hostID, requestID uuid.UUID) error
 		return err
 	}
 	s.notify(ctx, joinRequest.HikerID, o, notification.KindJoinRequestApproved)
-	s.broadcastOutingChanged(ctx, o.ID)
+	s.broadcastOutingChanged(o.ID)
 	return nil
 }
 
@@ -473,7 +473,7 @@ func (s *Service) Decline(ctx context.Context, hostID, requestID uuid.UUID) erro
 	}
 
 	s.notify(ctx, joinRequest.HikerID, outing, notification.KindJoinRequestDeclined)
-	s.broadcastOutingChanged(ctx, outing.ID)
+	s.broadcastOutingChanged(outing.ID)
 	return nil
 }
 
@@ -499,7 +499,7 @@ func (s *Service) Withdraw(ctx context.Context, hikerID, outingID uuid.UUID) err
 		return err
 	}
 	s.notify(ctx, outing.HostID, outing, notification.KindJoinRequestWithdrawn)
-	s.broadcastOutingChanged(ctx, outingID)
+	s.broadcastOutingChanged(outing.ID)
 	return nil
 }
 
@@ -517,7 +517,7 @@ func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID)
 		return err
 	}
 	s.notify(ctx, joinRequest.HikerID, o, notification.KindMemberRemoved)
-	s.broadcastOutingChanged(ctx, o.ID)
+	s.broadcastOutingChanged(o.ID)
 	return nil
 }
 
@@ -669,8 +669,9 @@ func (s *Service) EditJoinRequest(ctx context.Context, hikerID, joinRequestID uu
 	}
 	if before.Guests != jr.Guests || before.SeatsOffered != jr.SeatsOffered || before.Role != jr.Role {
 		s.notify(ctx, o.HostID, o, notification.KindJoinRequestUpdated)
+		s.broadcastOutingChanged(o.ID)
 	}
-	s.broadcastOutingChanged(ctx, o.ID)
+
 	return jr, nil
 }
 
@@ -970,7 +971,7 @@ func (s *Service) RestoreRequest(ctx context.Context, hostID, requestID uuid.UUI
 		return err
 	}
 	s.notify(ctx, req.HikerID, o, notification.KindJoinRequestRestored)
-	s.broadcastOutingChanged(ctx, o.ID)
+	s.broadcastOutingChanged(o.ID)
 	return nil
 }
 
@@ -995,7 +996,7 @@ func (s *Service) notify(ctx context.Context, hikerID uuid.UUID, outing *Outing,
 		s.broadcaster.BroadcastToUser(hikerID, events.Event{Type: "notification.created", Data: string(data)})
 	}
 }
-func (s *Service) broadcastOutingChanged(ctx context.Context, outingID uuid.UUID) {
+func (s *Service) broadcastOutingChanged(outingID uuid.UUID) {
 	data, _ := json.Marshal(map[string]any{"outing_id": outingID})
 	s.broadcaster.Broadcast(events.Event{Type: "outing.changed", Data: string(data)})
 }
