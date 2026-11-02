@@ -64,6 +64,12 @@ func Test_MyOutings_Buckets(t *testing.T) {
 	if myOutings.Joined[0].ID != approvedJoin.ID {
 		t.Errorf("joined[0] = %s, want %s", myOutings.Joined[0].ID, approvedJoin.ID)
 	}
+	if len(myOutings.Requested) != 1 {
+		t.Fatalf("requested: len %d, want 1", len(myOutings.Requested))
+	}
+	if myOutings.Requested[0].ID != pendingJoin.ID {
+		t.Errorf("requested[0] = %s, want %s", myOutings.Requested[0].ID, pendingJoin.ID)
+	}
 }
 
 func Test_MyOutings_Sorted(t *testing.T) {
@@ -487,7 +493,7 @@ func Test_MyOutings_Capacity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MyOutings: %v", err)
 	}
-	if len(mine.Hosting) != 1 || len(mine.Joined) != 1 {
+	if len(mine.Hosting) != 1 || len(mine.Joined) != 1 || len(mine.Requested)!=1 {
 		t.Fatalf("expected 1 hosting and 1 joined, got %d and %d", len(mine.Hosting), len(mine.Joined))
 	}
 

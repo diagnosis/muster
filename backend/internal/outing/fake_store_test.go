@@ -192,8 +192,9 @@ func (f *fakeStore) ListJoinRequests(ctx context.Context, outingID uuid.UUID, st
 
 func (f *fakeStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*MyOutings, error) {
 	myOutings := &MyOutings{
-		Hosting: []Outing{},
-		Joined:  []Outing{},
+		Hosting:   []Outing{},
+		Joined:    []Outing{},
+		Requested: []Outing{},
 	}
 	for _, o := range f.outings {
 		if o.HostID == hikerID {
@@ -201,19 +202,29 @@ func (f *fakeStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*MyOut
 		}
 	}
 	for _, r := range f.requests {
-		if r.HikerID == hikerID && r.Status == RequestStatusAccepted {
+		if r.HikerID == hikerID {
 			o, err := f.GetOuting(ctx, r.OutingID)
 			if err != nil {
 				return nil, err
 			}
-			myOutings.Joined = append(myOutings.Joined, *o)
+			switch r.Status {
+			case RequestStatusAccepted:
+
+				myOutings.Joined = append(myOutings.Joined, *o)
+			case RequestStatusRequested:
+				myOutings.Requested = append(myOutings.Requested, *o)
+			}
 		}
+
 	}
 	sort.Slice(myOutings.Hosting, func(i, j int) bool {
 		return myOutings.Hosting[i].StartsAt.Before(myOutings.Hosting[j].StartsAt)
 	})
 	sort.Slice(myOutings.Joined, func(i, j int) bool {
 		return myOutings.Joined[i].StartsAt.Before(myOutings.Joined[j].StartsAt)
+	})
+	sort.Slice(myOutings.Requested, func(i, j int) bool {
+		return myOutings.Requested[i].StartsAt.Before(myOutings.Requested[j].StartsAt)
 	})
 
 	return myOutings, nil

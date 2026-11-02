@@ -587,13 +587,14 @@ func (s *Service) MyOutings(ctx context.Context, hikerID uuid.UUID) (*MyOutings,
 	if err != nil {
 		return nil, err
 	}
-	if err = s.attachCapacity(ctx, mine.Hosting, mine.Joined); err != nil {
+	if err = s.attachCapacity(ctx, mine.Hosting, mine.Joined, mine.Requested); err != nil {
 		return nil, err
 	}
 
 	now := time.Now()
 	stampAll(mine.Joined, now)
 	stampAll(mine.Hosting, now)
+	stampAll(mine.Requested, now)
 	return mine, nil
 }
 
