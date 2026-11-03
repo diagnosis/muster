@@ -175,3 +175,5 @@ export const requestLoginCode = (ctx:APIRequestContext, input:{email:string}) =>
     ctx.post('/api/auth/login-code', {data:input})
 export const listOutings = (ctx:APIRequestContext) =>
     ctx.get('api/outings')
+export const listForMe = (ctx:APIRequestContext) =>
+    ctx.get('/api/me/outings')

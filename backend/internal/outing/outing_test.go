@@ -64,6 +64,12 @@ func Test_MyOutings_Buckets(t *testing.T) {
 	if myOutings.Joined[0].ID != approvedJoin.ID {
 		t.Errorf("joined[0] = %s, want %s", myOutings.Joined[0].ID, approvedJoin.ID)
 	}
+	if len(myOutings.Requested) != 1 {
+		t.Fatalf("requested: len %d, want 1", len(myOutings.Requested))
+	}
+	if myOutings.Requested[0].ID != pendingJoin.ID {
+		t.Errorf("requested[0] = %s, want %s", myOutings.Requested[0].ID, pendingJoin.ID)
+	}
 }
 
 func Test_MyOutings_Sorted(t *testing.T) {
@@ -478,7 +484,7 @@ func Test_MyOutings_Capacity(t *testing.T) {
 	b := seedOuting(8, 4, StatusOpen, host, f)
 	c := seedOuting(10, 4, StatusOpen, hiker, f)
 
-	seedJoinRequest(a.ID, hiker, RequestStatusRequested, RoleDriver, f, 0, withSeats(2)) // pending: not in Joined
+	seedJoinRequest(a.ID, hiker, RequestStatusRequested, RoleDriver, f, 0, withSeats(2)) // pending: Requested, seats don't count
 	seedJoinRequest(b.ID, hiker, RequestStatusAccepted, RoleRider, f, 1)
 	seedJoinRequest(c.ID, uuid.New(), RequestStatusAccepted, RoleRider, f, 1)
 	seedJoinRequest(c.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 0) // makes c differ from b
@@ -487,8 +493,9 @@ func Test_MyOutings_Capacity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MyOutings: %v", err)
 	}
-	if len(mine.Hosting) != 1 || len(mine.Joined) != 1 {
-		t.Fatalf("expected 1 hosting and 1 joined, got %d and %d", len(mine.Hosting), len(mine.Joined))
+	if len(mine.Hosting) != 1 || len(mine.Joined) != 1 || len(mine.Requested) != 1 {
+		t.Fatalf("expected 1 hosting, 1 joined, 1 requested; got %d, %d, %d",
+			len(mine.Hosting), len(mine.Joined), len(mine.Requested))
 	}
 
 	want := map[uuid.UUID]Capacity{
@@ -496,8 +503,11 @@ func Test_MyOutings_Capacity(t *testing.T) {
 		c.ID: {PeopleCount: 3, SeatCapacity: 4, SeatsShort: 0, SpotsLeft: 1, WaitingCount: 1},
 		// joined: host + me + my guest = 3 in 4 seats, max 8
 		b.ID: {PeopleCount: 3, SeatCapacity: 4, SeatsShort: 0, SpotsLeft: 1, WaitingCount: 0},
+		// requested: host alone in 2 seats, max 6; I'm the one waiting, my 2 seats not yet counted
+		a.ID: {PeopleCount: 1, SeatCapacity: 2, SeatsShort: 0, SpotsLeft: 1, WaitingCount: 1},
 	}
-	for _, o := range append(mine.Hosting, mine.Joined...) {
+	all := append(append(mine.Hosting, mine.Joined...), mine.Requested...)
+	for _, o := range all {
 		if o.Capacity == nil {
 			t.Errorf("%s: capacity is nil", o.ID)
 			continue

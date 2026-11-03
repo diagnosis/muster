@@ -2,7 +2,7 @@ import {createFileRoute, Link} from '@tanstack/react-router'
 import {requireAuth} from "@/queries.ts";
 import {OutingCard} from "@/components/OutingCard.tsx";
 import styles from "@/routes/me.outings.module.css"
-import type {Phase} from "@/types.ts";
+import type {MyRequestType, Phase} from "@/types.ts";
 import {useEffect, useState} from "react";
 import {useMyOutings} from "@/queries/outing.ts";
 import {useQueryClient} from "@tanstack/react-query";
@@ -31,8 +31,9 @@ export function MeOutingsPage() {
 
 
     const all = [
-        ...data.hosting.map(outing => ({outing, hosting: true})),
-        ...data.joined.map(outing => ({outing, hosting: false})),
+        ...data.hosting.map(outing => ({outing, requestType:'hosting' as const})),
+        ...data.joined.map(outing => ({outing, requestType:'joined' as const })),
+        ...data.requested.map(outing => ({outing, requestType:'requested' as const})),
     ]
     const visible = all
         .filter(item => item.outing.phase === tab)
@@ -64,9 +65,9 @@ export function MeOutingsPage() {
                 {tab === "upcoming" && <Link className="btn-primary btn" to="/outings/new">Create outing</Link>}
             </div>
             : <div className={styles.list} role="tabpanel">
-                {visible.map(({outing, hosting}) => (
+                {visible.map(({outing, requestType}) => (
                     <Link className={styles.cardLink} key={outing.id} to="/outings/$id" params={{id: outing.id}}>
-                        <OutingCard outing={outing} label={roleLabel(hosting, outing.phase)}/>
+                        <OutingCard outing={outing} label={roleLabel(requestType, outing.phase)}/>
                     </Link>
                 ))}
                 {tab === "in_progress" && <p className={styles.note}>
@@ -92,7 +93,21 @@ const EMPTY: Record<Phase, string> = {
     past: "No past outings yet. The ones you host or join will be kept here.",
 }
 
-function roleLabel(hosting: boolean, phase: Phase): string {
-    if (phase === "past") return hosting ? "You hosted" : "You went"
-    return hosting ? "You're hosting" : "You're going"
+function roleLabel(requestType: MyRequestType, phase: Phase): string {
+    if (phase === "past") {
+        let m  = "" ;
+        switch (requestType){
+            case "requested": m = "You asked"; break;
+            case "hosting": m = "You hosted" ; break;
+            case "joined": m = "You went";
+        }
+        return m
+    }
+    let m = ""
+    switch (requestType){
+        case "requested": m = "You asked"; break;
+        case "hosting": m = "You're hosting"; break;
+        case "joined": m = "You're going"
+    }
+    return m
 }

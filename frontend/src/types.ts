@@ -145,7 +145,9 @@ export interface JoinRequestView extends JoinRequest{
 export interface MyOutings{
     hosting: Outing[]
     joined: Outing[]
+    requested: Outing[]
 }
+export type MyRequestType = 'hosting' | 'joined' | 'requested'
 
 export interface CreateOutingInput {
     title: string

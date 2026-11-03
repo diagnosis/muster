@@ -269,8 +269,9 @@ type CapacityStats struct {
 
 // MyOutings groups the outings a hiker hosts and the ones they joined.
 type MyOutings struct {
-	Hosting []Outing `json:"hosting"`
-	Joined  []Outing `json:"joined"`
+	Hosting   []Outing `json:"hosting"`
+	Joined    []Outing `json:"joined"`
+	Requested []Outing `json:"requested"`
 }
 
 // ListedHiker is a hiker shown by name only, on the waiting and

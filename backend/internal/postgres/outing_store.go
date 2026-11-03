@@ -528,7 +528,7 @@ func (s *OutingStore) SetOutingStatus(ctx context.Context, id uuid.UUID, status 
 	return nil
 }
 
-// ListForHiker returns the outings the hiker hosts and the ones they've joined (accepted requests only), each soonest first.
+// ListForHiker returns the outings the hiker hosts and the ones they've joined (accepted and requested requests), each soonest first.
 func (s *OutingStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*outing.MyOutings, error) {
 	hostingQuery := `
 	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
@@ -538,18 +538,19 @@ func (s *OutingStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*out
 		WHERE host_id = $1 
 		ORDER BY starts_at
 `
-	joinedQuery := `
+	hikerQuery := `
 	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
 			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
-			o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at
+			o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at, jr.status AS request_status
 		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
 		JOIN join_requests jr ON jr.outing_id = o.id
-		WHERE jr.hiker_id = $1 AND jr.status = 'accepted'
+		WHERE jr.hiker_id = $1 AND jr.status IN ('accepted', 'requested')
 		ORDER BY o.starts_at
 `
 	myOutings := &outing.MyOutings{
-		Hosting: []outing.Outing{},
-		Joined:  []outing.Outing{},
+		Hosting:   []outing.Outing{},
+		Joined:    []outing.Outing{},
+		Requested: []outing.Outing{},
 	}
 
 	rowsHosting, err := s.pool.Query(ctx, hostingQuery, hikerID)
@@ -568,20 +569,26 @@ func (s *OutingStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*out
 		return nil, apperr.Database("failed to list hosting outings", "my_outings: iterate hosting outings failed", err)
 	}
 
-	rowsJoined, err := s.pool.Query(ctx, joinedQuery, hikerID)
+	rowsHiker, err := s.pool.Query(ctx, hikerQuery, hikerID)
 	if err != nil {
 		return nil, apperr.Database("failed to list joined outings", "my_outings: select joined outings failed", err)
 	}
-	defer rowsJoined.Close()
+	defer rowsHiker.Close()
 
-	for rowsJoined.Next() {
-		joinedOuting, scanErr := scanOuting(rowsJoined)
+	for rowsHiker.Next() {
+		var status outing.RequestStatus
+		o, scanErr := scanOuting(rowsHiker, &status)
 		if scanErr != nil {
 			return nil, apperr.Database("failed to list joined outings", "my_outings: scan joined outings failed", scanErr)
 		}
-		myOutings.Joined = append(myOutings.Joined, *joinedOuting)
+		switch status {
+		case outing.RequestStatusAccepted:
+			myOutings.Joined = append(myOutings.Joined, *o)
+		case outing.RequestStatusRequested:
+			myOutings.Requested = append(myOutings.Requested, *o)
+		}
 	}
-	if err = rowsJoined.Err(); err != nil {
+	if err = rowsHiker.Err(); err != nil {
 		return nil, apperr.Database("failed to list joined outings", "my_outings: iterate joined outings failed", err)
 	}
 
@@ -724,30 +731,15 @@ func scanMemberHost(row pgx.Row) (*outing.Member, error) {
 	)
 	return m, err
 }
-
-func scanOuting(row pgx.Row) (*outing.Outing, error) {
+func scanOuting(row pgx.Row, extra ...any) (*outing.Outing, error) {
 	o := &outing.Outing{}
-	err := row.Scan(
-		&o.ID,
-		&o.HostID,
-		&o.Title,
-		&o.Destination,
-		&o.MeetLabel,
-		&o.MeetLat,
-		&o.MeetLng,
-		&o.StartsAt,
-		&o.MaxSize,
-		&o.HostSeats,
-		&o.CostPerSeatCents,
-		&o.Difficulty,
-		&o.Pace,
-		&o.Notes,
-		&o.Status,
-		&o.CreatedAt,
-		&o.UpdatedAt,
-		&o.ConversationID,
-		&o.EndsAt,
-	)
+	dest := []any{
+		&o.ID, &o.HostID, &o.Title, &o.Destination, &o.MeetLabel, &o.MeetLat, &o.MeetLng,
+		&o.StartsAt, &o.MaxSize, &o.HostSeats, &o.CostPerSeatCents, &o.Difficulty, &o.Pace,
+		&o.Notes, &o.Status, &o.CreatedAt, &o.UpdatedAt, &o.ConversationID, &o.EndsAt,
+	}
+	dest = append(dest, extra...)
+	err := row.Scan(dest...)
 	return o, err
 }
 

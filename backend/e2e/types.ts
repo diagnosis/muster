@@ -48,6 +48,11 @@ export interface OutingResponse {
     phase: string
     capacity: Capacity
 }
+export interface MyOutingsResponse{
+    hosting: OutingResponse[]
+    joined: OutingResponse[]
+    requested: OutingResponse[]
+}
 export interface Capacity{
     people_count: number
     seat_capacity: number
