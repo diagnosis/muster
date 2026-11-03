@@ -47,4 +47,25 @@ test.describe("my outings tabs", () => {
         await expect(card(page, outing.title)).toHaveCount(0)
         await expect(page.getByText(/Nothing is happening right now/)).toBeVisible()
     })
+
+    test ("requested hiker sees the outing under Upcoming, labelled as you asked", async ({page, context})=>{
+        const host = await createActor()
+        const hiker = await createActor()
+        const outing = await createOuting(host, {max_size:6, host_seats:4})
+        await joinRequest(hiker, outing.id)
+
+        await actorInBrowser(hiker, context)
+        await page.goto("/me/outings")
+        await expect(tab(page, /Upcoming/)).toHaveAttribute('aria-selected', 'true')
+        await expect(card(page, outing.title)).toContainText("You asked")
+        await expect(card(page, outing.title)).not.toContainText("You're going")
+
+        await tab(page, /In progress/).click()
+        await expect(card(page, outing.title)).toHaveCount(0)
+        await expect(page.getByText(/Nothing is happening right now/)).toBeVisible()
+
+        await tab(page, /Past/).click()
+        await expect(card(page, outing.title)).toHaveCount(0)
+        await expect(page.getByText(/No past outings yet. The ones you host or join will be kept here./)).toBeVisible()
+    })
 })
