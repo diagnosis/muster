@@ -59,8 +59,8 @@ type PublicProfile struct {
 // OutingCounts is the hosted/went-on pair behind a PublicProfile, counted over
 // past, non-cancelled outings. Zero values for a hiker with no history.
 type OutingCounts struct {
-	HostedCount int `json:"hosted_count"`
-	WentCount   int `json:"went_count"`
+	HostedCount int
+	WentCount   int
 }
 
 // RefreshToken is a stored refresh-token record. Only the SHA-256 hash

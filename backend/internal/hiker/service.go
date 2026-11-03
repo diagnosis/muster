@@ -71,13 +71,13 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 
 // RegisterInput carries the fields required to create a new hiker.
 type RegisterInput struct {
-	Email      string `json:"email"`
-	Password   string `json:"password"`
-	Name       string `json:"name"`
+	Email      string     `json:"email"`
+	Password   string     `json:"password"`
+	Name       string     `json:"name"`
 	Experience Experience `json:"experience"`
-	HomeArea   *string `json:"home_area"`
-	Bio        *string `json:"bio"`
-	Gender     *string `json:"gender"`
+	HomeArea   *string    `json:"home_area,omitempty"`
+	Bio        *string    `json:"bio,omitempty"`
+	Gender     *string    `json:"gender,omitempty"`
 }
 
 // Register creates a new hiker with a hashed password. It returns
