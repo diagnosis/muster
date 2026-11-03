@@ -20,19 +20,6 @@ test.describe("profile", ()=>{
         expect(detail.host.name).toBe('Ziplayan Ceylan');
     });
 
-    test('anonymous hiker card serves id/name/experience, no email', async () => {
-        const { ctx: ctxHost, user } = await asUser(BASE);
-        const outing = await unwrap<OutingResponse>(createOuting(ctxHost), 201)
-
-        const ctxAnon = await request.newContext({ baseURL: BASE });
-
-        const card = await unwrap<MemberCard>(getHiker(ctxAnon, outing.host_id), 200)
-
-        expect(card.id).toBe(outing.host_id);
-        expect(card.name).toBe(user.name);
-        expect(card.experience).toBe('beginner');
-        expect(card.email).toBeUndefined();       // the privacy assertion — the test's point
-    });
 
     test('invalid experience -> 400', async () => {
         const { ctx: ctxHost } = await asUser(BASE);

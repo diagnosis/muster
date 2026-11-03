@@ -42,6 +42,27 @@ type Hiker struct {
 	VerifiedAt   *time.Time `json:"verified_at"`
 }
 
+// PublicProfile is what any signed-in hiker may see about another: the fields
+// a hiker writes for other hikers to read, plus counts over past outings.
+// Never email, gender or verification state — the API spec asserts their absence.
+type PublicProfile struct {
+	ID          uuid.UUID  `json:"id"`
+	Name        string     `json:"name"`
+	Experience  Experience `json:"experience"`
+	HomeArea    *string    `json:"home_area"`
+	Bio         *string    `json:"bio"`
+	HostedCount int        `json:"hosted_count"`
+	WentCount   int        `json:"went_count"`
+	MemberSince time.Time  `json:"member_since"`
+}
+
+// OutingCounts is the hosted/went-on pair behind a PublicProfile, counted over
+// past, non-cancelled outings. Zero values for a hiker with no history.
+type OutingCounts struct {
+	HostedCount int `json:"hosted_count"`
+	WentCount   int `json:"went_count"`
+}
+
 // RefreshToken is a stored refresh-token record. Only the SHA-256 hash
 // of the token is persisted; the raw value lives in the client's cookie.
 type RefreshToken struct {

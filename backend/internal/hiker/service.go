@@ -31,6 +31,8 @@ type Storage interface {
 	SaveRefreshToken(ctx context.Context, t *RefreshToken) error
 	GetRefreshTokenByHash(ctx context.Context, hash string) (*RefreshToken, error)
 	DeleteRefreshTokens(ctx context.Context, hikerID uuid.UUID, platform Platform) error
+
+	OutingCounts(ctx context.Context, hikerID uuid.UUID) (OutingCounts, error)
 }
 
 // ServiceConfig provides deps for extending services
@@ -69,13 +71,13 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 
 // RegisterInput carries the fields required to create a new hiker.
 type RegisterInput struct {
-	Email      string
-	Password   string
-	Name       string
-	Experience Experience
-	HomeArea   *string
-	Bio        *string
-	Gender     *string
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	Name       string `json:"name"`
+	Experience Experience `json:"experience"`
+	HomeArea   *string `json:"home_area"`
+	Bio        *string `json:"bio"`
+	Gender     *string `json:"gender"`
 }
 
 // Register creates a new hiker with a hashed password. It returns
@@ -508,4 +510,29 @@ func (s *Service) LoginWithCode(ctx context.Context, email, code string, platfor
 		}
 	}
 	return s.mintSession(ctx, h, platform)
+}
+
+// PublicProfile builds the card for hikerID from the hiker row and their outing
+// counts. Not found when the hiker doesn't exist; unknown viewers are the
+// handler's concern, not this method's.
+func (s *Service) PublicProfile(ctx context.Context, hikerID uuid.UUID) (*PublicProfile, error) {
+	hiker, err := s.store.GetHikerByID(ctx, hikerID)
+	if err != nil {
+		return nil, err
+	}
+	oc, err := s.store.OutingCounts(ctx, hikerID)
+	if err != nil {
+		return nil, err
+	}
+	pb := &PublicProfile{
+		ID:          hikerID,
+		Name:        hiker.Name,
+		Experience:  hiker.Experience,
+		HomeArea:    hiker.HomeArea,
+		Bio:         hiker.Bio,
+		HostedCount: oc.HostedCount,
+		WentCount:   oc.WentCount,
+		MemberSince: hiker.CreatedAt,
+	}
+	return pb, nil
 }

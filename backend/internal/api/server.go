@@ -115,7 +115,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("GET /api/events", requireAuth(http.HandlerFunc(s.handleEvents)))
 
 	// hikers public routes
-	mux.HandleFunc("GET /api/hikers/{id}", s.handleGetHiker)
+	mux.Handle("GET /api/hikers/{id}", requireAuth(http.HandlerFunc(s.handleGetHiker)))
 
 	// messages
 	mux.Handle("POST /api/conversations/{id}/messages", requireAuth(http.HandlerFunc(s.handlePostMessage)))

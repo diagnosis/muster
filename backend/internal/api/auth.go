@@ -201,18 +201,14 @@ func (s *Server) handleGetHiker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h, err := s.hikers.GetByID(r.Context(), hikerID)
+	pp, err := s.hikers.PublicProfile(r.Context(), hikerID)
 	if err != nil {
-		logger.Warn(r.Context(), "hiker: failed to fetch hiker", "err", err)
+		logger.Warn(r.Context(), "hiker: failed to fetch public profile", "err", err)
 		responder.Error(w, err, correlationID)
 		return
 	}
 
-	responder.JSON(w, http.StatusOK, map[string]any{
-		"id":         h.ID,
-		"name":       h.Name,
-		"experience": h.Experience,
-	}, correlationID)
+	responder.JSON(w, http.StatusOK, pp, correlationID)
 
 }
 

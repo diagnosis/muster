@@ -1168,6 +1168,86 @@ func Test_LoginWithCode_UnknownEmail(t *testing.T) {
 	_, err = svc.LoginWithCode(context.Background(), "toaster@toast.toast", code, PlatformWeb)
 	wantStatus(t, err, apperr.CodeUnauthorized)
 }
+func Test_PublicProfile(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, f, _ := newTestService(t, fm)
+
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "test@test.com",
+		Password:   "Password123",
+		Name:       "Malik",
+		Experience: ExperienceIntermediate,
+		HomeArea:   ptr("Renton"),
+		Bio:        ptr("Hike, Bike, Brew!"),
+		Gender:     ptr("male"),
+	}, svc, fm)
+
+	f.outingCounts[h1.ID] = OutingCounts{
+		HostedCount: 4,
+		WentCount:   12,
+	}
+	pp, err := svc.PublicProfile(context.Background(), h1.ID)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if *pp.Bio != "Hike, Bike, Brew!" {
+		t.Errorf("expected: %s got %s", "Hike, Bike, Brew!", *pp.Bio)
+	}
+	if pp.Name != h1.Name {
+		t.Errorf("expected %s, got %s", h1.Name, pp.Name)
+	}
+	if *pp.HomeArea != *h1.HomeArea {
+		t.Errorf("expected %s, got %s", *h1.HomeArea, *pp.HomeArea)
+	}
+	if pp.ID != h1.ID {
+		t.Errorf("expected %s, got %s", h1.ID, pp.ID)
+	}
+	if pp.Experience != h1.Experience {
+		t.Errorf("expected %s, got %s", h1.Experience, pp.Experience)
+	}
+	if pp.MemberSince != h1.CreatedAt {
+		t.Errorf("expected %s, got %s", h1.CreatedAt, pp.MemberSince)
+	}
+	if pp.WentCount != 12 {
+		t.Errorf("expected 12 got %d", pp.WentCount)
+	}
+	if pp.HostedCount != 4 {
+		t.Errorf("expected 4 got %d", pp.HostedCount)
+	}
+
+}
+func Test_PublicProfile_Unknown(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+
+	_, err := svc.PublicProfile(context.Background(), uuid.New())
+	wantStatus(t, err, apperr.CodeNotFound)
+}
+
+// A hiker who has never hosted or joined anything has a card with zeros,
+// not an error: the counts query is an aggregate and returns 0, 0 for no rows.
+func Test_PublicProfile_NoOutings(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "new@test.com",
+		Password:   "Password123",
+		Name:       "Ayşe",
+		Experience: ExperienceBeginner,
+	}, svc, fm)
+
+	pp, err := svc.PublicProfile(context.Background(), h1.ID)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if pp.HostedCount != 0 || pp.WentCount != 0 {
+		t.Errorf("expected 0/0 got %d/%d", pp.HostedCount, pp.WentCount)
+	}
+	if pp.HomeArea != nil || pp.Bio != nil {
+		t.Errorf("expected nil home area and bio, got %v / %v", pp.HomeArea, pp.Bio)
+	}
+}
 
 func wantSession(t *testing.T, sess *Session, h *Hiker) {
 	if sess.Hiker.ID != h.ID {
@@ -1179,4 +1259,8 @@ func wantSession(t *testing.T, sess *Session, h *Hiker) {
 	if sess.AccessToken == "" {
 		t.Error("expected access token is not empty got empty")
 	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }

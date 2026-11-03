@@ -299,6 +299,17 @@ export interface EditJoinRequestInput {
     note?:string
 }
 
+export interface PublicProfileResponse{
+    id: string
+    name: string
+    experience: string
+    home_area?: string
+    bio?: string
+    hosted_count: number
+    went_count: number
+    member_since: string
+}
+
 export const CODE_EMAIL_NOT_VERIFIED = "email_not_verified"
 
 export const FORGOT_SENTENCE = "If email provided matches our record, you will receive a password reset email shortly."
