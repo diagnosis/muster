@@ -309,6 +309,17 @@ export interface PublicProfileResponse{
     went_count: number
     member_since: string
 }
+export interface HikerCardResponse{
+    id: string
+    name: string
+    experience: string
+    home_area?: string
+    bio?: string
+    hosted_count: number
+    went_count: number
+    member_since: string
+    can_dm: boolean
+}
 
 export const CODE_EMAIL_NOT_VERIFIED = "email_not_verified"
 

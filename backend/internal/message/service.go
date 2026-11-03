@@ -408,6 +408,16 @@ func (s *Service) MarkRead(ctx context.Context, convID, hikerID uuid.UUID, seq i
 
 }
 
+// CanDM reports whether initiator may open a DM with other: the rule StartDM
+// enforces, exposed so a page can hide the button instead of showing its 403.
+// Never true for yourself.
+func (s *Service) CanDM(ctx context.Context, initiator, other uuid.UUID) (bool, error) {
+	if initiator == other {
+		return false, nil
+	}
+	return s.store.CanDM(ctx, initiator, other)
+}
+
 func (s *Service) notify(ctx context.Context, actor, hikerID uuid.UUID, conv *Conversation, kind notification.Kind) {
 	actorName, err := s.store.HikerName(ctx, actor)
 	if err != nil {

@@ -124,6 +124,16 @@ export interface MeResponse{
     created_at: string,
     updated_at: string,
 }
+export interface PublicProfile{
+    id: string
+    name: string
+    experience: Experience
+    home_area?: string
+    bio?: string
+    hosted_count: number
+    went_count: number
+    member_since: string
+}
 
 export interface MeInputRequest{
     name?:string

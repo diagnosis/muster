@@ -50,3 +50,8 @@ export function outingRange(startIso: string, endIso?: string | null): string {
     }
     return `${start} – ${outingWhen(endIso)}`
 }
+
+// memberSince formats a join date as month and year: "Aug 2026".
+export function memberSince(iso: string): string {
+    return new Date(iso).toLocaleDateString(undefined, {month: 'short', year: 'numeric'})
+}

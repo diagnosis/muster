@@ -22,6 +22,10 @@ type fakeMessageService struct {
 	err                   error
 }
 
+func (f *fakeMessageService) CanDM(ctx context.Context, initiator, other uuid.UUID) (bool, error) {
+	return false, nil
+}
+
 func (f *fakeMessageService) PostMessage(ctx context.Context, convID, hikerID uuid.UUID, body string) (*message.Message, error) {
 	f.gotConvID, f.gotHikerID, f.gotBody = convID, hikerID, body
 	return f.message, f.err

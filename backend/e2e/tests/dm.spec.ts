@@ -6,7 +6,7 @@ import {asUser, BASE} from "../fixtures";
 import {unwrap, unwrapError, unwrapExpectNoContent} from "../envelope";
 import {
     ApiErrorBody,
-    ConversationResponse,
+    ConversationResponse, HikerCardResponse,
     JoinRequestResponse, ListConversationsResponse,
     Message,
     OutingResponse,
@@ -16,7 +16,7 @@ import {
     accept,
     acceptDM,
     createOuting,
-    declineDM,
+    declineDM, getHiker,
     listConversations,
     postMessage,
     reopenDM,
@@ -139,6 +139,30 @@ test.describe("dm specs", () => {
         const st = await unwrap<ListConversationsResponse>(listConversations(stranger.ctx), 200)
         expect(st.conversations.length).toBe(0)
 
+    });
+    test("can dm on hiker hiker - members", async () =>{
+        const hiker = await unwrap<HikerCardResponse>(getHiker(member1.ctx, member2.id), 200)
+        expect(hiker.can_dm).toBe(true)
+    })
+    test("can dm on hiker hiker - stranger", async () =>{
+        const hiker = await unwrap<HikerCardResponse>(getHiker(stranger.ctx, member2.id), 200)
+        expect(hiker.can_dm).toBe(false)
+    })
+    test("can dm on hiker hiker - host", async () =>{
+        const hiker = await unwrap<HikerCardResponse>(getHiker(host.ctx, member2.id), 200)
+        expect(hiker.can_dm).toBe(true)
+    })
+    test("can dm on hiker hiker - pending", async () =>{
+        const hiker = await unwrap<HikerCardResponse>(getHiker(pending.ctx, member2.id), 200)
+        expect(hiker.can_dm).toBe(false)
+    })
+    test("can host dm pending", async ()=>{
+        const hiker = await unwrap<HikerCardResponse>(getHiker(host.ctx, pending.id), 200)
+        expect(hiker.can_dm).toBe(true)
+    })
+    test("can dm on hiker hiker - own card is never messageable", async () => {
+        const hiker = await unwrap<HikerCardResponse>(getHiker(member1.ctx, member1.id), 200)
+        expect(hiker.can_dm).toBe(false)
     })
 
 

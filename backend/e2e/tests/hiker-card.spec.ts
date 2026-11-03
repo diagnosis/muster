@@ -2,7 +2,7 @@ import {expect, request, test} from "@playwright/test";
 import {asUser, BASE} from "../fixtures";
 import {unwrap} from "../envelope";
 import {accept, cancelOuting, createOuting, getHiker, requestJoin} from "../api";
-import {JoinRequestResponse, OutingResponse, PublicProfileResponse} from "../types";
+import {HikerCardResponse, JoinRequestResponse, OutingResponse, PublicProfileResponse} from "../types";
 import {randomUUID} from "node:crypto";
 import {setOutingTimes} from "../db";
 
@@ -11,8 +11,8 @@ test.describe('hiker public profile card', ()=>{
     test('register and check (new hiker)', async ()=>{
         const hiker  = await asUser(BASE, {experience:"intermediate", bio:"cold brew", home_area:"serik"})
         const viewer = await asUser(BASE)
-        const pp = await unwrap<PublicProfileResponse>(getHiker(viewer.ctx, hiker.id), 200)
-        expect(pp).toEqual({
+        const hcr = await unwrap<HikerCardResponse>(getHiker(viewer.ctx, hiker.id), 200)
+        expect(hcr).toEqual({
             id: hiker.id,
             name: hiker.user.name,
             experience: 'intermediate',
@@ -21,9 +21,10 @@ test.describe('hiker public profile card', ()=>{
             hosted_count: 0,
             went_count: 0,
             member_since: expect.any(String),
+            can_dm:false
         })
         for (const secret of ['email', 'gender', 'verified_at', 'password_hash', 'created_at']) {
-            expect(pp).not.toHaveProperty(secret)
+            expect(hcr).not.toHaveProperty(secret)
         }
     })
     test('anon wants see faces 401', async () => {
@@ -66,4 +67,5 @@ test.describe('hiker public profile card', ()=>{
         expect(hikerCard.hosted_count).toBe(0)
         expect(hikerCard.went_count).toBe(1)
     })
+
 })
