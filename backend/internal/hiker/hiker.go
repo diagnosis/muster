@@ -49,8 +49,8 @@ type PublicProfile struct {
 	ID          uuid.UUID  `json:"id"`
 	Name        string     `json:"name"`
 	Experience  Experience `json:"experience"`
-	HomeArea    *string    `json:"home_area"`
-	Bio         *string    `json:"bio"`
+	HomeArea    *string    `json:"home_area,omitempty"`
+	Bio         *string    `json:"bio,omitempty"`
 	HostedCount int        `json:"hosted_count"`
 	WentCount   int        `json:"went_count"`
 	MemberSince time.Time  `json:"member_since"`
