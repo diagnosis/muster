@@ -439,3 +439,21 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 **The second `plural` was back.** `outings.$id.tsx` had its own `plural` under `lib/format`'s. The grammar bug from #52 was fixed in one of them. Import, don't redeclare.
 
 **Prove the stream, not focus.** A browser spec that waits for a card to change can go green on React Query's refetch-on-focus if Playwright fires a focus event. The sabotage — comment out the `useEffect` that subscribes — is the only proof the spec measures the stream.
+
+## Lessons from My outings: Requested (PR #55)
+
+**A green suite told us the suite had a hole.** The first store edit was `jr.status IN ('accepted','requested')` with no split in Go — every pending request became "You're going". `make check` and both e2e suites passed. There was no API spec for `GET /api/me/outings` at all, and no test anywhere asserting that a pending request is *not* in `joined`. The first commit on the branch was the test that should have been red.
+
+**The bucket is the rule, so the server names it.** "Return everything in `joined` with a status flag and let the client sort it" moves a rule to the client, breaks the existing meaning of `joined` for every consumer, and needs a `my_status` field on `Outing` that is meaningless in every other list. `Requested []Outing` on `MyOutings` is one line and the client just renders.
+
+**Two rulings in one morning is one too many.** I ruled "two queries plus a `listOutings` helper", then helped build the one-query version with a scanned status column, then ruled two queries again. Safa built the one-query version, correctly, and was confused for an hour by the mentor, not the code. One ruling per decision; if it changes, say so once and stay changed.
+
+**A literal in an object widens to `string`.** `{outing, requestType: 'hosting'}` types `requestType` as `string`, not `'hosting'`, so it never matched the `MyRequestType` union and the fix was being applied downstream with an annotation on the `map` parameter. `as const` at the three sites where the literal is written; delete the annotation.
+
+**`scanOuting(row, extra ...any)`.** A scan helper with a fixed column list can take extra destinations by building the list as a slice and `append(dest, extra...)` before one `Scan(dest...)`. Existing callers pass nothing; the one query that selects a 20th column passes `&status`. Two `Scan` calls on one row is not an option — the first consumes it.
+
+**The capacity assertion lived in the wrong test, and then in no test.** The unit test for buckets checked ids; the API spec found `requested[0].capacity` undefined because `attachCapacity` still took two lists. `Test_MyOutings_Capacity` already had the pending outing in its fixture ("pending: not in Joined") — it just never looked at it. Three edits there and the sabotage (drop `mine.Requested` from `attachCapacity`) reddens `a.ID: capacity is nil`.
+
+**Copy that claims more than the data.** "You may go" is a prediction; "You could not go" asserts something that may be false. The request is the only fact, so the label is "You asked" in both phases.
+
+**Past and in-progress aren't reachable through the API.** `createOuting` enforces the 24-hour lead, so a browser spec for "requested outing under Past" needs a DB backdate. Phase logic is Full-tier in Go already; the browser tier is one spec per role under Upcoming and that's enough.

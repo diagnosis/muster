@@ -528,7 +528,7 @@ func (s *OutingStore) SetOutingStatus(ctx context.Context, id uuid.UUID, status 
 	return nil
 }
 
-// ListForHiker returns the outings the hiker hosts and the ones they've joined (accepted requests only), each soonest first.
+// ListForHiker returns the outings the hiker hosts and the ones they've joined (accepted and requested requests), each soonest first.
 func (s *OutingStore) ListForHiker(ctx context.Context, hikerID uuid.UUID) (*outing.MyOutings, error) {
 	hostingQuery := `
 	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,

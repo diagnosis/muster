@@ -581,7 +581,7 @@ func (s *Service) JoinRequests(ctx context.Context, hostID, outingID uuid.UUID, 
 	return s.store.ListJoinRequests(ctx, outingID, status)
 }
 
-// MyOutings returns the outings the hiker hosts and the ones they've joined (accepted only), each soonest first.
+// MyOutings returns the outings the hiker hosts and the ones they've joined (accepted and requested), each soonest first.
 func (s *Service) MyOutings(ctx context.Context, hikerID uuid.UUID) (*MyOutings, error) {
 	mine, err := s.store.ListForHiker(ctx, hikerID)
 	if err != nil {
