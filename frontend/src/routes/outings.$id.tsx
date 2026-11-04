@@ -15,7 +15,7 @@ import {useStartDM} from "@/queries/conversation.ts";
 import {CalendarIcon, FlagIcon, MessageIcon, PinIcon, TrashIcon} from "@/components/Icons.tsx";
 import {outingRange} from "@/utils/date.ts";
 import {useOuting, useRemoveMemberMutation, useWithdrawMutation} from "@/queries/outing.ts";
-import {initial, listNames, ordinal, plural} from "@/lib/format.ts";
+import {initial, ordinal, plural} from "@/lib/format.ts";
 import {WaitingListModal} from "@/components/WaitingListModal.tsx";
 
 
@@ -187,7 +187,11 @@ export function OutingDetailPage() {
                 <div className={styles.card}>
                     <div className={styles.memberRow}>
                         <span className={styles.avatar} aria-hidden="true">{initial(detail.host.name)}</span>
-                        <p className={styles.hostRow}>{detail.host.name} · {detail.host.experience}</p>
+                        <p className={styles.hostRow}>
+                            {detail.host.hiker_id
+                                ? <Link className={styles.nameLink} to="/hikers/$id" params={{id: detail.host.hiker_id}}>{detail.host.name}</Link>
+                                : detail.host.name} · {detail.host.experience}
+                        </p>
                         <span className={styles.hostTag}>Host</span>
                         <span className={styles.rowActions}>
             {canSeeStartDmBtn && detail.host.hiker_id && detail.host.hiker_id !== me?.id
@@ -197,7 +201,9 @@ export function OutingDetailPage() {
 
                     {detail.roster.map((m, i) => <div className={styles.memberRow} key={m.hiker_id ?? i}>
                         <span className={styles.avatar} aria-hidden="true">{initial(m.name)}</span>
-                        {m.name} · {m.experience}
+                        {m.hiker_id
+                            ? <Link className={styles.nameLink} to="/hikers/$id" params={{id: m.hiker_id}}>{m.name}</Link>
+                            : m.name} · {m.experience}
                         <span className={styles.rowActions}>
             {canSeeStartDmBtn && m.hiker_id && m.hiker_id !== me?.id
                 && messageBtn(m.hiker_id, m.name)}
@@ -219,7 +225,10 @@ export function OutingDetailPage() {
                                     {waitingPreview.map((w, i) => <span className={styles.chipAvatar} key={i}>{initial(w.name)}</span>)}
                                 </div>
                                 <p className={styles.waitingNames}>
-                                    {listNames(waitingPreview.map(w => w.name))}
+                                    {waitingPreview.map((w, i) => <span key={w.hiker_id}>
+        {i > 0 && (i === waitingPreview.length - 1 ? ' and ' : ', ')}
+                                        <Link className={styles.nameLink} to="/hikers/$id" params={{id: w.hiker_id}}>{w.name}</Link>
+    </span>)}
                                     {detail.waiting.length > 3 && <> and <strong>{detail.waiting.length - 3} more</strong></>}
                                 </p>
                                 {detail.waiting.length > 3 &&

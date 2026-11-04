@@ -1,7 +1,7 @@
 import {createFileRoute, Link, useNavigate} from '@tanstack/react-router'
 import {useHiker} from "@/queries/profile.ts";
 import {requireAuth, useMeQuery} from "@/queries.ts";
-import type {PublicProfile} from "@/types.ts";
+import type {HikerCard} from "@/types.ts";
 import {useStartDM} from "@/queries/conversation.ts";
 import styles from "@/routes/hikers.$id.module.css"
 import {initial} from "@/lib/format.ts";
@@ -23,7 +23,7 @@ function PublicProfilePage() {
   return <div><ProfileCard hiker={hiker} isMe={me?.id === hiker.id}/></div>
 }
 interface ProfileCardProps {
-  hiker: PublicProfile
+  hiker: HikerCard
   isMe: boolean
 }
 
@@ -42,7 +42,7 @@ function ProfileCard({hiker, isMe}: ProfileCardProps) {
           </div>
           {isMe
               ? <Link className="btn btn-outline" to="/me/profile">Edit profile</Link>
-              : <button type="button" className={`btn btn-outline ${styles.message}`}
+              :hiker.can_dm && <button type="button" className={`btn btn-outline ${styles.message}`}
                         disabled={startDM.isPending}
                         onClick={() => startDM.mutate(hiker.id, {
                           onSuccess: (conv) => navigate({to: '/conversations/$id', params: {id: conv.id}})

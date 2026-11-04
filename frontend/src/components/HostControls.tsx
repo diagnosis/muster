@@ -156,10 +156,14 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
                                         <span className={styles.reqName}>{r.hiker_name}</span>{' '}requests as {r.role}
                                         {r.guests > 0 && ` and brings ${r.guests} guest${r.guests > 1 ? 's' : ''}`}
                                     </button>
-                                    : <>
+                                    :  <>
                                         <div className={styles.historyRow}>
-                                            <p><span className={styles.reqName}>{r.hiker_name}</span>{' '}asked as {r.role}
-                                                {r.guests > 0 && ` and brings ${r.guests} guest${r.guests > 1 ? 's' : ''}`}</p>
+                                            <p>
+                                                <Link className={styles.nameLink} to="/hikers/$id" params={{id: r.hiker_id}}>
+                                                    <span className={styles.reqName}>{r.hiker_name}</span>
+                                                </Link>{' '}asked as {r.role}
+                                                {r.guests > 0 && ` and brings ${r.guests} guest${r.guests > 1 ? 's' : ''}`}
+                                            </p>
                                             <p className={styles.historyWhen}>{labels[status]} {relativeTime(r.updated_at)}</p>
                                         </div>
                                         <button className={styles.restoreBtn} onClick={() => restoreMutation.mutate(r.id)}
@@ -178,6 +182,9 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
         }
         {selectedRequest&&(
             <Modal title={selectedRequest.hiker_name} onClose={() => setSelectedRequest(null)}>
+                <Link className={styles.profileLink} to="/hikers/$id" params={{id: selectedRequest.hiker_id}}>
+                    View profile
+                </Link>
                 <dl className={styles.facts}>
                     <div className={styles.fact}><dt>Experience</dt><dd>{selectedRequest.hiker_experience}</dd></div>
                     <div className={styles.fact}><dt>Joining as</dt><dd>{selectedRequest.role}</dd></div>
