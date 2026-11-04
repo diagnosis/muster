@@ -226,8 +226,8 @@ export function OutingDetailPage() {
                                 </div>
                                 <p className={styles.waitingNames}>
                                     {waitingPreview.map((w, i) => <span key={w.hiker_id}>
-        {i > 0 && (i === waitingPreview.length - 1 ? ' and ' : ', ')}
-                                        <Link className={styles.nameLink} to="/hikers/$id" params={{id: w.hiker_id}}>{w.name}</Link>
+        {i > 0 && (i === waitingPreview.length - 1 && detail.waiting.length <= 3 ? ' and ' : ', ')}
+                                        <Link className={"name-link"} to="/hikers/$id" params={{id: w.hiker_id}}>{w.name}</Link>
     </span>)}
                                     {detail.waiting.length > 3 && <> and <strong>{detail.waiting.length - 3} more</strong></>}
                                 </p>

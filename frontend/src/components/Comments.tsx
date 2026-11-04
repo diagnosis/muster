@@ -67,7 +67,7 @@ function CommentRow({ c, outingId, hostId, onReply }: { c: CommentView; outingId
             <span className={styles.avatar} aria-hidden="true">{c.author_name.charAt(0).toUpperCase()}</span>
             <div className={styles.content}>
                 <div className={styles.meta}>
-                    <Link className={styles.nameLink} to="/hikers/$id" params={{id: c.hiker_id}}>
+                    <Link className={"name-link"} to="/hikers/$id" params={{id: c.hiker_id}}>
                         <span className={styles.author}>{c.author_name}</span>
                     </Link> · <time>{relativeTime(c.created_at)}</time>
                 </div>

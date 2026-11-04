@@ -212,8 +212,6 @@
     background: var(--surface-sunken);
 }
 
-.nameLink{ color: inherit; text-decoration: none; }
-.nameLink:hover, .nameLink:focus-visible{ text-decoration: underline; }
 .profileLink{
     align-self: flex-start;
     font-size: var(--text-label);

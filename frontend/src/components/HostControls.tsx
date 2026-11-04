@@ -159,7 +159,7 @@ export function HostControls( {outingId, detail}: HostControlsProps ){
                                     :  <>
                                         <div className={styles.historyRow}>
                                             <p>
-                                                <Link className={styles.nameLink} to="/hikers/$id" params={{id: r.hiker_id}}>
+                                                <Link className="name-link" to="/hikers/$id" params={{id: r.hiker_id}}>
                                                     <span className={styles.reqName}>{r.hiker_name}</span>
                                                 </Link>{' '}asked as {r.role}
                                                 {r.guests > 0 && ` and brings ${r.guests} guest${r.guests > 1 ? 's' : ''}`}
