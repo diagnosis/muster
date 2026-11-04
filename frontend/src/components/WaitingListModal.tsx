@@ -16,7 +16,7 @@ export function WaitingListModal({waiting, onClose}: {waiting: ListedHiker[], on
                         <span className={styles.avatar} aria-hidden="true">{initial(w.name)}</span>
                         <span className={styles.name}>
                             {w.is_me && <span className={styles.you}>(you) </span>}
-                            <Link className={styles.nameLink} to="/hikers/$id" params={{id: w.hiker_id}}>{w.name}</Link>
+                            <Link className={"name-link"} to="/hikers/$id" params={{id: w.hiker_id}}>{w.name}</Link>
                         </span>
                         {w.role === 'driver' &&
                             <span className={styles.driverTag}>Driver · {w.seats_offered} {w.seats_offered === 1 ? 'seat' : 'seats'}</span>}

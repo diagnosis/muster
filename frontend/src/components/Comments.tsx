@@ -91,7 +91,7 @@ function CommentRow({ c, outingId, hostId, onReply }: { c: CommentView; outingId
                             <button className="btn btn-danger" disabled={del.isPending} onClick={() => del.mutate(currentComment.id, {
                                 onSuccess: () => setCurrentComment(null)
                             })}>Yes</button>
-                            <button className={"btn btn-quite"} onClick={() => setCurrentComment(null)}>Never mind</button>
+                            <button className={"btn-quite"} onClick={() => setCurrentComment(null)}>Never mind</button>
                         </div>
                         {del.isError&&<p className={styles.error}>{del.error.message}</p>}
                     </div>

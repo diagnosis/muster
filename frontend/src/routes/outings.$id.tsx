@@ -189,7 +189,7 @@ export function OutingDetailPage() {
                         <span className={styles.avatar} aria-hidden="true">{initial(detail.host.name)}</span>
                         <p className={styles.hostRow}>
                             {detail.host.hiker_id
-                                ? <Link className={styles.nameLink} to="/hikers/$id" params={{id: detail.host.hiker_id}}>{detail.host.name}</Link>
+                                ? <Link className={"name-link"} to="/hikers/$id" params={{id: detail.host.hiker_id}}>{detail.host.name}</Link>
                                 : detail.host.name} · {detail.host.experience}
                         </p>
                         <span className={styles.hostTag}>Host</span>
