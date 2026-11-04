@@ -118,12 +118,14 @@ export interface EditJoinRequestInput {
 }
 
 export interface MeResponse{
-    id:string
-    email:string,
-    name:string,
-    experience:Experience,
-    created_at: string,
-    updated_at: string,
+    id: string
+    email: string
+    name: string
+    experience: Experience
+    home_area?: string
+    bio?: string
+    created_at: string
+    updated_at: string
 }
 export interface HikerCard{
     id: string
@@ -137,9 +139,13 @@ export interface HikerCard{
     can_dm: boolean
 }
 
+
+
 export interface MeInputRequest{
-    name?:string
-    experience?:Experience
+    name?: string
+    experience?: Experience
+    home_area?: string
+    bio?: string
 }
 
 export interface RegisterRequest{
@@ -305,21 +311,5 @@ export interface ConversationSummary{
     unread_count: number
 }
 
-export interface MeResponse{
-    id: string
-    email: string
-    name: string
-    experience: Experience
-    home_area?: string
-    bio?: string
-    created_at: string
-    updated_at: string
-}
 
-export interface MeInputRequest{
-    name?: string
-    experience?: Experience
-    home_area?: string
-    bio?: string
-}
 
