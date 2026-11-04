@@ -14,6 +14,8 @@ export function ProfileForm({me}: ProfileFormProps){
     const qc = useQueryClient()
     const [hikerName, setHikerName] = useState(me.name?? "")
     const [hikerExperience, setHikerExperience] = useState<Experience>(me.experience)
+    const [homeArea, setHomeArea] = useState(me.home_area ?? "")
+    const [bio, setBio] = useState(me.bio ?? "")
 
     const meMutation = useMutation(
         {
@@ -32,11 +34,18 @@ export function ProfileForm({me}: ProfileFormProps){
     const forgotPasswordMutation = useForgotPasswordMutation()
     function handleProfileUpdate(e:React.SubmitEvent){
         e.preventDefault()
-        meMutation.mutate({ name: hikerName, experience: hikerExperience })
+        meMutation.mutate({
+            name: hikerName,
+            experience: hikerExperience,
+            ...(homeArea.trim() && {home_area: homeArea.trim()}),
+            ...(bio.trim() && {bio: bio.trim()}),
+        })
     }
     const isDirty =
         hikerName !== (me.name ?? "") ||
-        hikerExperience !== me.experience
+        hikerExperience !== me.experience ||
+        homeArea !== (me.home_area ?? "") ||
+        bio !== (me.bio ?? "")
     const isDisabled =
         !hikerName ||
         !isDirty ||
@@ -57,6 +66,19 @@ export function ProfileForm({me}: ProfileFormProps){
                     value={hikerName}
                     onChange={e=>setHikerName(e.target.value)}
                 />
+            </label>
+            <label className={styles.label}>
+                Home area
+                <input type="text" value={homeArea} placeholder="Issaquah, Eastside…"
+                       onChange={e => setHomeArea(e.target.value)}/>
+                <span className={styles.hint}>Shown on your card so people know roughly where you drive from.</span>
+            </label>
+            <label className={styles.label}>
+                About you
+                <textarea value={bio} maxLength={500} rows={4}
+                          placeholder="What you like to hike, how you like to go, anything a host should know."
+                          onChange={e => setBio(e.target.value)}/>
+                <span className={styles.hint}>{bio.length}/500 · shown on your card.</span>
             </label>
             <fieldset className={styles.fieldset}>
                 <legend className={styles.legend}>Experience</legend>

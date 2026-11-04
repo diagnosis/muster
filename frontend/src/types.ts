@@ -305,5 +305,21 @@ export interface ConversationSummary{
     unread_count: number
 }
 
+export interface MeResponse{
+    id: string
+    email: string
+    name: string
+    experience: Experience
+    home_area?: string
+    bio?: string
+    created_at: string
+    updated_at: string
+}
 
+export interface MeInputRequest{
+    name?: string
+    experience?: Experience
+    home_area?: string
+    bio?: string
+}
 

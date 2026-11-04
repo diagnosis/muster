@@ -202,7 +202,7 @@ export function OutingDetailPage() {
                     {detail.roster.map((m, i) => <div className={styles.memberRow} key={m.hiker_id ?? i}>
                         <span className={styles.avatar} aria-hidden="true">{initial(m.name)}</span>
                         {m.hiker_id
-                            ? <Link className={styles.nameLink} to="/hikers/$id" params={{id: m.hiker_id}}>{m.name}</Link>
+                            ? <Link className={"name-link"} to="/hikers/$id" params={{id: m.hiker_id}}>{m.name}</Link>
                             : m.name} · {m.experience}
                         <span className={styles.rowActions}>
             {canSeeStartDmBtn && m.hiker_id && m.hiker_id !== me?.id
