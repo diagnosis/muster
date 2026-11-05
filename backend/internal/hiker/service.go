@@ -29,11 +29,7 @@ type Storage interface {
 	SetPassword(ctx context.Context, hikerID uuid.UUID, hash string) error
 
 	SaveRefreshToken(ctx context.Context, t *RefreshToken) error
-	// RotateRefreshToken replaces the row holding oldHash with newHash in one
-	// statement, recording oldHash as previous_hash. NotFound when no row holds oldHash.
 	RotateRefreshToken(ctx context.Context, oldHash, newHash string, platform Platform, expiresAt time.Time) (*RefreshToken, error)
-	// RotateFromPrevious is the grace path: the row whose previous_hash is
-	// previousHash and whose rotated_at is within grace is rotated again.
 	RotateFromPrevious(ctx context.Context, previousHash, newHash string, platform Platform, expiresAt time.Time, since time.Time) (*RefreshToken, error)
 	DeleteRefreshToken(ctx context.Context, hash string) error
 	DeleteAllRefreshTokens(ctx context.Context, hikerID uuid.UUID) error

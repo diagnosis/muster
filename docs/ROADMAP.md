@@ -1,6 +1,6 @@
 # Muster — Roadmap
 
-*As of 2026-11-04 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #55 merged) and the `feat/profile-card` branch, confirmed by Safa. Replaces the 2026-08-07 roadmap.*
+*As of 2026-11-05 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #56 merged) and the `fix/refresh-rotation` branch, confirmed by Safa. Replaces the 2026-08-07 roadmap.*
 
 *Doc hierarchy: roadmap = why and when · spec = what · engineering notes = how.*
 
@@ -35,6 +35,7 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 | Live outing pages (PR #54) | One SSE event, `outing.changed {outing_id}`, broadcast to **every** open connection (`Hub.Broadcast`, no rooms, no audience) after each of nine service transitions: Update, Cancel, RequestJoin, EditJoinRequest, Withdraw, Accept, Decline, RemoveMember, RestoreRequest. Comments don't emit. The outing page filters by id and refetches detail + join requests; browse and My-outings refetch their list on any poke. The page dropped its `notification.created` subscription — one signal per concern. Design with numbered decisions in `backend/docs/events/outing-changed.md`. Anonymous viewers still refetch on focus (the stream is authenticated) |
 | My outings: Requested (PR #55) | `GET /api/me/outings` gains a third bucket, `requested`: outings the hiker has asked to join and the host hasn't answered. One store query returns accepted and requested rows together with `jr.status` as a 20th column (`scanOuting` takes extra scan targets), and the store splits them; capacity is attached to all three. The page merges the three into one list per tab with a role label: "You asked" (same words past or upcoming — the host never answered, so that's the only fact). Declined and withdrawn appear in no bucket; the API spec asserts that explicitly, which no test did before — this morning's `IN ('accepted','requested')` with no split went green against the whole suite |
 | Hiker card (PR #56) | `/hikers/:id`, reached from every name on an outing (host row, roster, waiting summary and modal, the host's request history and decision modal, comment authors, the DM header). `GET /api/hikers/{id}` now requires auth and returns `hiker.PublicProfile` — name, experience, home area, bio, hosted/went-on counts over past non-cancelled outings, member-since — plus `can_dm`, composed in the handler from `message.Service.CanDM` so the Message button only shows when it would work. Never email, gender or verification; the API spec asserts their absence. Own card shows "Edit profile". The profile form gains Home area and About you (the PATCH existed since v0; nothing called it). `ListedHiker` now carries `hiker_id` on the wire. Signup accepted no `home_area` until this PR: `RegisterInput` had no JSON tags behind `DisallowUnknownFields` |
+| Sessions per device (PR #57) | `user_refresh_tokens` held one row per hiker per platform (`UNIQUE (hiker_id, platform)`), so logging in on a second browser or a phone deleted the first one's token and it was signed out on its next refresh. Now one row per login; rotation is one `UPDATE … WHERE token_hash = $old AND platform = $p AND expires_at > now() RETURNING …`, atomic by construction; a token rotated in the last 10 s still refreshes (`previous_hash`, `rotated_at`), covering a browser whose refresh response was lost. Logout revokes only the presenting session; password reset still signs out everywhere. Design and a sequence diagram of the grace path in `backend/docs/login/refresh-rotation.md` |
 
 ---
 
@@ -48,7 +49,6 @@ In this order. Items can be added.
 
 ### Known bugs
 
-- **Signed out for no reason: refresh-token rotation loses a race.** `mintSession` deletes the old refresh token and saves the new one as two store calls, not one transaction. When the request is cancelled between them (tab navigates, EventSource reconnect aborted) the old token is gone and the new cookie never arrives; the next refresh says "unknown refresh token" → 401 → signed out. Seen 2026-11-04 with the two log lines 138 ms apart (`context canceled` on the delete, then the 401). The client's single-flight only covers one tab. Fix, `fix/refresh-rotation`: delete+insert in one transaction, a ~10 s grace in which the superseded token still refreshes (returning the already-minted replacement), and an API spec that fires two refreshes concurrently and expects both to land. Also reproduce: after re-login on another browser the waiting list rendered empty once.
 - **`verify-email` shows "expired or already used" on a fresh link in dev.** React StrictMode runs the page's effect twice, the first call consumes the token, the second gets a 409 and overwrites the success message. CI builds (no StrictMode) pass, so the suite is run with `CI=1`. Fix: make the verify call fire once (a ref guard or a mutation keyed on the token).
 
 ### Polish ledger (not blocking v1; do in batches)
@@ -104,6 +104,11 @@ In this order. Items can be added.
 - Double poke: the subject of a transition gets `notification.created` (bell) and `outing.changed` (page). Two listeners, one refetch each; React Query dedupes. Acceptable, watch the network tab if it ever looks like more.
 - A wiring test in `internal/api`: register a client on the real hub, POST a join through the router, read one `outing.changed` from the channel. Twenty lines; the only seam #54 left untested by code.
 - Login cross-tab broadcast: same hub, `login` event to the user's other tabs, so a sign-in on one tab lifts the signed-out state on another.
+- Logout is behind `requireAuth`; with an expired access token it 401s before reading the refresh cookie, so the session row survives and the cookies stay. The refresh cookie is the credential being revoked; move the route out of the guard.
+- Expired refresh-token rows are never deleted now that login no longer clears the platform's row. A weekly `DELETE WHERE expires_at < now() - interval '30 days'` once there's a scheduler.
+- Refresh-token families with reuse detection (v2): a superseded token presented after the grace window is a theft signal; revoke every token descended from that login. One `family_id` column on top of #57.
+- A "your devices" list on the profile page, now that rows are per session, with "sign out of all devices" calling the existing `DeleteAllRefreshTokens`.
+- `wantStatus` in `hiker` tests now fails cleanly on a nil error; `outing`'s copy of the helper may not — check.
 - Gender on outings, **by demand only** (v2): three steps in order — "show my gender on my card" opt-in on the profile form (off by default; the card shows it only when on), then an aggregate "N women going" count on the outing page, then women-only outings as a host setting. Never the raw signup field on a public card. Design before code.
 - Profile photo or avatar upload: storage, a column, image resizing. The card uses the initial today, same as roster rows.
 - Hiker card as a drawer inside the host's decision modal: `ProfileCard` is already its own function so the same component can render in a slide-in; today "View profile" navigates away and the modal is gone on back.

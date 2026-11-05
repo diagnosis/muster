@@ -487,3 +487,29 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 **A refresh-token race, diagnosed from two log lines.** `context canceled` on the delete, then `unknown refresh token` 138 ms later: rotation is delete-then-insert without a transaction, the request was cancelled between them, the browser retried with the token that had just been deleted. The client's single-flight covers one tab. Ledgered with the fix (transaction + grace window + a concurrent-refresh spec); not this branch.
 
 **Decide, then build.** Backend in three hours on Monday night because the canvas had settled what the card was and the query was proven before Go saw it. Compare the Monday morning on `Requested`.
+
+## Lessons from sessions per device (PR #57)
+
+**The bug that "kept coming back" was two bugs.** The afternoon diagnosis (a cancelled request between delete and insert) was real but rare. The one Safa kept hitting was `UNIQUE (hiker_id, platform)`: Chrome and Firefox are both `web`, so the second login deleted the first browser's row, and the first browser was signed out fifteen minutes later when its access token expired. It felt random because it fired on a timer, not on the action that caused it. Read the schema before the logs.
+
+**"Not serious" was the most user-visible bug in the app.** Phone browser plus laptop is two `web` sessions. Every real user would have hit it within a day.
+
+**Rotate in one statement and the race disappears.** `UPDATE … SET token_hash = $new, previous_hash = token_hash … WHERE token_hash = $old … RETURNING` either happened or didn't; there's no moment between a delete and an insert for a cancel to land in. `SET previous_hash = token_hash` reads the old value even though the same statement assigns `token_hash` — right-hand sides see the row as it was.
+
+**Checks after a write are too late.** The old `Refresh` looked the token up, then checked expiry and platform. With rotation as the lookup, a check afterwards would reject a client whose row was already rotated. Platform and expiry moved into the `WHERE`.
+
+**A bare parameter in SQL arithmetic is typed by Postgres's guess.** `rotated_at > now() - $5` with a `time.Duration`: Postgres read `now() - $5` as timestamp minus timestamp, got an interval, and refused `timestamptz > interval`. Every unknown-token refresh became a 500, caught by the API suite's garbage-token spec on the first run. Passing a `since` timestamp from the service removed the arithmetic entirely.
+
+**The clock belongs to the rule.** `Test_Refresh_GraceExpires` was green with an 11-second `time.Sleep` and red with an injected clock, which proved the injected clock wasn't wired: the service still passed `refreshGrace` and the fake read `time.Now()`. Moving the cutoff computation into the service (`since := s.now().Add(-refreshGrace)`) gave the rule and its clock one home, made the fake a comparison, and made the test take milliseconds.
+
+**Fakes found three bugs of their own.** `return nil, nil` on a missing key (the service would dereference nil); `*token.PreviousHash = oldHash` on a nil pointer; the old key never deleted, so a replay would have matched directly and skipped the grace rule. Then the grace condition was written with the sign wrong, then inverted, then right — one line, three attempts, each caught by the accept test or its sabotage.
+
+**A test can assert the bug it's meant to prevent.** The first grace test asserted that a second login's refresh *fails* — the exact two-browser bug the branch fixes. One session per test when the subject is one session.
+
+**I said the middle token dies; it doesn't.** With previous-hash grace, the token one rotation back is always refreshable for ten seconds. What dies is the token two back. The test asserts that, not my first description of it.
+
+**`wantStatus` panicked on success.** A helper that dereferences `err` without a nil check turns "expected 401, got success" into a SIGSEGV. A sabotage found it. `t.Helper()` plus a nil guard.
+
+**Concurrent requests need an explicit cookie.** Two `refresh` calls in a `Promise.all` from one context might send T0 and T1 if the jar updates between them. Reading T0 from `storageState()` and sending it as a header on both guarantees one takes the normal path and one the grace path — and `refreshGrace = 0` reddens exactly that spec.
+
+**Best practice was worth the extra column.** Safa's previous projects did delete-and-replace without grace. A sequence diagram of one row through three refreshes (normal, lost response, replay after the window) is what made `previous_hash` make sense; it's in the design doc.
