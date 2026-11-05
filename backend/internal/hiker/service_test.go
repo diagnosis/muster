@@ -31,6 +31,9 @@ func getTestJWTSigner() (*secure.JWTSigner, error) {
 
 func wantStatus(t *testing.T, err error, want apperr.Status) {
 	t.Helper()
+	if err == nil {
+		t.Fatalf("expected status %v, got nil error", want)
+	}
 	se, ok := apperr.AsStatusErr(err)
 	if !ok || se.Status != want {
 		t.Fatalf("got error %v with code: %s, want status code: %s", err, se.Code, want.Code())
@@ -1247,6 +1250,123 @@ func Test_PublicProfile_NoOutings(t *testing.T) {
 	if pp.HomeArea != nil || pp.Bio != nil {
 		t.Errorf("expected nil home area and bio, got %v / %v", pp.HomeArea, pp.Bio)
 	}
+}
+
+func Test_Refresh_TwoSessionCoexists(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "new@test.com",
+		Password:   "Password123",
+		Name:       "Ayşe",
+		Experience: ExperienceBeginner,
+	}, svc, fm)
+
+	sess, err := svc.Login(context.Background(), h1.Email, "Password123", PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	sess2, err := svc.Login(context.Background(), h1.Email, "Password123", PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+
+	rsess1, err := svc.Refresh(context.Background(), sess.RefreshToken, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	rsess2, err := svc.Refresh(context.Background(), sess2.RefreshToken, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if rsess1.RefreshToken == rsess2.RefreshToken {
+		t.Errorf("expected them to be different")
+	}
+}
+func Test_Logout_OnlyThisSession(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "new@test.com",
+		Password:   "Password123",
+		Name:       "Ayşe",
+		Experience: ExperienceBeginner,
+	}, svc, fm)
+	sess, err := svc.Login(context.Background(), h1.Email, "Password123", PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	sess2, err := svc.Login(context.Background(), h1.Email, "Password123", PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if err = svc.Logout(context.Background(), sess.RefreshToken); err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.Refresh(context.Background(), sess.RefreshToken, PlatformWeb)
+	wantStatus(t, err, apperr.CodeInvalidCredentials)
+	rsess2, err := svc.Refresh(context.Background(), sess2.RefreshToken, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if sess2.RefreshToken == rsess2.RefreshToken {
+		t.Errorf("expected them to be different")
+	}
+
+}
+func Test_Refresh_GraceAcceptsSupersededToken(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "new@test.com",
+		Password:   "Password123",
+		Name:       "Ayşe",
+		Experience: ExperienceBeginner,
+	}, svc, fm)
+	sess1, err := svc.Login(context.Background(), h1.Email, "Password123", PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	r1, err := svc.Refresh(context.Background(), sess1.RefreshToken, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.Refresh(context.Background(), sess1.RefreshToken, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.Refresh(context.Background(), r1.RefreshToken, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.Refresh(context.Background(), sess1.RefreshToken, PlatformWeb)
+	wantStatus(t, err, apperr.CodeInvalidCredentials)
+}
+
+func Test_Refresh_GraceExpires(t *testing.T) {
+
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "new@test.com",
+		Password:   "Password123",
+		Name:       "Ayşe",
+		Experience: ExperienceBeginner,
+	}, svc, fm)
+	sess1, err := svc.Login(context.Background(), h1.Email, "Password123", PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.Refresh(context.Background(), sess1.RefreshToken, PlatformWeb)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	svc.now = func() time.Time {
+		return time.Now().Add(refreshGrace + time.Second)
+	}
+	_, err = svc.Refresh(context.Background(), sess1.RefreshToken, PlatformWeb)
+	wantStatus(t, err, apperr.CodeInvalidCredentials)
+
 }
 
 func wantSession(t *testing.T, sess *Session, h *Hiker) {

@@ -147,22 +147,12 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	correlationID, _ := logger.GetCorrelationID(r.Context())
-	idStr, ok := middleware.GetUserID(r.Context())
-	if !ok {
-		logger.Error(r.Context(), "user not logged in")
-		responder.Error(w, apperr.Unauthorized("already logged out", "already logged out"), correlationID)
-		return
-	}
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		logger.Error(r.Context(), "failed to parse id", "err", err)
-		responder.Error(w, apperr.Unauthorized("unauthorized", "unauthorized"), correlationID)
-		return
-	}
-	if err := s.hikers.Logout(r.Context(), id, hiker.PlatformWeb); err != nil {
-		logger.Error(r.Context(), "failed to fetch logout service", "err", err)
-		responder.Error(w, err, correlationID)
-		return
+	if cookie, err := r.Cookie("refresh_token"); err == nil {
+		if err = s.hikers.Logout(r.Context(), cookie.Value); err != nil {
+			logger.Error(r.Context(), "logout: failed to revoke refresh token", "err", err)
+			responder.Error(w, err, correlationID)
+			return
+		}
 	}
 	s.clearSessionCookies(w)
 	responder.JSON(w, http.StatusOK, nil, correlationID)

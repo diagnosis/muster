@@ -457,3 +457,59 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 **Copy that claims more than the data.** "You may go" is a prediction; "You could not go" asserts something that may be false. The request is the only fact, so the label is "You asked" in both phases.
 
 **Past and in-progress aren't reachable through the API.** `createOuting` enforces the 24-hour lead, so a browser spec for "requested outing under Past" needs a DB backdate. Phase logic is Full-tier in Go already; the browser tier is one spec per role under Upcoming and that's enough.
+
+## Lessons from the hiker card (PR #56)
+
+**The write side existed; the read side didn't, and the form didn't either.** `PATCH /api/me/profile` has taken `home_area` and `bio` since v0, `GET /api/hikers/{id}` has existed since the roster did, and `ProfileForm` had name and experience. None of the three touched the two fields. A feature can be "in the backend" and still be invisible: check the form, the response shape, and the page, not just the route table.
+
+**Untagged struct behind `DisallowUnknownFields` = a field list that rejects snake_case.** `RegisterInput` had no JSON tags, so the decoder matched `bio` and `experience` by case-insensitive field name and rejected `home_area` as unknown. Nobody could have signed up with a home area through the API. The first e2e fixture to try it found it. Tags on every struct that crosses the wire.
+
+**A public shape is its own struct, so the compiler enforces the field list.** `PublicProfile` isn't a trimmed `Hiker`; it has no `Email` field at all, and a test that tried `pp.Gender` wouldn't compile. The API spec still asserts `not.toHaveProperty('email')` for the wire, because the struct proves the Go side and the spec proves the JSON side.
+
+**Viewer-dependent facts don't belong on the subject's struct.** `can_dm` is about the pair (viewer, hiker), so it's composed in the handler from `message.Service.CanDM` and embedded beside `*hiker.PublicProfile` in a response struct. `hiker` never learns about messaging; the rule stays in `message`; the button hides instead of showing a 403.
+
+**"Past" has one definition and it's in Go.** The counts query's `COALESCE(o.ends_at, o.starts_at + interval '12 hours') <= now()` mirrors `outing.effectiveEnd`. The comment above the query says "change both or neither", because `starts_at < now()` would have counted in-progress outings and disagreed with every phase badge on the site.
+
+**Run the query in psql before it goes in Go.** The first draft had `12h` (not SQL), a `COALESCE` with no comparison, and `AS` inside the parentheses. Three errors in a row from the database, each fixed in seconds, none of which would have been a readable Go compile error.
+
+**The handler was fetching the hiker twice.** `GetByID` then `PublicProfile(h.ID)` — the second already fetches and already returns not-found. One call, one error path.
+
+**An anonymous-access test was the rule.** `profile.spec.ts` asserted a logged-out viewer gets the card. Making the endpoint `requireAuth` reddened it, which is the right kind of red: a spec disagreeing with a decision. The spec moved to the new file with the new rule, and the commit says why: the roster hides names from guests; a card by id can't be a side door.
+
+**A link inside a button is swallowed.** The request row in the host's decision list is a `<button>`; the card link went into the modal it opens and onto the history rows, which are plain text. And a `title` prop typed `string` can't hold a link — widen the shared `Modal` or put the link in the body.
+
+**`listNames` returned a string, so the waiting summary couldn't link.** Rewritten as JSX with the join inline — and the join grew a case `listNames` never had: when "and N more" follows, the last separator inside the preview is ", " not " and ". Four waiters read "A, B and C and 1 more" until that was added.
+
+**Deleting the module rule before changing the callers leaves `styles.x === undefined`.** `.nameLink` moved to a global `.name-link`; three callers kept `className={styles.nameLink}` and rendered with no class — the host name showed the global `a` underline in the very screenshot that was meant to confirm the fix. `git grep nameLink` before pushing a rename.
+
+**Duplicate interface declarations merge silently.** `MeResponse` and `MeInputRequest` were declared twice in `types.ts`; TypeScript merged them, `tsc` passed, the suite was green. Two homes for a type is still two homes.
+
+**A refresh-token race, diagnosed from two log lines.** `context canceled` on the delete, then `unknown refresh token` 138 ms later: rotation is delete-then-insert without a transaction, the request was cancelled between them, the browser retried with the token that had just been deleted. The client's single-flight covers one tab. Ledgered with the fix (transaction + grace window + a concurrent-refresh spec); not this branch.
+
+**Decide, then build.** Backend in three hours on Monday night because the canvas had settled what the card was and the query was proven before Go saw it. Compare the Monday morning on `Requested`.
+
+## Lessons from sessions per device (PR #57)
+
+**The bug that "kept coming back" was two bugs.** The afternoon diagnosis (a cancelled request between delete and insert) was real but rare. The one Safa kept hitting was `UNIQUE (hiker_id, platform)`: Chrome and Firefox are both `web`, so the second login deleted the first browser's row, and the first browser was signed out fifteen minutes later when its access token expired. It felt random because it fired on a timer, not on the action that caused it. Read the schema before the logs.
+
+**"Not serious" was the most user-visible bug in the app.** Phone browser plus laptop is two `web` sessions. Every real user would have hit it within a day.
+
+**Rotate in one statement and the race disappears.** `UPDATE … SET token_hash = $new, previous_hash = token_hash … WHERE token_hash = $old … RETURNING` either happened or didn't; there's no moment between a delete and an insert for a cancel to land in. `SET previous_hash = token_hash` reads the old value even though the same statement assigns `token_hash` — right-hand sides see the row as it was.
+
+**Checks after a write are too late.** The old `Refresh` looked the token up, then checked expiry and platform. With rotation as the lookup, a check afterwards would reject a client whose row was already rotated. Platform and expiry moved into the `WHERE`.
+
+**A bare parameter in SQL arithmetic is typed by Postgres's guess.** `rotated_at > now() - $5` with a `time.Duration`: Postgres read `now() - $5` as timestamp minus timestamp, got an interval, and refused `timestamptz > interval`. Every unknown-token refresh became a 500, caught by the API suite's garbage-token spec on the first run. Passing a `since` timestamp from the service removed the arithmetic entirely.
+
+**The clock belongs to the rule.** `Test_Refresh_GraceExpires` was green with an 11-second `time.Sleep` and red with an injected clock, which proved the injected clock wasn't wired: the service still passed `refreshGrace` and the fake read `time.Now()`. Moving the cutoff computation into the service (`since := s.now().Add(-refreshGrace)`) gave the rule and its clock one home, made the fake a comparison, and made the test take milliseconds.
+
+**Fakes found three bugs of their own.** `return nil, nil` on a missing key (the service would dereference nil); `*token.PreviousHash = oldHash` on a nil pointer; the old key never deleted, so a replay would have matched directly and skipped the grace rule. Then the grace condition was written with the sign wrong, then inverted, then right — one line, three attempts, each caught by the accept test or its sabotage.
+
+**A test can assert the bug it's meant to prevent.** The first grace test asserted that a second login's refresh *fails* — the exact two-browser bug the branch fixes. One session per test when the subject is one session.
+
+**I said the middle token dies; it doesn't.** With previous-hash grace, the token one rotation back is always refreshable for ten seconds. What dies is the token two back. The test asserts that, not my first description of it.
+
+**`wantStatus` panicked on success.** A helper that dereferences `err` without a nil check turns "expected 401, got success" into a SIGSEGV. A sabotage found it. `t.Helper()` plus a nil guard.
+
+**Concurrent requests need an explicit cookie.** Two `refresh` calls in a `Promise.all` from one context might send T0 and T1 if the jar updates between them. Reading T0 from `storageState()` and sending it as a header on both guarantees one takes the normal path and one the grace path — and `refreshGrace = 0` reddens exactly that spec.
+
+**Best practice was worth the extra column.** Safa's previous projects did delete-and-replace without grace. A sequence diagram of one row through three refreshes (normal, lost response, replay after the window) is what made `previous_hash` make sense; it's in the design doc.

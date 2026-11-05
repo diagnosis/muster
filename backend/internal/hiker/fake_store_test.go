@@ -23,6 +23,70 @@ func newFakeStore() *fakeStore {
 	}
 }
 
+func (f *fakeStore) RotateRefreshToken(ctx context.Context, oldHash, newHash string, platform Platform, expiresAt time.Time) (*RefreshToken, error) {
+	now := time.Now()
+	token, ok := f.rt[oldHash]
+	if !ok {
+		return nil, apperr.NotFound("not found", "not found")
+	}
+	if token.Platform != platform || token.ExpiresAt.Before(now) {
+		return nil, apperr.NotFound("not found", "not found")
+	}
+
+	token.TokenHash = newHash
+	token.PreviousHash = &oldHash
+	token.RotatedAt = &now
+	token.ExpiresAt = expiresAt
+	f.rt[newHash] = token
+	delete(f.rt, oldHash)
+	return token, nil
+}
+
+func (f *fakeStore) RotateFromPrevious(ctx context.Context, previousHash, newHash string, platform Platform, expiresAt time.Time, since time.Time) (*RefreshToken, error) {
+
+	now := time.Now()
+	var tok *RefreshToken
+	for _, token := range f.rt {
+		if token.PreviousHash != nil && *token.PreviousHash == previousHash {
+			tok = token
+			break
+		}
+
+	}
+	if tok == nil {
+		return nil, apperr.NotFound("not found", "not found")
+	}
+	if tok.Platform != platform || tok.ExpiresAt.Before(now) {
+		return nil, apperr.NotFound("not found", "not found")
+	}
+	if tok.RotatedAt == nil || !tok.RotatedAt.After(since) {
+		return nil, apperr.NotFound("not found", "not found")
+	}
+	tokHash := tok.TokenHash
+	tok.PreviousHash = &tokHash
+	tok.TokenHash = newHash
+	tok.RotatedAt = &now
+	tok.ExpiresAt = expiresAt
+	f.rt[newHash] = tok
+	delete(f.rt, tokHash)
+
+	return tok, nil
+}
+
+func (f *fakeStore) DeleteRefreshToken(ctx context.Context, hash string) error {
+	delete(f.rt, hash)
+	return nil
+}
+
+func (f *fakeStore) DeleteAllRefreshTokens(ctx context.Context, hikerID uuid.UUID) error {
+	for _, token := range f.rt {
+		if token.HikerID == hikerID {
+			delete(f.rt, token.TokenHash)
+		}
+	}
+	return nil
+}
+
 func (f *fakeStore) CreateHiker(ctx context.Context, h *Hiker) error {
 	for _, hiker := range f.hikers {
 		if strings.EqualFold(hiker.Email, h.Email) {

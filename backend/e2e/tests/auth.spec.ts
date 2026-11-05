@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import {test, expect, request} from '@playwright/test';
 import {asUnverifiedUser, asUser, BASE} from '../fixtures'
 import {unwrap, unwrapError} from "../envelope";
 import {
@@ -242,6 +242,33 @@ test.describe('auth', ()=>{
     await unwrap(verifyLoginCode(hiker.ctx, {email:hiker.user.email, code:code2}), 200)
     await unwrap(verifyLoginCode(hiker.ctx, {email:hiker.user.email, code:code2}), 401)
 
+  })
+  test("two session coexist", async () => {
+    const hiker = await asUser(BASE)
+    const ctx  = await request.newContext({baseURL:BASE})
+   await unwrap(login(ctx, {email:hiker.user.email, password:hiker.user.password}), 200)
+    await unwrap(refresh(hiker.ctx), 200)
+    await unwrap(refresh(ctx), 200)
+  })
+  test('concurrent refresh from one session', async () =>{
+    const hiker = await asUser(BASE)
+    const t0 = (await hiker.ctx.storageState()).cookies.find(c => c.name == "refresh_token")!.value
+    const [a,b] = await Promise.all([
+        refresh(hiker.ctx, {Cookie: `refresh_token=${t0}`}),
+        refresh(hiker.ctx, {Cookie: `refresh_token=${t0}`}),
+    ])
+    await unwrap(a, 200)
+    await unwrap(b, 200)
+
+  })
+  test('logging out one session leaves the other signed in', async () => {
+    const hiker = await asUser(BASE)
+    const other = await request.newContext({baseURL: BASE})
+    await unwrap(login(other, {email: hiker.user.email, password: hiker.user.password}), 200)
+
+    await unwrap(logout(hiker.ctx), 200)
+    await unwrap(refresh(hiker.ctx), 401)
+    await unwrap(refresh(other), 200)
   })
 
 })
