@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/diagnosis/muster/internal/hiker"
@@ -162,33 +163,88 @@ func (s *HikerStore) SaveRefreshToken(ctx context.Context, t *hiker.RefreshToken
 	return nil
 }
 
-// GetRefreshTokenByHash returns the refresh-token record matching the
-// given hash. A missing row translates to apperr.NotFound.
-func (s *HikerStore) GetRefreshTokenByHash(ctx context.Context, hash string) (*hiker.RefreshToken, error) {
+// RotateRefreshToken swaps oldHash for newHash on the row that holds it, in one
+// statement, recording oldHash as previous_hash and stamping rotated_at. The
+// row must match platform and be unexpired; those are WHERE conditions, not
+// checks after, so a row is never rotated for a client that will be refused.
+// NotFound when no row matches.
+func (s *HikerStore) RotateRefreshToken(ctx context.Context, oldHash, newHash string, platform hiker.Platform, expiresAt time.Time) (*hiker.RefreshToken, error) {
 	q := `
-		SELECT id, hiker_id, token_hash, platform, expires_at, created_at
-		FROM user_refresh_tokens
-		WHERE token_hash = $1
+		UPDATE user_refresh_tokens 
+		SET token_hash = $2, previous_hash = token_hash,
+		    rotated_at = now(), expires_at = $4
+		WHERE token_hash = $1 AND platform = $3 AND expires_at > now()
+		RETURNING id, hiker_id, token_hash, platform, expires_at, created_at, previous_hash, rotated_at;
 `
-	t := &hiker.RefreshToken{}
-
-	err := s.pool.QueryRow(ctx, q, hash).Scan(&t.ID, &t.HikerID, &t.TokenHash, &t.Platform, &t.ExpiresAt, &t.CreatedAt)
-	if err != nil {
+	var tok hiker.RefreshToken
+	row := s.pool.QueryRow(ctx, q, oldHash, newHash, platform, expiresAt)
+	if err := row.Scan(
+		&tok.ID,
+		&tok.HikerID,
+		&tok.TokenHash,
+		&tok.Platform,
+		&tok.ExpiresAt,
+		&tok.CreatedAt,
+		&tok.PreviousHash,
+		&tok.RotatedAt,
+	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperr.NotFound("token not found", "no row for hash")
+			return nil, apperr.NotFound("not found", "not found")
 		}
-		return nil, apperr.Database("could not load token", "select token by hash failed", err)
+		return nil, apperr.Database("failed to get new token", "failed to rotate token", err)
 	}
-	return t, nil
+	return &tok, nil
 }
 
-// DeleteRefreshTokens removes all refresh tokens for the hiker on the
-// given platform. Deleting zero rows is not an error.
-func (s *HikerStore) DeleteRefreshTokens(ctx context.Context, hikerID uuid.UUID, platform hiker.Platform) error {
-	q := `DELETE FROM user_refresh_tokens WHERE hiker_id = $1 AND platform = $2`
-	_, err := s.pool.Exec(ctx, q, hikerID, platform)
-	if err != nil {
-		return apperr.Database("could not delete refresh tokens", "delete user_refresh_tokens failed", err)
+// RotateFromPrevious is the grace path (design R3): the row whose previous_hash
+// is previousHash and whose rotated_at is within grace is rotated again — for a
+// client that never received the last rotation's cookie and retried with the
+// token it still held. Same platform and expiry conditions as RotateRefreshToken.
+// NotFound when no row matches, including when the window has passed.
+func (s *HikerStore) RotateFromPrevious(ctx context.Context, previousHash, newHash string, platform hiker.Platform, expiresAt time.Time, since time.Time) (*hiker.RefreshToken, error) {
+	q := `
+		UPDATE user_refresh_tokens 
+		SET token_hash = $2, previous_hash = token_hash, rotated_at = now(),
+		    expires_at = $4
+		WHERE previous_hash = $1 AND platform = $3 AND rotated_at > $5 AND expires_at > now()
+		RETURNING id, hiker_id, token_hash, platform, expires_at, created_at, previous_hash, rotated_at;
+`
+	var tok hiker.RefreshToken
+	row := s.pool.QueryRow(ctx, q, previousHash, newHash, platform, expiresAt, since)
+	if err := row.Scan(
+		&tok.ID,
+		&tok.HikerID,
+		&tok.TokenHash,
+		&tok.Platform,
+		&tok.ExpiresAt,
+		&tok.CreatedAt,
+		&tok.PreviousHash,
+		&tok.RotatedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperr.NotFound("not found", "not found")
+		}
+		return nil, apperr.Database("failed to get new token", "failed to rotate token", err)
+	}
+	return &tok, nil
+}
+
+// DeleteRefreshToken revokes one session: the row holding hash. Deleting a
+// token that isn't there is not an error, so a second logout still succeeds.
+func (s *HikerStore) DeleteRefreshToken(ctx context.Context, hash string) error {
+	q := `DELETE FROM user_refresh_tokens WHERE token_hash = $1`
+	if _, err := s.pool.Exec(ctx, q, hash); err != nil {
+		return apperr.Database("could not sign out", "delete refresh token failed", err)
+	}
+	return nil
+}
+
+// DeleteAllRefreshTokens revokes every session the hiker holds, on every
+// device. Used by password reset: no session that knew the old password survives.
+func (s *HikerStore) DeleteAllRefreshTokens(ctx context.Context, hikerID uuid.UUID) error {
+	q := `DELETE FROM user_refresh_tokens WHERE hiker_id = $1`
+	if _, err := s.pool.Exec(ctx, q, hikerID); err != nil {
+		return apperr.Database("could not sign out everywhere", "delete all refresh tokens failed", err)
 	}
 	return nil
 }

@@ -66,12 +66,14 @@ type OutingCounts struct {
 // RefreshToken is a stored refresh-token record. Only the SHA-256 hash
 // of the token is persisted; the raw value lives in the client's cookie.
 type RefreshToken struct {
-	ID        uuid.UUID
-	HikerID   uuid.UUID
-	TokenHash string
-	Platform  Platform
-	ExpiresAt time.Time
-	CreatedAt time.Time
+	ID           uuid.UUID
+	HikerID      uuid.UUID
+	TokenHash    string
+	Platform     Platform
+	ExpiresAt    time.Time
+	CreatedAt    time.Time
+	PreviousHash *string
+	RotatedAt    *time.Time
 }
 
 // Session is the result of a successful authentication: the hiker plus

@@ -29,8 +29,14 @@ type Storage interface {
 	SetPassword(ctx context.Context, hikerID uuid.UUID, hash string) error
 
 	SaveRefreshToken(ctx context.Context, t *RefreshToken) error
-	GetRefreshTokenByHash(ctx context.Context, hash string) (*RefreshToken, error)
-	DeleteRefreshTokens(ctx context.Context, hikerID uuid.UUID, platform Platform) error
+	// RotateRefreshToken replaces the row holding oldHash with newHash in one
+	// statement, recording oldHash as previous_hash. NotFound when no row holds oldHash.
+	RotateRefreshToken(ctx context.Context, oldHash, newHash string, platform Platform, expiresAt time.Time) (*RefreshToken, error)
+	// RotateFromPrevious is the grace path: the row whose previous_hash is
+	// previousHash and whose rotated_at is within grace is rotated again.
+	RotateFromPrevious(ctx context.Context, previousHash, newHash string, platform Platform, expiresAt time.Time, since time.Time) (*RefreshToken, error)
+	DeleteRefreshToken(ctx context.Context, hash string) error
+	DeleteAllRefreshTokens(ctx context.Context, hikerID uuid.UUID) error
 
 	OutingCounts(ctx context.Context, hikerID uuid.UUID) (OutingCounts, error)
 }
@@ -55,6 +61,7 @@ type Service struct {
 	baseURL      string
 	verifyTTL    time.Duration
 	loginCodeTTL time.Duration
+	now          func() time.Time
 }
 
 // NewService returns a Service backed by store, minting tokens with jwt.
@@ -65,7 +72,7 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 
 	return &Service{
 		store: cfg.Store, tokens: cfg.Token, mail: cfg.Mail, jwt: cfg.JWT,
-		baseURL: cfg.BaseURL, verifyTTL: cfg.VerifyTTL, loginCodeTTL: cfg.LoginCodeTTL,
+		baseURL: cfg.BaseURL, verifyTTL: cfg.VerifyTTL, loginCodeTTL: cfg.LoginCodeTTL, now: time.Now,
 	}, nil
 }
 
@@ -190,48 +197,64 @@ func (s *Service) Login(ctx context.Context, email, password string, platform Pl
 	return s.mintSession(ctx, h, platform)
 }
 
-// Logout revokes the hiker's stored refresh token for the given
-// platform. The access token remains valid until it expires — that's
+// Logout revokes the hiker's stored refresh token
+// The access token remains valid until it expires — that's
 // the price of stateless JWTs, and why they're short-lived.
-func (s *Service) Logout(ctx context.Context, id uuid.UUID, platform Platform) error {
-	if !platform.Valid() {
-		return apperr.BadRequest("invalid platform", "invalid platform")
-	}
-	return s.store.DeleteRefreshTokens(ctx, id, platform)
+func (s *Service) Logout(ctx context.Context, raw string) error {
+	return s.store.DeleteRefreshToken(ctx, secure.HashRefreshToken(raw))
 }
 
-// Refresh exchanges a valid raw refresh token for a new Session,
-// rotating the stored token: the presented token is revoked and a
-// replacement issued. Any credential-shaped failure returns
-// apperr.InvalidCredentials.
+// refreshGrace is how long a superseded refresh token still refreshes (R3):
+// long enough for a browser that never received the new cookie to retry,
+// short enough that a leaked old token is not a second credential for long.
+const refreshGrace = 10 * time.Second
+
+func isNotFound(err error) bool {
+	se, ok := apperr.AsStatusErr(err)
+	return ok && se.Status == apperr.CodeNotFound
+}
+
+// Refresh exchanges a valid raw refresh token for a new Session, rotating the
+// stored token in one statement: the row holding the presented hash takes the
+// new hash. Expiry and platform are conditions of that update, not checks after
+// it — once a row is rotated the client must receive the new token. A token
+// rotated within refreshGrace still refreshes (and rotates again). Any
+// credential-shaped failure returns apperr.InvalidCredentials.
 func (s *Service) Refresh(ctx context.Context, rawToken string, platform Platform) (*Session, error) {
 	if !platform.Valid() {
 		return nil, apperr.BadRequest("invalid platform", "invalid platform")
 	}
-
-	rt, err := s.store.GetRefreshTokenByHash(ctx, secure.HashRefreshToken(rawToken))
+	newRawToken, err := secure.GenerateRefreshToken()
 	if err != nil {
-		if se, ok := apperr.AsStatusErr(err); ok && se.Status == apperr.CodeNotFound {
-			return nil, apperr.InvalidCredentials("invalid credentials", "unknown refresh token")
-		}
+		return nil, apperr.Internal("could not create session", "refresh token generation failed", err)
+	}
+	oldHash := secure.HashRefreshToken(rawToken)
+	newHash := secure.HashRefreshToken(newRawToken)
+	expiresAt := s.now().Add(s.jwt.RefreshExpiry())
+	since := s.now().Add(-refreshGrace)
+	rt, err := s.store.RotateRefreshToken(ctx, oldHash, newHash, platform, expiresAt)
+	if isNotFound(err) {
+		rt, err = s.store.RotateFromPrevious(ctx, oldHash, newHash, platform, expiresAt, since)
+	}
+	if isNotFound(err) {
+		return nil, apperr.InvalidCredentials("invalid credentials", "unknown refresh token")
+	}
+	if err != nil {
 		return nil, err
-	}
-	if rt.ExpiresAt.Before(time.Now()) {
-		return nil, apperr.InvalidCredentials("invalid credentials", "token expired")
-	}
-	if rt.Platform != platform {
-		return nil, apperr.InvalidCredentials("invalid credentials", "platform mismatch")
 	}
 
 	h, err := s.store.GetHikerByID(ctx, rt.HikerID)
+	if isNotFound(err) {
+		return nil, apperr.InvalidCredentials("invalid credentials", "unknown refresh token")
+	}
 	if err != nil {
-		if se, ok := apperr.AsStatusErr(err); ok && se.Status == apperr.CodeNotFound {
-			return nil, apperr.InvalidCredentials("invalid credentials", "unknown refresh token")
-		}
 		return nil, err
 	}
-	return s.mintSession(ctx, h, platform)
-
+	access, err := s.jwt.SignAccess(h.ID.String())
+	if err != nil {
+		return nil, apperr.Internal("could not create session", "access token signing failed", err)
+	}
+	return &Session{Hiker: h, AccessToken: access, RefreshToken: newRawToken}, nil
 }
 
 // GetByID returns the hiker with the given id.
@@ -302,11 +325,8 @@ func (s *Service) mintSession(ctx context.Context, h *Hiker, platform Platform) 
 		Platform:  platform,
 		ExpiresAt: time.Now().Add(s.jwt.RefreshExpiry()),
 	}
-	// v0 policy: one session per platform...
-	if err := s.store.DeleteRefreshTokens(ctx, h.ID, platform); err != nil {
-		return nil, err
-	}
-	if err := s.store.SaveRefreshToken(ctx, newRt); err != nil {
+
+	if err = s.store.SaveRefreshToken(ctx, newRt); err != nil {
 		return nil, err
 	}
 	return &Session{
@@ -370,12 +390,8 @@ func (s *Service) ResetPassword(ctx context.Context, raw, newPassword string) er
 	if err != nil {
 		return err
 	}
-	for _, p := range AllPlatforms {
-		err = s.store.DeleteRefreshTokens(ctx, hikerID, p)
-		if err != nil {
-			logger.Warn(ctx, "failed to delete old tokens", "err", err)
-			return err
-		}
+	if err = s.store.DeleteAllRefreshTokens(ctx, hikerID); err != nil {
+		return err
 	}
 
 	c := email.Content{
