@@ -1,6 +1,6 @@
 # Muster — Roadmap
 
-*As of 2026-11-02 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #54 merged) and the `feat/my-outings-requested` branch, confirmed by Safa. Replaces the 2026-08-07 roadmap.*
+*As of 2026-11-04 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #55 merged) and the `feat/profile-card` branch, confirmed by Safa. Replaces the 2026-08-07 roadmap.*
 
 *Doc hierarchy: roadmap = why and when · spec = what · engineering notes = how.*
 
@@ -34,6 +34,7 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 | Capacity on the card (PR #52) | The browse and My-outings lists carry `capacity` per outing (`people_count`, `seat_capacity`, `seats_short`, `spots_left`, `waiting_count`), computed by one `capacityOf` that `Detail` and `Update` now share; the store returns raw per-outing sums in one grouped query. The card gains a fill bar and one sentence in four states, in priority order: seats short ("3 seats short, a driver would help"), no seats left under the max ("a driver would open more"), full, open; waiting appended in any state. The second state was found by a fixture, not designed: 3 people in 3 seats with max 8 read "full" and hid that a driver would change everything. Difficulty and pace chips gain quiet labels ("terrain moderate · pace moderate"). `Detail` gains `waiting_count`, public like the other four numbers |
 | Live outing pages (PR #54) | One SSE event, `outing.changed {outing_id}`, broadcast to **every** open connection (`Hub.Broadcast`, no rooms, no audience) after each of nine service transitions: Update, Cancel, RequestJoin, EditJoinRequest, Withdraw, Accept, Decline, RemoveMember, RestoreRequest. Comments don't emit. The outing page filters by id and refetches detail + join requests; browse and My-outings refetch their list on any poke. The page dropped its `notification.created` subscription — one signal per concern. Design with numbered decisions in `backend/docs/events/outing-changed.md`. Anonymous viewers still refetch on focus (the stream is authenticated) |
 | My outings: Requested (PR #55) | `GET /api/me/outings` gains a third bucket, `requested`: outings the hiker has asked to join and the host hasn't answered. One store query returns accepted and requested rows together with `jr.status` as a 20th column (`scanOuting` takes extra scan targets), and the store splits them; capacity is attached to all three. The page merges the three into one list per tab with a role label: "You asked" (same words past or upcoming — the host never answered, so that's the only fact). Declined and withdrawn appear in no bucket; the API spec asserts that explicitly, which no test did before — this morning's `IN ('accepted','requested')` with no split went green against the whole suite |
+| Hiker card (PR #56) | `/hikers/:id`, reached from every name on an outing (host row, roster, waiting summary and modal, the host's request history and decision modal, comment authors, the DM header). `GET /api/hikers/{id}` now requires auth and returns `hiker.PublicProfile` — name, experience, home area, bio, hosted/went-on counts over past non-cancelled outings, member-since — plus `can_dm`, composed in the handler from `message.Service.CanDM` so the Message button only shows when it would work. Never email, gender or verification; the API spec asserts their absence. Own card shows "Edit profile". The profile form gains Home area and About you (the PATCH existed since v0; nothing called it). `ListedHiker` now carries `hiker_id` on the wire. Signup accepted no `home_area` until this PR: `RegisterInput` had no JSON tags behind `DisallowUnknownFields` |
 
 ---
 
@@ -41,13 +42,13 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 
 In this order. Items can be added.
 
-1. **Public hiker card page.** The API route exists (`GET /api/hikers/{id}`); the page does not. Home area and bio are in the backend and get surfaced here and on the profile form, together with a profile photo or avatar.
-2. **Pagination.** Browse first, with keyset pagination. The browse-card capacity spec and both `live.spec.ts` tests create their own outings and expect them on the page they open; they will need a page-one guarantee or a filter when this lands. Then chat, then the Past tab. Server-side phase filtering comes with it.
-3. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
-4. **One real hike organized through Muster.** v1 is done when boots hit dirt.
+1. **Pagination.** Browse first, with keyset pagination. The browse-card capacity spec and both `live.spec.ts` tests create their own outings and expect them on the page they open; they will need a page-one guarantee or a filter when this lands. Then chat, then the Past tab. Server-side phase filtering comes with it.
+2. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
+3. **One real hike organized through Muster.** v1 is done when boots hit dirt.
 
 ### Known bugs
 
+- **Signed out for no reason: refresh-token rotation loses a race.** `mintSession` deletes the old refresh token and saves the new one as two store calls, not one transaction. When the request is cancelled between them (tab navigates, EventSource reconnect aborted) the old token is gone and the new cookie never arrives; the next refresh says "unknown refresh token" → 401 → signed out. Seen 2026-11-04 with the two log lines 138 ms apart (`context canceled` on the delete, then the 401). The client's single-flight only covers one tab. Fix, `fix/refresh-rotation`: delete+insert in one transaction, a ~10 s grace in which the superseded token still refreshes (returning the already-minted replacement), and an API spec that fires two refreshes concurrently and expects both to land. Also reproduce: after re-login on another browser the waiting list rendered empty once.
 - **`verify-email` shows "expired or already used" on a fresh link in dev.** React StrictMode runs the page's effect twice, the first call consumes the token, the second gets a 409 and overwrites the success message. CI builds (no StrictMode) pass, so the suite is run with `CI=1`. Fix: make the verify call fire once (a ref guard or a mutation keyed on the token).
 
 ### Polish ledger (not blocking v1; do in batches)
@@ -86,7 +87,7 @@ In this order. Items can be added.
 - Edit an accepted request: demote to the queue, or try to fit the new seats and keep the seat if it fits.
 - `ListJoinRequests` and `WaitingNames` share a filter and an order and differ only in projection; one query, two projections.
 - `MyJoinRequest` is a pass-through so the edit handler can resolve "my request" to an id; `EditJoinRequest` could take the outing id instead (strangers would then get 404, not 403).
-- Host's Restore button still uses `HostControls.module.css .restoreBtn`; move it to the global `.btn-outline` the Edit button uses.
+- Host's Restore button still uses `HostControls.module.css .restoreBtn`; `.btn-outline` is global now, use it.
 - Collapse the `seedJoinRequest*` test helpers into one with an options struct.
 - Bare `tsc` in `frontend/` reports ~98 narrowing errors; `tsc -b` is clean. Find out which config the bare command reads. A frontend `make check` (tsc -b, eslint, build) would make this moot.
 - Two `uuid.UUID` parameters side by side (`hikerID, requestID`) were swapped twice this month; typed ids (`type RequestID uuid.UUID`) would make it a compile error.
@@ -103,6 +104,13 @@ In this order. Items can be added.
 - Double poke: the subject of a transition gets `notification.created` (bell) and `outing.changed` (page). Two listeners, one refetch each; React Query dedupes. Acceptable, watch the network tab if it ever looks like more.
 - A wiring test in `internal/api`: register a client on the real hub, POST a join through the router, read one `outing.changed` from the channel. Twenty lines; the only seam #54 left untested by code.
 - Login cross-tab broadcast: same hub, `login` event to the user's other tabs, so a sign-in on one tab lifts the signed-out state on another.
+- Gender on outings, **by demand only** (v2): three steps in order — "show my gender on my card" opt-in on the profile form (off by default; the card shows it only when on), then an aggregate "N women going" count on the outing page, then women-only outings as a host setting. Never the raw signup field on a public card. Design before code.
+- Profile photo or avatar upload: storage, a column, image resizing. The card uses the initial today, same as roster rows.
+- Hiker card as a drawer inside the host's decision modal: `ProfileCard` is already its own function so the same component can render in a slide-in; today "View profile" navigates away and the modal is gone on back.
+- Outing-page modal state in the URL (`?waiting=1`, `?request=<id>`) so browser back restores an open modal. ~15 lines with TanStack `validateSearch`.
+- Clearing home area or bio: PATCH treats a missing field as "leave alone" and can't clear to null (v0 note in `UpdateProfileInput`); the form just doesn't send an emptied field. Needs a sentinel or a separate clear endpoint. Bio has a 500-char client cap and no server limit.
+- The waiting-summary name join (", " / " and " / "and N more") is inline JSX on the outing page; if a third list needs it, make it a `JoinedNames` component.
+- `.btn-quite` is a typo for quiet, used once in `Comments.tsx`.
 - A history view ("I withdrew by mistake, where was that outing?"): withdrawn and declined requests are deliberately absent from My outings. If it's ever asked for, it's a separate list, not a fourth bucket.
 - `ListForHiker` runs two queries (hosting, requests) that select the same 19 columns; one `listOutings(ctx, query, args...)` helper would collapse the two scan/iterate blocks. SQL-week exercise: rewrite `ListForHiker` as one query with a `CASE`/`UNION` and compare `EXPLAIN`.
 - Browse grid on desktop: tried in #52 and reverted. Two 22rem cards don't fit the 44rem shell, and the chips wrap at that width. If it comes back: widen the shell for list pages only and let width decide the columns; never a per-row setting.
@@ -119,7 +127,6 @@ In this order. Items can be added.
 - `mintLoginCode` and the sha256 mirror of `authtoken.hashCode` exist twice, in `backend/e2e/db.ts` and `frontend/e2e/fixtures/db.ts`; the browser suite should import the API suite's helper.
 - Password field: a show/hide eye toggle on the login and signup forms.
 - A `GET /api/dev/login-code/{hiker}` route in dev/test would let specs read a real minted code instead of planting one; the hash mirror then goes away.
-- "could not delete refresh tokens" 500 shows up as a flake under the full browser suite (117 specs, parallel logins) and never in 60 isolated runs; check pool size and contention on the `refresh_tokens` delete.
 - Two `authtoken` fakes (`authtoken/fake_store_test.go` keyed by id, `hiker/fake_token_store_test.go` keyed by hash); a shared `authtokentest` package was tried and dropped.
 
 ---
