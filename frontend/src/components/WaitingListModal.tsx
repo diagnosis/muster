@@ -2,6 +2,7 @@ import {Modal} from '@/components/Modal'
 import type {ListedHiker} from '@/types'
 import {initial} from '@/lib/format'
 import styles from './WaitingListModal.module.css'
+import {Link} from "@tanstack/react-router";
 
 export function WaitingListModal({waiting, onClose}: {waiting: ListedHiker[], onClose: () => void}) {
     return (
@@ -14,7 +15,8 @@ export function WaitingListModal({waiting, onClose}: {waiting: ListedHiker[], on
                         <span className={styles.position}>{i + 1}</span>
                         <span className={styles.avatar} aria-hidden="true">{initial(w.name)}</span>
                         <span className={styles.name}>
-                           {w.is_me && <span className={styles.you}> (you)</span>} {w.name}
+                            {w.is_me && <span className={styles.you}>(you) </span>}
+                            <Link className={"name-link"} to="/hikers/$id" params={{id: w.hiker_id}}>{w.name}</Link>
                         </span>
                         {w.role === 'driver' &&
                             <span className={styles.driverTag}>Driver · {w.seats_offered} {w.seats_offered === 1 ? 'seat' : 'seats'}</span>}

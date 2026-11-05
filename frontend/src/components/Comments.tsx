@@ -9,6 +9,7 @@ import {useMeQuery} from "@/queries.ts";
 import {Modal} from "@/components/Modal.tsx";
 import {COMMENT_REMOVED} from "@/lib/copy.ts";
 import {HeartIcon} from "@/components/Icons.tsx";
+import {Link} from "@tanstack/react-router";
 interface CommentsProp{
     outingId: string
     hostId: string
@@ -66,7 +67,9 @@ function CommentRow({ c, outingId, hostId, onReply }: { c: CommentView; outingId
             <span className={styles.avatar} aria-hidden="true">{c.author_name.charAt(0).toUpperCase()}</span>
             <div className={styles.content}>
                 <div className={styles.meta}>
-                    <span className={styles.author}>{c.author_name}</span> · <time>{relativeTime(c.created_at)}</time>
+                    <Link className={"name-link"} to="/hikers/$id" params={{id: c.hiker_id}}>
+                        <span className={styles.author}>{c.author_name}</span>
+                    </Link> · <time>{relativeTime(c.created_at)}</time>
                 </div>
                 <p className={c.deleted ? `${styles.body} ${styles.stub}` : styles.body}>
                     {c.deleted ? COMMENT_REMOVED : c.body}
@@ -88,7 +91,7 @@ function CommentRow({ c, outingId, hostId, onReply }: { c: CommentView; outingId
                             <button className="btn btn-danger" disabled={del.isPending} onClick={() => del.mutate(currentComment.id, {
                                 onSuccess: () => setCurrentComment(null)
                             })}>Yes</button>
-                            <button className={"btn btn-quite"} onClick={() => setCurrentComment(null)}>Never mind</button>
+                            <button className={"btn-quite"} onClick={() => setCurrentComment(null)}>Never mind</button>
                         </div>
                         {del.isError&&<p className={styles.error}>{del.error.message}</p>}
                     </div>

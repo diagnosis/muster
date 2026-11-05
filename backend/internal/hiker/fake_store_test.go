@@ -10,14 +10,16 @@ import (
 )
 
 type fakeStore struct {
-	hikers map[uuid.UUID]*Hiker
-	rt     map[string]*RefreshToken
+	hikers       map[uuid.UUID]*Hiker
+	rt           map[string]*RefreshToken
+	outingCounts map[uuid.UUID]OutingCounts
 }
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
-		hikers: map[uuid.UUID]*Hiker{},
-		rt:     map[string]*RefreshToken{},
+		hikers:       map[uuid.UUID]*Hiker{},
+		rt:           map[string]*RefreshToken{},
+		outingCounts: make(map[uuid.UUID]OutingCounts),
 	}
 }
 
@@ -95,6 +97,19 @@ func (f *fakeStore) SetPassword(ctx context.Context, hikerID uuid.UUID, hash str
 	}
 	h.PasswordHash = hash
 	return nil
+}
+
+func (f *fakeStore) OutingCounts(ctx context.Context, hikerID uuid.UUID) (OutingCounts, error) {
+	v, ok := f.outingCounts[hikerID]
+	if !ok {
+		return OutingCounts{}, nil
+	}
+	oc := OutingCounts{
+		HostedCount: v.HostedCount,
+		WentCount:   v.WentCount,
+	}
+
+	return oc, nil
 }
 
 var _ Storage = (*fakeStore)(nil)

@@ -191,8 +191,20 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	responder.JSON(w, http.StatusOK, h, correlationID)
 
 }
+
+type hikerCardResponse struct {
+	*hiker.PublicProfile
+	CanDM bool `json:"can_dm"`
+}
+
 func (s *Server) handleGetHiker(w http.ResponseWriter, r *http.Request) {
 	correlationID, _ := logger.GetCorrelationID(r.Context())
+	meID, err := getAuthenticatedUserID(r)
+	if err != nil {
+		logger.Warn(r.Context(), "failed to capture meID", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
 
 	hikerID, err := pathUUID(r, "id")
 	if err != nil {
@@ -200,19 +212,23 @@ func (s *Server) handleGetHiker(w http.ResponseWriter, r *http.Request) {
 		responder.Error(w, err, correlationID)
 		return
 	}
-
-	h, err := s.hikers.GetByID(r.Context(), hikerID)
+	pp, err := s.hikers.PublicProfile(r.Context(), hikerID)
 	if err != nil {
-		logger.Warn(r.Context(), "hiker: failed to fetch hiker", "err", err)
+		logger.Warn(r.Context(), "hiker: failed to fetch public profile", "err", err)
 		responder.Error(w, err, correlationID)
 		return
 	}
-
-	responder.JSON(w, http.StatusOK, map[string]any{
-		"id":         h.ID,
-		"name":       h.Name,
-		"experience": h.Experience,
-	}, correlationID)
+	ok, err := s.messages.CanDM(r.Context(), meID, hikerID)
+	if err != nil {
+		logger.Warn(r.Context(), "failed to check candm", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	hcr := &hikerCardResponse{
+		PublicProfile: pp,
+		CanDM:         ok,
+	}
+	responder.JSON(w, http.StatusOK, hcr, correlationID)
 
 }
 

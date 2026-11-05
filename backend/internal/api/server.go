@@ -49,6 +49,7 @@ type messageService interface {
 	ListMessages(ctx context.Context, convID, hikerID uuid.UUID) ([]*message.Message, error)
 	DeleteMessage(ctx context.Context, msgID, hikerID uuid.UUID) error
 	StartDM(ctx context.Context, h1, h2 uuid.UUID) (*message.Conversation, error)
+	CanDM(ctx context.Context, initiator, other uuid.UUID) (bool, error)
 	AcceptDM(ctx context.Context, convID, actor uuid.UUID) error
 	DeclineDM(ctx context.Context, convID, actor uuid.UUID) error
 	ReopenDM(ctx context.Context, convID, actor uuid.UUID) error
@@ -115,7 +116,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("GET /api/events", requireAuth(http.HandlerFunc(s.handleEvents)))
 
 	// hikers public routes
-	mux.HandleFunc("GET /api/hikers/{id}", s.handleGetHiker)
+	mux.Handle("GET /api/hikers/{id}", requireAuth(http.HandlerFunc(s.handleGetHiker)))
 
 	// messages
 	mux.Handle("POST /api/conversations/{id}/messages", requireAuth(http.HandlerFunc(s.handlePostMessage)))

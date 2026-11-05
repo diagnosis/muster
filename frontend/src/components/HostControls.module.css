@@ -211,3 +211,11 @@
 .restoreBtn:hover{
     background: var(--surface-sunken);
 }
+
+.profileLink{
+    align-self: flex-start;
+    font-size: var(--text-label);
+    font-weight: 600;
+    color: var(--color-primary);
+}
+.profileLink:hover, .profileLink:focus-visible{ text-decoration: underline; }

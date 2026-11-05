@@ -65,7 +65,13 @@ function ConversationPage() {
                 {isOuting ? <MountainIcon/> : otherName.charAt(0).toUpperCase()}
             </span>
                 <div className={styles.headText}>
-                    <h1 className={styles.title}>{isOuting ? conv.outing_title : otherName}</h1>
+                    <h1 className={styles.title}>
+                        {isOuting
+                            ? conv.outing_title
+                            : other
+                                ? <Link className="name-link" to="/hikers/$id" params={{id: other.hiker_id}}>{otherName}</Link>
+                                : otherName}
+                    </h1>
                     <p className={styles.sub}>
                         {isOuting
                             ? (conv.outing_starts_at ? outingWhen(conv.outing_starts_at) : "Outing chat")

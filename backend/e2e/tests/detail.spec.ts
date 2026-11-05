@@ -86,8 +86,8 @@ test.describe("detail", ()=>{
 
         const asRider = await unwrap<DetailResponse>(getDetail(r1.ctx, o.id), 200)
         expect(asRider.waiting).toEqual([
-            { name: d1.user.name, role: 'driver', seats_offered: 3, guests: 0, is_me: false },
-            { name: r1.user.name, role: 'rider',  seats_offered: 0, guests: 2, is_me: true },
+            { hiker_id:d1.id ,name: d1.user.name, role: 'driver', seats_offered: 3, guests: 0, is_me: false },
+            { hiker_id:r1.id,name: r1.user.name, role: 'rider',  seats_offered: 0, guests: 2, is_me: true },
         ])
 
         const asHost = await unwrap<DetailResponse>(getDetail(host.ctx, o.id), 200)

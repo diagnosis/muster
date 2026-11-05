@@ -193,6 +193,26 @@ func (s *HikerStore) DeleteRefreshTokens(ctx context.Context, hikerID uuid.UUID,
 	return nil
 }
 
+// OutingCounts returns how many past outings the hiker hosted (not cancelled)
+// and how many past outings they were accepted on. "Past" mirrors
+// outing.effectiveEnd: ends_at when set, else starts_at + 12 hours — change both or neither.
+func (s *HikerStore) OutingCounts(ctx context.Context, hikerID uuid.UUID) (hiker.OutingCounts, error) {
+	q := `
+		SELECT
+		  (SELECT COUNT(*) FROM outings o
+			WHERE o.host_id = $1 AND o.status <> 'cancelled'
+			  AND COALESCE(o.ends_at, o.starts_at + interval '12 hours') <= now()) AS hosted,
+		  (SELECT COUNT(*) FROM join_requests jr JOIN outings o ON o.id = jr.outing_id
+			WHERE jr.hiker_id = $1 AND jr.status = 'accepted' AND o.status <> 'cancelled'
+			  AND COALESCE(o.ends_at, o.starts_at + interval '12 hours') <= now()) AS went
+`
+	oc := hiker.OutingCounts{}
+	if err := s.pool.QueryRow(ctx, q, hikerID).Scan(&oc.HostedCount, &oc.WentCount); err != nil {
+		return hiker.OutingCounts{}, apperr.Database("failed to get counts", "failed to scan outings", err)
+	}
+	return oc, nil
+}
+
 // adding helper methods
 func scanHiker(row pgx.Row) (*hiker.Hiker, error) {
 	h := &hiker.Hiker{}

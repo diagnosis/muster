@@ -59,6 +59,7 @@ export interface Capacity{
 }
 
 export interface ListedHiker {
+    hiker_id:string
     name: string
     role: 'driver' | 'rider'
     seats_offered: number
@@ -117,17 +118,34 @@ export interface EditJoinRequestInput {
 }
 
 export interface MeResponse{
-    id:string
-    email:string,
-    name:string,
-    experience:Experience,
-    created_at: string,
-    updated_at: string,
+    id: string
+    email: string
+    name: string
+    experience: Experience
+    home_area?: string
+    bio?: string
+    created_at: string
+    updated_at: string
+}
+export interface HikerCard{
+    id: string
+    name: string
+    experience: Experience
+    home_area?: string
+    bio?: string
+    hosted_count: number
+    went_count: number
+    member_since: string
+    can_dm: boolean
 }
 
+
+
 export interface MeInputRequest{
-    name?:string
-    experience?:Experience
+    name?: string
+    experience?: Experience
+    home_area?: string
+    bio?: string
 }
 
 export interface RegisterRequest{
