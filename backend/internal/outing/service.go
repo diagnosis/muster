@@ -2,6 +2,7 @@ package outing
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"time"
@@ -20,7 +21,7 @@ type Storage interface {
 	CreateOuting(ctx context.Context, o *Outing) error
 	GetOuting(ctx context.Context, id uuid.UUID) (*Outing, error)
 	SetOutingStatus(ctx context.Context, id uuid.UUID, s Status) error
-	ListUpcoming(ctx context.Context, now time.Time) ([]Outing, error)
+	ListUpcoming(ctx context.Context, now time.Time, cursor *Cursor, limit int) ([]Outing, error)
 	ListForHiker(ctx context.Context, hikerID uuid.UUID) (*MyOutings, error)
 	UpdateOuting(ctx context.Context, o *Outing) error
 
@@ -521,21 +522,106 @@ func (s *Service) RemoveMember(ctx context.Context, hostID, requestID uuid.UUID)
 	return nil
 }
 
-// ListUpcoming returns open outings that start in the future, soonest
-// first. The service owns the clock; the store just filters against
-// the time it's given.
-func (s *Service) ListUpcoming(ctx context.Context) ([]Outing, error) {
+// Browse page sizes. A request with no limit gets defaultPageSize; anything
+// above maxPageSize is clamped, never an error, so a client can't ask for the
+// whole table in one call.
+const (
+	defaultPageSize = 20
+	maxPageSize     = 50
+)
+
+// ListUpcoming returns one page of open outings that start in the future,
+// soonest first, ties broken by id. cursor is the NextCursor of the previous
+// page, or "" for the first; a token that doesn't decode is a bad request.
+// limit defaults to defaultPageSize and is capped at maxPageSize.
+//
+// The store is asked for limit+1 rows: the extra row only proves another page
+// exists and is dropped, and NextCursor is built from the last row kept, so
+// the dropped row is the first of the next page. NextCursor is nil on the
+// last page. The service owns the clock; the store filters against the time
+// it's given.
+func (s *Service) ListUpcoming(ctx context.Context, cursor string, limit int) (*Page, error) {
 	now := time.Now()
-	outings, err := s.store.ListUpcoming(ctx, now)
+
+	var c *Cursor
+	if cursor != "" {
+		var cerr error
+		c, cerr = decodeCursor(cursor)
+		if cerr != nil {
+			return nil, apperr.BadRequest("bad request", "failed decode cursor token", cerr)
+		}
+	}
+	if c != nil {
+		if c.StartsAt.IsZero() || c.ID == uuid.Nil {
+			return nil, apperr.BadRequest("bad request", "cursor is empty")
+		}
+	}
+
+	if limit < 1 {
+		limit = defaultPageSize
+	}
+	if limit > maxPageSize {
+		limit = maxPageSize
+	}
+
+	outings, err := s.store.ListUpcoming(ctx, now, c, limit+1)
 	if err != nil {
 		return nil, err
 	}
+	var nextCursor *string
+	if len(outings) > limit {
+		last := outings[limit-1]
+		outings = outings[:limit]
+		nc := Cursor{
+			StartsAt: last.StartsAt,
+			ID:       last.ID,
+		}
+		var t string
+		t, err = encodeCursor(nc)
+		if err != nil {
+			return nil, apperr.Internal("internal error", "failed to encode cursor", err)
+		}
+		nextCursor = &t
+	}
+	page := &Page{
+		Items:      outings,
+		NextCursor: nextCursor,
+	}
+
 	if err = s.attachCapacity(ctx, outings); err != nil {
 		return nil, err
 	}
-
 	stampAll(outings, now)
-	return outings, nil
+
+	return page, nil
+}
+
+// encodeCursor packs a list position into the opaque token clients send back
+// as ?after=: JSON, then unpadded URL-safe base64. Clients must treat it as a
+// string; its contents can change without changing the API.
+func encodeCursor(c Cursor) (string, error) {
+	b, err := json.Marshal(&c)
+	if err != nil {
+		return "", err
+	}
+	t := base64.RawURLEncoding.EncodeToString(b)
+	return t, err
+}
+
+// decodeCursor is the inverse of encodeCursor. It returns an error for
+// anything that isn't base64 or isn't a cursor inside; callers map that to a
+// bad request, since the token only ever comes from a client.
+func decodeCursor(token string) (*Cursor, error) {
+	var c *Cursor
+	b, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(b, &c)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
 // attachCapacity sets Capacity on every outing in the given slices with one store call.

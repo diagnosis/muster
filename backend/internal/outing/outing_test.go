@@ -4,6 +4,8 @@ package outing
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -20,10 +22,11 @@ func Test_ListUpcoming_SortedOpenFuture(t *testing.T) {
 	far := seedOuting(6, 2, StatusOpen, host, f, withStart(time.Now().Add(64*time.Hour)))
 	soon := seedOuting(6, 2, StatusOpen, host, f, withStart(time.Now().Add(12*time.Hour)))
 
-	got, err := svc.ListUpcoming(context.Background())
+	page, err := svc.ListUpcoming(context.Background(), "", 20)
 	if err != nil {
 		t.Fatalf("ListUpcoming: %v", err)
 	}
+	got := page.Items
 	if len(got) != 3 {
 		t.Fatalf("expected 3 outings, got %d", len(got))
 	}
@@ -264,14 +267,14 @@ func Test_ListUpcoming_Phase(t *testing.T) {
 	seedOuting(8, 4, StatusOpen, host, f, withStart(time.Now().Add(10*time.Hour)), withEnd(&upComingEnd))
 	seedOuting(6, 4, StatusOpen, host, f, withStart(time.Now().Add(-30*time.Hour)), withEnd(&pastEnd))
 	seedOuting(6, 4, StatusOpen, host, f, withStart(time.Now().Add(-10*time.Hour)), withEnd(&inProgressEnd))
-	outings, err := svc.ListUpcoming(context.Background())
+	page, err := svc.ListUpcoming(context.Background(), "", 20)
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-	if len(outings) != 2 {
-		t.Fatalf("expected 2 got %d", len(outings))
+	if len(page.Items) != 2 {
+		t.Fatalf("expected 2 got %d", len(page.Items))
 	}
-	for _, o := range outings {
+	for _, o := range page.Items {
 		if o.Phase != PhaseUpcoming {
 			t.Errorf("expected phase: %v got %v", PhaseUpcoming, o.Phase)
 		}
@@ -451,11 +454,11 @@ func Test_ListUpcoming_Capacity(t *testing.T) {
 	seedJoinRequest(a.ID, uuid.New(), RequestStatusAccepted, RoleRider, f, 1)
 	seedJoinRequest(a.ID, uuid.New(), RequestStatusRequested, RoleRider, f, 0)
 
-	got, err := svc.ListUpcoming(context.Background())
+	page, err := svc.ListUpcoming(context.Background(), "", 20)
 	if err != nil {
 		t.Fatalf("ListUpcoming: %v", err)
 	}
-
+	got := page.Items
 	want := map[uuid.UUID]Capacity{
 		// host + rider + guest = 3 in 2 host seats: one short, no spots, one waiting
 		a.ID: {PeopleCount: 3, SeatCapacity: 2, SeatsShort: 1, SpotsLeft: 0, WaitingCount: 1},
@@ -514,6 +517,64 @@ func Test_MyOutings_Capacity(t *testing.T) {
 		}
 		if *o.Capacity != want[o.ID] {
 			t.Errorf("%s: got %+v, want %+v", o.ID, *o.Capacity, want[o.ID])
+		}
+	}
+}
+
+// The browse list comes back in pages (design: default 20, max 50, opaque
+// cursor). Following NextCursor from an empty cursor must visit every upcoming
+// outing exactly once, in pages of the size asked for, and end with a nil
+// cursor. Outings 6 and 7 start at the same instant, so a cursor that compared
+// starts_at alone would skip or repeat one of them at a page boundary.
+func Test_ListUpcoming_Pages(t *testing.T) {
+	svc, f, _, _ := newTestService(t)
+	host := uuid.New()
+	base := time.Now().Add(48 * time.Hour)
+
+	var outings []*Outing
+	for i := range 25 {
+		start := base.Add(time.Duration(i) * time.Hour)
+		if i == 10 {
+			start = base.Add(9 * time.Hour) // same instant as outing 6
+		}
+		o := seedOuting(8, 3, StatusOpen, host, f,
+			withTitle(fmt.Sprintf("outing - %d", i)), withStart(start))
+		outings = append(outings, o)
+	}
+
+	seen := map[uuid.UUID]bool{}
+	sizes := []int{}
+	cursor := ""
+	for {
+		if len(sizes) > 5 {
+			t.Fatalf("more than 5 pages: cursor is not advancing (sizes so far %v)", sizes)
+		}
+		page, err := svc.ListUpcoming(context.Background(), cursor, 10)
+		if err != nil {
+			t.Fatalf("ListUpcoming: %v", err)
+		}
+		sizes = append(sizes, len(page.Items))
+		for _, o := range page.Items {
+			if seen[o.ID] {
+				t.Fatalf("outing %s appeared twice", o.ID)
+			}
+			seen[o.ID] = true
+		}
+		if page.NextCursor == nil {
+			break
+		}
+		cursor = *page.NextCursor
+	}
+
+	if !slices.Equal(sizes, []int{10, 10, 5}) {
+		t.Errorf("page sizes: got %v, want [10 10 5]", sizes)
+	}
+	if len(seen) != 25 {
+		t.Errorf("outings seen: got %d, want 25", len(seen))
+	}
+	for i, o := range outings {
+		if !seen[o.ID] {
+			t.Errorf("outing %d (%s) never appeared on any page", i, o.ID)
 		}
 	}
 }

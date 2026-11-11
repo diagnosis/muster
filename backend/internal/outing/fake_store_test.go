@@ -150,7 +150,7 @@ func (f *fakeStore) SetOutingStatus(ctx context.Context, outingID uuid.UUID, sta
 	return nil
 }
 
-func (f *fakeStore) ListUpcoming(ctx context.Context, now time.Time) ([]Outing, error) {
+func (f *fakeStore) ListUpcoming(ctx context.Context, now time.Time, cursor *Cursor, limit int) ([]Outing, error) {
 	upcoming := []Outing{}
 	for _, o := range f.outings {
 		if o.Status == StatusOpen && o.StartsAt.After(now) {
@@ -158,8 +158,25 @@ func (f *fakeStore) ListUpcoming(ctx context.Context, now time.Time) ([]Outing, 
 		}
 	}
 	sort.Slice(upcoming, func(i, j int) bool {
-		return upcoming[i].StartsAt.Before(upcoming[j].StartsAt)
+		if !upcoming[i].StartsAt.Equal(upcoming[j].StartsAt) {
+			return upcoming[i].StartsAt.Before(upcoming[j].StartsAt)
+		}
+		return upcoming[i].ID.String() < upcoming[j].ID.String()
 	})
+	if cursor != nil {
+		rest := upcoming[:0:0]
+		for _, o := range upcoming {
+			later := o.StartsAt.After(cursor.StartsAt)
+			sameTimeBiggerID := o.StartsAt.Equal(cursor.StartsAt) && o.ID.String() > cursor.ID.String()
+			if later || sameTimeBiggerID {
+				rest = append(rest, o)
+			}
+		}
+		upcoming = rest
+	}
+	if len(upcoming) > limit {
+		upcoming = upcoming[:limit]
+	}
 	return upcoming, nil
 }
 

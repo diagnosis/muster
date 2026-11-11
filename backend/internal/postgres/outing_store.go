@@ -282,17 +282,37 @@ func (s *OutingStore) UpdateOuting(ctx context.Context, o *outing.Outing) error 
 	return nil
 }
 
-// ListUpcoming returns open outings starting after now, soonest first.
-func (s *OutingStore) ListUpcoming(ctx context.Context, now time.Time) ([]outing.Outing, error) {
-	q := `
-	SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
-			o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
-			o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at
-		FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
-	WHERE status = 'open' AND starts_at > $1
-	ORDER BY starts_at
-`
-	rows, err := s.pool.Query(ctx, q, now)
+// ListUpcoming returns one page of open outings starting after now, ordered by
+// (starts_at, id) so the order is total even when outings share a start time.
+//
+// after is the keyset cursor: nil means the first page; otherwise only rows
+// strictly past (after.StartsAt, after.ID) in that order are returned. The row
+// comparison and the ORDER BY both match the outings (starts_at, id) index, so
+// every page is an index scan no matter how deep the caller has paged.
+//
+// limit is applied as given. The service decides page size and asks for one
+// extra row to learn whether another page exists; the store does not know
+// about either rule.
+func (s *OutingStore) ListUpcoming(ctx context.Context, now time.Time, after *outing.Cursor, limit int) ([]outing.Outing, error) {
+
+	const selectUpcoming = `
+    SELECT o.id, o.host_id, o.title, o.destination, o.meet_label, o.meet_lat, o.meet_lng,
+           o.starts_at, o.max_size, o.host_seats, o.cost_per_seat_cents, o.difficulty, o.pace, o.notes, o.status,
+           o.created_at, o.updated_at, c.id AS conversation_id, o.ends_at
+    FROM outings o LEFT JOIN conversations c ON c.outing_id = o.id
+    WHERE o.status = 'open' AND o.starts_at > $1`
+
+	var q string
+	var args []any
+	if after == nil {
+		q = selectUpcoming + ` ORDER BY o.starts_at, o.id LIMIT $2`
+		args = []any{now, limit}
+	} else {
+		q = selectUpcoming + ` AND (o.starts_at, o.id) > ($2, $3) ORDER BY o.starts_at, o.id LIMIT $4`
+		args = []any{now, after.StartsAt, after.ID, limit}
+	}
+
+	rows, err := s.pool.Query(ctx, q, args...)
 	if err != nil {
 		return nil, apperr.Database("failed to list outings", "select upcoming outings failed", err)
 	}
@@ -300,13 +320,13 @@ func (s *OutingStore) ListUpcoming(ctx context.Context, now time.Time) ([]outing
 
 	outings := []outing.Outing{}
 	for rows.Next() {
-		o, err := scanOuting(rows)
-		if err != nil {
-			return nil, apperr.Database("failed to list outings", "scan upcoming outing failed", err)
+		o, nerr := scanOuting(rows)
+		if nerr != nil {
+			return nil, apperr.Database("failed to list outings", "scan upcoming outing failed", nerr)
 		}
 		outings = append(outings, *o)
 	}
-	if err := rows.Err(); err != nil {
+	if err = rows.Err(); err != nil {
 		return nil, apperr.Database("failed to list outings", "iterate upcoming outings failed", err)
 	}
 	return outings, nil
