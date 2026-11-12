@@ -1369,6 +1369,41 @@ func Test_Refresh_GraceExpires(t *testing.T) {
 
 }
 
+// An unknown email and a wrong password must be indistinguishable to the
+// caller: same code, same message. Otherwise login reveals which emails
+// have accounts.
+func Test_Login_UnknownEmailAndWrongPasswordLookTheSame(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h, _ := registerAndVerify(t, RegisterInput{
+		Email:      "new@test.com",
+		Password:   "Password123",
+		Name:       "Ayşe",
+		Experience: ExperienceBeginner,
+	}, svc, fm)
+
+	_, unknownEmail := svc.Login(context.Background(), "nobody@test.com", "Password123", PlatformWeb)
+	_, wrongPassword := svc.Login(context.Background(), h.Email, "Password1234", PlatformWeb)
+
+	wantStatus(t, unknownEmail, apperr.CodeInvalidCredentials)
+	wantStatus(t, wrongPassword, apperr.CodeInvalidCredentials)
+
+	const msg = "invalid login credentials"
+	wantErrMessage(t, unknownEmail, msg)
+	wantErrMessage(t, wrongPassword, msg)
+}
+func wantErrMessage(t *testing.T, err error, msg string) {
+	t.Helper()
+	se, ok := apperr.AsStatusErr(err)
+	if !ok {
+		t.Errorf("not status error")
+	}
+	if se.Message != msg {
+		t.Errorf("expected %s got %s", msg, se.Message)
+	}
+
+}
+
 func wantSession(t *testing.T, sess *Session, h *Hiker) {
 	if sess.Hiker.ID != h.ID {
 		t.Errorf("expected %v got %v", h.ID, sess.Hiker.ID)

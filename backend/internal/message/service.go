@@ -100,7 +100,7 @@ func (s *Service) PostMessage(ctx context.Context, conversationID, hikerID uuid.
 		}
 		if o.Status != outing.StatusOpen {
 			msg := fmt.Sprintf("outing is %s", o.Status)
-			return nil, apperr.Forbidden(msg, msg)
+			return nil, apperr.Conflict(msg, msg)
 		}
 		if !o.DiscussionOpen(s.now()) {
 			return nil, apperr.Conflict("chat closed 7 days after this outing ended", "outing chat window closed")

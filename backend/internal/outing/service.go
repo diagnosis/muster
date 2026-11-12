@@ -222,10 +222,10 @@ func (s *Service) Update(ctx context.Context, hostID, outingID uuid.UUID, in Upd
 		return nil, apperr.Conflict("outing is cancelled", "update on cancelled outing")
 	}
 	if o.StartsAt.Before(time.Now()) {
-		return nil, apperr.BadRequest("this outing has already started, so it can't be edited", "outing already started")
+		return nil, apperr.Conflict("this outing has already started, so it can't be edited", "outing already started")
 	}
 	if time.Until(o.StartsAt) < minUpdateLeadTime {
-		return nil, apperr.BadRequest("it's too late to edit this outing; you can still cancel it", "under 12h edit cutoff")
+		return nil, apperr.Conflict("it's too late to edit this outing; you can still cancel it", "under 12h edit cutoff")
 	}
 
 	if in.Title != nil {
@@ -311,7 +311,7 @@ func (s *Service) Cancel(ctx context.Context, hostID, outingID uuid.UUID) error 
 		return apperr.Conflict("outing is already cancelled", "already cancelled")
 	}
 	if o.StartsAt.Before(time.Now()) {
-		return apperr.BadRequest("this outing has already started, so it can't be cancelled", "outing already started")
+		return apperr.Conflict("this outing has already started, so it can't be cancelled", "outing already started")
 	}
 	if err = s.store.SetOutingStatus(ctx, outingID, StatusCancelled); err != nil {
 		return err
@@ -954,7 +954,7 @@ func (s *Service) DeleteComment(ctx context.Context, outingID, commentID, hikerI
 		return err
 	}
 	if c.OutingID != outingID {
-		return apperr.Conflict("comment does not belong to this outing", "cannot delete comment from different outing")
+		return apperr.BadRequest("comment does not belong to this outing", "cannot delete comment from different outing")
 	}
 	if c.HikerID != hikerID && hikerID != o.HostID {
 		return apperr.Forbidden("only the host or the comment's author can delete it", "stranger cannot delete the comment")

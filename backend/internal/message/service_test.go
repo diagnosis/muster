@@ -117,7 +117,7 @@ func Test_PostMessage_OutingCancelled(t *testing.T) {
 	m2 := uuid.New()
 	conv := f.addOutingConversation(outingID, host, outing.StatusCancelled, m1, m2)
 	_, err := svc.PostMessage(context.Background(), conv.ID, m1, "hello")
-	wantStatus(t, err, apperr.CodeForbidden)
+	wantStatus(t, err, apperr.CodeConflict)
 }
 
 func Test_PostMessage_BadBody(t *testing.T) {
@@ -1232,7 +1232,7 @@ func Test_PostMessage_OutingChatWindow(t *testing.T) {
 	}{
 		{"one second before the window closes", closes.Add(-time.Second), outing.StatusOpen, false, false},
 		{"exactly when the window closes", closes, outing.StatusOpen, true, false},
-		{"cancelled outing, clock past the window", closes.Add(1 * time.Hour), outing.StatusCancelled, false, true},
+		{"cancelled outing, clock past the window", closes.Add(1 * time.Hour), outing.StatusCancelled, true, true},
 	}
 
 	for _, cc := range cases {
