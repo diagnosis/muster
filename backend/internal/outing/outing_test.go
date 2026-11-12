@@ -179,7 +179,7 @@ func Test_Update_PastBadRequest(t *testing.T) {
 	o := seedOuting(6, 3, StatusOpen, host, f, withStart(time.Now().Add(-2*time.Hour)))
 	updatedTitle := "won't matter"
 	_, err := svc.Update(context.Background(), host, o.ID, UpdateInput{Title: &updatedTitle})
-	wantStatus(t, err, apperr.CodeBadRequest)
+	wantStatus(t, err, apperr.CodeConflict)
 }
 
 func Test_Update_SeatShrinkAllowed(t *testing.T) {
@@ -293,16 +293,17 @@ func Test_Update_DeadlineRejections(t *testing.T) {
 		name     string
 		startsAt time.Time
 		in       UpdateInput
+		want     apperr.Status
 	}{
-		{name: "outing in 6 hours, start moved 3 days out", startsAt: time.Now().Add(6 * time.Hour), in: UpdateInput{StartsAt: &in3Days}},
-		{name: "outing in 6 hours, edit title", startsAt: time.Now().Add(6 * time.Hour), in: UpdateInput{Title: &title}},
-		{name: "outing in 3 days, start moved to 1 hour from now", startsAt: time.Now().Add(72 * time.Hour), in: UpdateInput{StartsAt: &in1Hour}},
+		{name: "outing in 6 hours, start moved 3 days out", startsAt: time.Now().Add(6 * time.Hour), in: UpdateInput{StartsAt: &in3Days}, want: apperr.CodeConflict},
+		{name: "outing in 6 hours, edit title", startsAt: time.Now().Add(6 * time.Hour), in: UpdateInput{Title: &title}, want: apperr.CodeConflict},
+		{name: "outing in 3 days, start moved to 1 hour from now", startsAt: time.Now().Add(72 * time.Hour), in: UpdateInput{StartsAt: &in1Hour}, want: apperr.CodeBadRequest},
 	}
 	for _, cc := range cases {
 		t.Run(cc.name, func(t *testing.T) {
 			o := seedOuting(6, 4, StatusOpen, host, f, withStart(cc.startsAt))
 			_, err := svc.Update(context.Background(), host, o.ID, cc.in)
-			wantStatus(t, err, apperr.CodeBadRequest)
+			wantStatus(t, err, cc.want)
 		})
 	}
 }

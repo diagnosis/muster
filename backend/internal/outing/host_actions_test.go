@@ -263,7 +263,7 @@ func Test_Cancel_HostCancelsPastEvent(t *testing.T) {
 	o := seedOuting(6, 2, StatusOpen, hostID, f, withStart(time.Now().Add(-2*time.Hour)))
 
 	err := svc.Cancel(context.Background(), hostID, o.ID)
-	wantStatus(t, err, apperr.CodeBadRequest)
+	wantStatus(t, err, apperr.CodeConflict)
 }
 
 func Test_Cancel_RandomCancelsEvent(t *testing.T) {

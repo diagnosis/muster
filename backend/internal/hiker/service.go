@@ -181,13 +181,13 @@ func (s *Service) Login(ctx context.Context, email, password string, platform Pl
 
 	ok, err := secure.VerifyPassword(password, h.PasswordHash)
 	if err != nil {
-		return nil, apperr.InvalidCredentials("Invalid login credentials", "failed to verify password", err)
+		return nil, apperr.InvalidCredentials("invalid login credentials", "failed to verify password", err)
 	}
 	if !ok {
-		return nil, apperr.InvalidCredentials("Invalid login credentials", "password not match")
+		return nil, apperr.InvalidCredentials("invalid login credentials", "password not match")
 	}
 	if h.VerifiedAt == nil {
-		return nil, apperr.EmailNotVerified("Email needs to be verified.", "account not verified")
+		return nil, apperr.EmailNotVerified("email needs to be verified.", "account not verified")
 	}
 
 	return s.mintSession(ctx, h, platform)
