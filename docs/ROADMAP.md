@@ -1,6 +1,6 @@
 # Muster — Roadmap
 
-*As of 2026-11-05 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #56 merged) and the `fix/refresh-rotation` branch, confirmed by Safa. Replaces the 2026-08-07 roadmap.*
+*As of 2026-11-12 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #57 merged) and the `feat/pagination` branch, confirmed by Safa. Replaces the 2026-08-07 roadmap.*
 
 *Doc hierarchy: roadmap = why and when · spec = what · engineering notes = how.*
 
@@ -10,7 +10,7 @@
 
 Muster is live at muster.safadev.app. Backend and frontend are on `main`, gated by CI (`ci.yml`) and deployed by `deploy.yml`. Migrations run before the new binary, so schema changes are expand-only.
 
-Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec files) that proves the real SQL and JSON, and a Playwright browser suite (22 spec files). CI runs both against a throwaway Postgres service container; nothing in CI touches the hosted database.
+Test suites: Go unit tests against a fake store, a Playwright API suite (14 spec files) that proves the real SQL and JSON, and a Playwright browser suite (23 spec files). CI runs both against a throwaway Postgres service container; nothing in CI touches the hosted database.
 
 ### Shipped
 
@@ -36,6 +36,7 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 | My outings: Requested (PR #55) | `GET /api/me/outings` gains a third bucket, `requested`: outings the hiker has asked to join and the host hasn't answered. One store query returns accepted and requested rows together with `jr.status` as a 20th column (`scanOuting` takes extra scan targets), and the store splits them; capacity is attached to all three. The page merges the three into one list per tab with a role label: "You asked" (same words past or upcoming — the host never answered, so that's the only fact). Declined and withdrawn appear in no bucket; the API spec asserts that explicitly, which no test did before — this morning's `IN ('accepted','requested')` with no split went green against the whole suite |
 | Hiker card (PR #56) | `/hikers/:id`, reached from every name on an outing (host row, roster, waiting summary and modal, the host's request history and decision modal, comment authors, the DM header). `GET /api/hikers/{id}` now requires auth and returns `hiker.PublicProfile` — name, experience, home area, bio, hosted/went-on counts over past non-cancelled outings, member-since — plus `can_dm`, composed in the handler from `message.Service.CanDM` so the Message button only shows when it would work. Never email, gender or verification; the API spec asserts their absence. Own card shows "Edit profile". The profile form gains Home area and About you (the PATCH existed since v0; nothing called it). `ListedHiker` now carries `hiker_id` on the wire. Signup accepted no `home_area` until this PR: `RegisterInput` had no JSON tags behind `DisallowUnknownFields` |
 | Sessions per device (PR #57) | `user_refresh_tokens` held one row per hiker per platform (`UNIQUE (hiker_id, platform)`), so logging in on a second browser or a phone deleted the first one's token and it was signed out on its next refresh. Now one row per login; rotation is one `UPDATE … WHERE token_hash = $old AND platform = $p AND expires_at > now() RETURNING …`, atomic by construction; a token rotated in the last 10 s still refreshes (`previous_hash`, `rotated_at`), covering a browser whose refresh response was lost. Logout revokes only the presenting session; password reset still signs out everywhere. Design and a sequence diagram of the grace path in `backend/docs/login/refresh-rotation.md` |
+| Browse pagination (PR #58) | `GET /api/outings` returns one page: `{items, next_cursor}`, 20 by default, 50 at most (a limit outside the range is clamped, never refused). Keyset, not offset: the cursor is the `(starts_at, id)` of the last row returned, sent as an opaque base64url string in `?after=`; a cursor the server can't read is a 400. The service asks the store for one row more than the page to learn whether a next page exists. New index `outings (starts_at, id)`: the first page went from a sequential scan and sort of ~10,800 rows (3.3 ms) to an index scan of the rows returned (0.1 ms), and stays there at any depth. The browse page uses `useInfiniteQuery` with a Load more button; `outing.changed` refetches the pages already loaded. First feature whose query was written and `EXPLAIN`ed in DataGrip before it was a Go string. Design in `backend/docs/outing/pagination.md` |
 
 ---
 
@@ -43,7 +44,7 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (11 spec
 
 In this order. Items can be added.
 
-1. **Pagination.** Browse first, with keyset pagination. The browse-card capacity spec and both `live.spec.ts` tests create their own outings and expect them on the page they open; they will need a page-one guarantee or a filter when this lands. Then chat, then the Past tab. Server-side phase filtering comes with it.
+1. **Pagination, the rest.** Browse shipped in #58. Still open: chat (the messaging design's D5 makes it a v2 trigger at 100 messages per conversation; decide whether it stays in v1) and server-side phase filtering. My outings' Past tab is v3+; until then it gets a safety `LIMIT` in the audit.
 2. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
 3. **One real hike organized through Muster.** v1 is done when boots hit dirt.
 
@@ -133,12 +134,24 @@ In this order. Items can be added.
 - Password field: a show/hide eye toggle on the login and signup forms.
 - A `GET /api/dev/login-code/{hiker}` route in dev/test would let specs read a real minted code instead of planting one; the hash mirror then goes away.
 - Two `authtoken` fakes (`authtoken/fake_store_test.go` keyed by id, `hiker/fake_token_store_test.go` keyed by hash); a shared `authtokentest` package was tried and dropped.
+- Browse filters, by demand: date range and area first ("what's on this weekend near me"), then host; title search last (needs `pg_trgm` or full-text search, a plain index can't serve `ILIKE '%…%'`). A filter is one more `WHERE` condition and leaves the cursor alone while the order stays `(starts_at, id)`.
+- Hike distance and elevation gain on an outing: two nullable columns, fields on create and edit, shown on the card and detail page; then filters on browse. Typed by the host. Decide after the audit whether it goes before the first real hike.
+- A Go test for the page-size clamp (limit 0 → 20, 1000 → 50, with 60 seeded). The API spec's "at most 50" proves nothing on a database with fewer than 51 open outings, which is what CI has.
+- `backend/e2e/types.ts`: `PageResponse.next_cursor` is typed `?: string`; the server sends `string | null`.
+- `Test_ListUpcoming_Pages` comments still say outings 6 and 7 are the tied pair; the code ties 9 and 10.
+- `outing.Cursor` has no JSON tags, so the token carries `StartsAt` and `ID` as keys. Short tags would shrink it; changing them invalidates cursors in open tabs for one request.
+- `decodeCursor` accepts the base64 of JSON `null` and treats it as the first page. Harmless; a strict check would 400.
+- The front of the browse list is shared by every spec that parks an outing there (`moveToFront`, `setOutingTimes` at now + 5 min). `showOnBrowse` copes by clicking Load more. If the API suite ever needs the same, give it a helper that follows `next_cursor` until an id turns up.
+- `moveToFront` exists in the browser suite only; the API suite's capacity and pagination specs write the same two lines inline.
+- With an infinite query, each `outing.changed` poke refetches every loaded page of browse. Fine at tens of connections; if it shows up, refetch only the first page or patch the changed card.
+- `CREATE INDEX` in a migration takes a lock that blocks writes for the build. Instant on today's table; use `CREATE INDEX CONCURRENTLY` (outside a transaction) once a table is large.
 
 ---
 
 ## v2 — the map, on the web
 
 - Trail and meeting-point map on the outing page and on browse.
+- Trail picker on create: choose a trail and pre-fill distance, elevation gain and difficulty. Needs a trail data source (OpenStreetMap has geometry; no public API is known for AllTrails or WTA). Only if hosts say typing two numbers is a problem.
 - No-shows: after a hike the host marks who did not come; counts appear on public stats, for riders as well as drivers. The frozen roster from v1 is what this is recorded against.
 - Add-to-home-screen remains the phone story.
 

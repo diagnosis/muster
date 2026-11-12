@@ -513,3 +513,48 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 **Concurrent requests need an explicit cookie.** Two `refresh` calls in a `Promise.all` from one context might send T0 and T1 if the jar updates between them. Reading T0 from `storageState()` and sending it as a header on both guarantees one takes the normal path and one the grace path — and `refreshGrace = 0` reddens exactly that spec.
 
 **Best practice was worth the extra column.** Safa's previous projects did delete-and-replace without grace. A sequence diagram of one row through three refreshes (normal, lost response, replay after the window) is what made `previous_hash` make sense; it's in the design doc.
+## Lessons from browse pagination (PR #58)
+
+**The query was proven before Go saw it.** Written in DataGrip against the dev database, with `EXPLAIN ANALYZE` before and after the index: a sequential scan of ~10,800 rows plus a sort (3.3 ms) became an index scan of the ten rows returned (0.1 ms). The index removes the sort because the rows already come out in `(starts_at, id)` order. This is now the rule for every store query: DataGrip, `EXPLAIN` where it matters, then the Go string.
+
+**`EXPLAIN` without the `ORDER BY` shows no sort to remove.** The first plan looked fine because the query being explained wasn't the query being shipped.
+
+**A cursor is a `WHERE` condition, not a page number.** Page one has no cursor. Page two is "rows after this one": `(starts_at, id) > ($2, $3)`. A row comparison is true when the first column is greater, or equal with the second greater — the same rule the fake spells out as `later || sameTimeBiggerID`.
+
+**`starts_at` alone is not an order.** Two outings at the same instant have no defined order between them, so "after this one" can skip one or return one twice. The `id` in the `ORDER BY`, the index and the cursor is what makes the order total. All three must agree.
+
+**Ask for one row more than you need.** `limit + 1` from the store: if the extra row arrives there is a next page, and the cursor is built from the last row *kept*. The first draft took the cursor from the first row of the page. The dropped row is the next page's first row, so the cursor must point at the row just before it.
+
+**Why the cursor is JSON inside base64.** Two separate jobs. `json.Marshal` turns the `Cursor` struct into bytes (`{"StartsAt":"…","ID":"…"}`); `json.Unmarshal` turns bytes back into the struct. Marshal and Unmarshal work on a `[]byte` in memory; `Encoder` and `Decoder` do the same job on a stream such as a request body. Base64 then turns those bytes into text that is safe in a URL: JSON contains `{`, `"` and `:`, which would need escaping in a query string, and `RawURLEncoding` uses only letters, digits, `-` and `_`, with no `=` padding. It is not encryption and hides nothing; anyone can decode it. The point is that the client treats it as one string and sends it back untouched, so the contents can change without the API changing.
+
+**A zero-value check, not a past check.** The first cursor validation rejected `StartsAt.Before(now)`, which refuses an honest cursor the moment its outing starts. A cursor is a position, not a claim about the future. `IsZero()` and `uuid.Nil` catch a token that decoded to nothing.
+
+**A plain `errors.New` in a service is a 500.** "cursor is empty" was the client's mistake; `apperr.BadRequest` makes it a 400. The API spec with a garbage token is what holds that.
+
+**A nil pointer never reaches Postgres.** "Doesn't Postgres handle it?" — `after.StartsAt` on a nil `*Cursor` panics in Go before any query is sent. And if NULLs did reach it, `(starts_at, id) > (NULL, NULL)` is NULL, which is not true, so page one would be empty. Two query strings, one `if`.
+
+**A join makes bare column names ambiguous.** `id` exists on `outings` and `conversations`. The page-one query got away with unprefixed `status` and `starts_at`; the row comparison's `id` would not have.
+
+**A placeholder shipped into a query.** The mentor's sketch had `SELECT o.id, ... , o.ends_at`; the `...` was pasted as written. Read a snippet before running it, and a sketch should say which part is elided.
+
+**A sabotage that passes is a finding about the test.** Commenting out the id tiebreak in the fake left `Test_ListUpcoming_Pages` green. The tied pair was outings 6 and 7, inside page one, where no cursor ever compares them. Moving the tie to outings 9 and 10 (the first page boundary) turned the same sabotage red: `[10 10 4]`, outing 10 missing. A tie test must put the tie where the cursor is.
+
+**The missing row and the short page are in different places.** The skipped outing was at the boundary of pages one and two; the shortfall showed on page three, because every later row shifted up by one. Read which row is missing, not which page is short.
+
+**The Go tests ran against the fake; the SQL had still never run from Go.** Every existing API spec calls the list without `after`, so the cursor branch had no coverage until `pagination.spec.ts`. Three outings at one instant with `limit: 2` forces a tie across a boundary in real Postgres. `>` → `>=` returned 18 rows of which 10 were distinct.
+
+**A spec must not build a cursor.** It takes `next_cursor` from one response and sends it in the next. A spec that encodes its own would test its copy of the format.
+
+**"Find my outing on the list" was never a safe assertion; pagination only exposed it.** With every outing in one response, `list.find(o => o.id === mine)` always worked. With pages, the spec's outing was thousands of rows deep. An afternoon went on start times passed through the API (the first item's time, plus 24 hours, minus 24, minus 23): none can work, because the API accepts only starts at least 24 hours out and the front of the list is sooner than that. The start has to be written to the database after the create, which `setOutingTimes` already did for past outings.
+
+**The mentor asked for the helper three times instead of reading it.** `setOutingTimes` was in the repo the whole time. One `git grep` would have ended the loop an hour earlier. Read the file before asking for it.
+
+**The front of the list fills up.** With every browse spec parking outings at now + 5 minutes, 28 were counted there against a page of 20, and the mobile project (which runs second) failed three specs that chromium passed. It looked like a mobile bug. `showOnBrowse` clicks Load more until the card is present; a spec can't assume page one, whatever it does to the start time. Count before you theorise: one `SELECT count(*)` settled it.
+
+**Two of the mentor's warnings were wrong and one was right.** Wrong: that the "same start as the first item" version would fall outside the first 50 (it ties with the front, so it takes ~25 runs), and that leftovers accumulate in CI (the database is fresh each run). Right: that version breaks when the list is empty and when the first item is under 24 hours away. Say which objection is the real one.
+
+**Playwright won't let a spec import a spec.** The IDE auto-imported `showOnBrowse` from `specs/browse.spec.ts` instead of `fixtures/browse.ts`; CI failed with "test file should not import test file". Helpers live in `fixtures/`.
+
+**`useInfiniteQuery` is the client's version of the same loop.** `initialPageParam: null`, `getNextPageParam: page => page.next_cursor`, and `data.pages.flatMap(p => p.items)` for rendering. The key is still `['outings']`, so every existing invalidation kept working. `?after=${after}` with a null cursor sends the text "null"; build the URL only when there is a cursor.
+
+**The pagination style chooses the UI.** Numbered pages need `OFFSET` and a total count. A cursor can only continue, so the control is Load more. For a soonest-first list that is also what a hiker wants; finding a specific outing is a job for filters.

@@ -1,8 +1,9 @@
 import {expect, request, test} from '@playwright/test'
 import {asUser,BASE} from "../fixtures";
 import {accept, createOuting, getDetail, listOutings, login, requestJoin} from "../api";
-import {Capacity, DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
+import {Capacity, DetailResponse, JoinRequestResponse, OutingResponse, PageResponse} from "../types";
 import {unwrap} from "../envelope";
+import {setOutingTimes} from "../db";
 
 
 test.describe('capacity', ()=> {
@@ -130,8 +131,15 @@ test.describe('capacity', ()=> {
         // o2: max 6, host seats 2; nobody asked
         const o2 = await unwrap<OutingResponse>(createOuting(host.ctx, {max_size: 6, host_seats: 2}), 201)
 
+        // The browse list is paginated, soonest first. Move both outings to a few
+        // minutes from now so they are on page one whatever else is in the database.
+        const soon = new Date(Date.now() + 5 * 60 * 1000)
+        await setOutingTimes(o1.id, soon, null)
+        await setOutingTimes(o2.id, soon, null)
+
         const anon = await request.newContext({baseURL: BASE})
-        const list = await unwrap<OutingResponse[]>(listOutings(anon), 200)
+        const page = await unwrap<PageResponse>(listOutings(anon, {limit:20}), 200)
+        const list = page.items
 
         const got1 = list.find(o => o.id === o1.id)
         expect(got1).toBeDefined()

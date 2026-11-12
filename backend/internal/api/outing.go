@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/diagnosis/go-toolkit/v3/logger"
 	"github.com/diagnosis/go-toolkit/v3/responder"
@@ -267,15 +268,20 @@ func (s *Server) handleCancelOuting(w http.ResponseWriter, r *http.Request) {
 // handleListUpcoming returns upcoming open outings, soonest first. Public — the teaser for hikers without accounts.
 func (s *Server) handleListUpcoming(w http.ResponseWriter, r *http.Request) {
 	correlationID, _ := logger.GetCorrelationID(r.Context())
-
-	outings, err := s.outings.ListUpcoming(r.Context())
+	after := r.URL.Query().Get("after")
+	limitStr := r.URL.Query().Get("limit")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		limit = 0
+	}
+	page, err := s.outings.ListUpcoming(r.Context(), after, limit)
 	if err != nil {
 		logger.Warn(r.Context(), "outing: list upcoming failed", "err", err)
 		responder.Error(w, err, correlationID)
 		return
 	}
 
-	responder.JSON(w, http.StatusOK, outings, correlationID)
+	responder.JSON(w, http.StatusOK, page, correlationID)
 }
 
 // handleJoinRequests lists the outing's join requests ({id} = outing id),

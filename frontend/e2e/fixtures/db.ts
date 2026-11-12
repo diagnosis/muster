@@ -44,3 +44,12 @@ export async function setOutingTimes(outingID: string, startsAt: Date, endsAt: D
         [outingID, startsAt, endsAt],
     )
 }
+
+// moveToFront gives outings a start a few minutes from now, so they sort to
+// the top of the paginated browse list whatever else is in the database.
+export async function moveToFront(...outingIDs: string[]): Promise<void> {
+    const soon = new Date(Date.now() + 5 * 60 * 1000)
+    for (const id of outingIDs) {
+        await setOutingTimes(id, soon, null)
+    }
+}

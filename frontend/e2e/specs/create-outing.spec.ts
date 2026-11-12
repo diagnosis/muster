@@ -5,6 +5,9 @@ import {actorInBrowser, createActor} from "../fixtures/actor.ts";
 import {createOuting, uniqueOuting} from "../fixtures/outingApiHelper.ts";
 import {openNav} from "../fixtures/assertions.ts";
 import {fillCreateForm} from "../fixtures/mint.ts";
+import {moveToFront} from "../fixtures/db.ts";
+import {showOnBrowse} from "../fixtures/browse.ts";
+
 
 test.describe('create outing', ()=>{
     test('disabled-until-valid', async({page, context})=>{
@@ -34,7 +37,9 @@ test.describe('create outing', ()=>{
     test('seeded outing renders on browse', async ({page})=>{
         const actor = await createActor()
         const outing = (await createOuting(actor))
+        await moveToFront(outing.id)
         await page.goto('/')
+        await showOnBrowse(page, outing.title)
         await expect(page.getByRole('link', {name: outing.title})).toBeVisible()
     })
     test('host removes the end time on edit', async ({page, context}) => {

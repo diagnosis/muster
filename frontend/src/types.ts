@@ -57,6 +57,10 @@ export interface Capacity{
     spots_left: number
     waiting_count: number
 }
+export interface OutingPage {
+    items: Outing[]
+    next_cursor: string | null
+}
 
 export interface ListedHiker {
     hiker_id:string

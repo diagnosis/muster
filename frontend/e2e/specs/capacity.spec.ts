@@ -2,6 +2,9 @@ import {expect, test} from '@playwright/test'
 import {actorInBrowser, createActor} from "../fixtures/actor.ts";
 import {acceptRequest, createOuting, joinRequest, updateOuting} from "../fixtures/outingApiHelper.ts";
 import {FULL_WARNING, OUTING_FULL, SEAT_SHORT, NO_SEAT_LEFT} from "../fixtures/copy.ts";
+import {moveToFront} from "../fixtures/db.ts";
+import {showOnBrowse} from "../fixtures/browse.ts";
+
 
 
 test.describe('outing capacity', ()=>{
@@ -64,7 +67,10 @@ test.describe('outing capacity', ()=>{
         await joinRequest(waiter, seatless.id)
 
         await actorInBrowser(rider, context)
+        await moveToFront(short.id, seatless.id)
         await page.goto('/')
+        await showOnBrowse(page, short.title)
+        await showOnBrowse(page, seatless.title)
 
         const cardFor = (title: string) => page.locator('a', {has: page.getByRole('heading', {name: title})})
         await expect(cardFor(short.title).getByText('3 of 8 going · 1 seat short, a driver would help', {exact: true})).toBeVisible()

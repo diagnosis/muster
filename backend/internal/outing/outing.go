@@ -284,3 +284,18 @@ type ListedHiker struct {
 	Guests       int       `json:"guests"`
 	IsMe         bool      `json:"is_me"`
 }
+
+// Page is one slice of the browse list plus the token for the next one.
+// NextCursor is nil on the last page.
+type Page struct {
+	Items      []Outing `json:"items"`
+	NextCursor *string  `json:"next_cursor"`
+}
+
+// Cursor is a position in the browse list: the (starts_at, id) of the last
+// outing on a page. It crosses the API only as an opaque string; see
+// encodeCursor and decodeCursor.
+type Cursor struct {
+	StartsAt time.Time
+	ID       uuid.UUID
+}

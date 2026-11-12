@@ -35,6 +35,7 @@ type outingOption func(*Outing)
 
 func withStart(t time.Time) outingOption { return func(o *Outing) { o.StartsAt = t } }
 func withEnd(t *time.Time) outingOption  { return func(o *Outing) { o.EndsAt = t } }
+func withTitle(t string) func(*Outing)   { return func(o *Outing) { o.Title = t } }
 
 // seedOuting stores an outing starting in 48 hours, then applies opts.
 func seedOuting(maxSize, hostSeats int, status Status, hostID uuid.UUID, f *fakeStore, opts ...outingOption) *Outing {
