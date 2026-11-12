@@ -2,6 +2,9 @@
 import {expect, test} from '@playwright/test'
 import {actorInBrowser, createActor} from "../fixtures/actor.ts";
 import {acceptRequest, createOuting, joinRequest, withdraw} from "../fixtures/outingApiHelper.ts";
+import {moveToFront} from "../fixtures/db.ts";
+import {showOnBrowse} from "../fixtures/browse.ts";
+
 
 // outing.changed (backend/docs/events/outing-changed.md): a signed-in tab
 // refetches when any outing changes, with no reload and no focus event.
@@ -21,7 +24,9 @@ test.describe('outing.changed keeps lists live', () => {
         await acceptRequest(host, jr.id)
 
         await actorInBrowser(viewer, context)
+        await moveToFront(outing.id)
         await page.goto('/')
+        await showOnBrowse(page, outing.title)
         const card = cardFor(page, outing.title)
         await expect(card.getByText('3 of 8 going · 1 spot left', {exact: true})).toBeVisible()
 

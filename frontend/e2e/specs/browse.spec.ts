@@ -1,12 +1,17 @@
 import {test, expect} from '@playwright/test'
 import {createActor} from "../fixtures/actor.ts";
 import {createOuting} from "../fixtures/outingApiHelper.ts";
+import {moveToFront} from "../fixtures/db.ts";
+import {showOnBrowse} from "../fixtures/browse.ts";
 
 test('anonymous visitor sees browse list', async ({ page }) => {
     const host = await createActor()
     const outing = await createOuting(host, { cost_per_seat_cents: 900 })                                  // has cost
     const freeOuting = await createOuting(host, { cost_per_seat_cents: 0 })      // zero-cost
+    await moveToFront(outing.id, freeOuting.id)
     await page.goto('/')
+    await showOnBrowse(page, outing.title)
+    await showOnBrowse(page, freeOuting.title)
     const paidCard = page.getByRole('link', { name: outing.title })
     const freeCard = page.getByRole('link', { name: freeOuting.title })
     await expect(paidCard).toBeVisible()
@@ -14,3 +19,5 @@ test('anonymous visitor sees browse list', async ({ page }) => {
     await expect(freeCard).not.toContainText('$')          // cost renders only when nonzero
     await expect(paidCard).toContainText('/seat')          // and does render when nonzero
 })
+
+

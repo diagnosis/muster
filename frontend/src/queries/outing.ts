@@ -5,10 +5,10 @@ import type {
     JoinRequest, JoinRequestInput,
     JoinRequestView,
     MyOutings,
-    Outing,
+    OutingPage,
     RequestStatus
 } from "@/types.ts";
-import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import {useInfiniteQuery, useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 
 
 export const getOutingByID = async (id:string) => {
@@ -28,18 +28,21 @@ export function useOuting(id: string) {
     return useQuery(outingQueryOptions(id))
 }
 
-export const getOutings=async ()=>{
-    const res = await apiClient.get<Outing[]>('/api/outings')
+export const getOutings=async (after:string|null)=>{
+    const url = after ? `/api/outings?after=${encodeURIComponent(after)}` : '/api/outings'
+    const res = await apiClient.get<OutingPage>(url)
     if (res.ok){
         return res.data
     }
     throw new ApiRequestError(res.error, res.httpStatus)
 }
 
-export function useOutings(){
-    return useQuery({
-        queryKey:['outings'],
-        queryFn:getOutings,
+export function useOutings() {
+    return useInfiniteQuery({
+        queryKey: ['outings'],
+        queryFn: ({pageParam}) => getOutings(pageParam),
+        initialPageParam: null as string | null,
+        getNextPageParam: (lastPage) => lastPage.next_cursor,
     })
 }
 
