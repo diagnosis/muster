@@ -1369,6 +1369,31 @@ func Test_Refresh_GraceExpires(t *testing.T) {
 
 }
 
+func Test_Login_WrongPassword(t *testing.T) {
+	fm := &fakeMailer{}
+	svc, _, _ := newTestService(t, fm)
+	h1, _ := registerAndVerify(t, RegisterInput{
+		Email:      "new@test.com",
+		Password:   "Password123",
+		Name:       "Ayşe",
+		Experience: ExperienceBeginner,
+	}, svc, fm)
+	_, err := svc.Login(context.Background(), h1.Email, "Password1234", PlatformWeb)
+	wantStatus(t, err, apperr.CodeInvalidCredentials)
+	wantErrMessage(t, err, "invalid login credentials")
+}
+func wantErrMessage(t *testing.T, err error, msg string) {
+	t.Helper()
+	se, ok := apperr.AsStatusErr(err)
+	if !ok {
+		t.Errorf("not status error")
+	}
+	if se.Message != msg {
+		t.Errorf("expected %s got %s", msg, se.Message)
+	}
+
+}
+
 func wantSession(t *testing.T, sess *Session, h *Hiker) {
 	if sess.Hiker.ID != h.ID {
 		t.Errorf("expected %v got %v", h.ID, sess.Hiker.ID)

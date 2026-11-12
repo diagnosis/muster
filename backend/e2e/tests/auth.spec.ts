@@ -117,7 +117,7 @@ test.describe('auth', ()=>{
     await unwrap(res, 403)
 
     const err  = await unwrapError(res)
-    expect(err.message).toBe("Email needs to be verified.")
+    expect(err.message).toBe("email needs to be verified.")
     expect(err.code).toBe(CODE_EMAIL_NOT_VERIFIED)
 
     const raw = await mintVerificationToken(id)
