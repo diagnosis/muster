@@ -17,7 +17,13 @@ test.describe("outing-crud actions", ()=> {
 
         res = await createOuting(ctxHost, {max_size:1})
         expect(res.status()).toBe(400)
-        expect((await unwrapError(res)).message).toBe("outing size has to be at least 2")
+        expect((await unwrapError(res)).message).toBe("group size has to be between 2 and 50")
+
+        res = await createOuting(ctxHost, {max_size:51})
+        expect(res.status()).toBe(400)
+        expect((await unwrapError(res)).message).toBe("group size has to be between 2 and 50")
+        res = await createOuting(ctxHost, {max_size:50})
+        expect(res.status()).toBe(201)
 
         res = await createOuting(ctxHost, {difficulty:"extreme"})
         expect(res.status()).toBe(400)
