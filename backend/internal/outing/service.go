@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/diagnosis/go-toolkit/v3/logger"
@@ -115,6 +116,12 @@ type UpdateInput struct {
 	ClearEndsAt      bool        `json:"clear_ends_at"`
 }
 
+const (
+	maxGroupSize  = 50
+	maxTitleChars = 255
+	maxNotesChars = 10_000
+)
+
 // validateOuting checks the row-shape rules shared by Create and Update:
 // required text fields, lead time (24h for a new outing, 12h for an
 // edited start), end-time bounds, size/seat/cost bounds, enum validity.
@@ -145,8 +152,8 @@ func validateOuting(o *Outing, isUpdate bool) error {
 	if o.EndsAt != nil && o.EndsAt.After(o.StartsAt.Add(maxOutingDuration)) {
 		return apperr.BadRequest("max outing duration is 14 days", "max duration violation")
 	}
-	if o.MaxSize < 2 {
-		return apperr.BadRequest("outing size has to be at least 2", "min members violation")
+	if o.MaxSize < 2 || o.MaxSize > maxGroupSize {
+		return apperr.BadRequest("group size has to be between 2 and 50", "max_size out of range")
 	}
 	if o.HostSeats < 0 {
 		return apperr.BadRequest("host seats cannot be negative", "negative host seats")
@@ -159,6 +166,12 @@ func validateOuting(o *Outing, isUpdate bool) error {
 	}
 	if o.CostPerSeatCents < 0 {
 		return apperr.BadRequest("invalid cost per seat input", "invalid seat cost")
+	}
+	if utf8.RuneCountInString(o.Title) > maxTitleChars {
+		return apperr.BadRequest("title can be at most 255 characters", "title too long")
+	}
+	if o.Notes != nil && utf8.RuneCountInString(*o.Notes) > maxNotesChars {
+		return apperr.BadRequest("notes can be at most 10,000 characters", "notes too long")
 	}
 
 	return nil
@@ -880,6 +893,8 @@ func (s *Service) Detail(ctx context.Context, outingID uuid.UUID, viewerID *uuid
 	return detail, nil
 }
 
+const maxCommentChars = 2_000
+
 // AddComment creates a comment on an outing. Only the audience (host,
 // roster, pending requesters) can comment. The outing must not be
 // cancelled, and comments close discussionWindow after it ends.
@@ -905,12 +920,11 @@ func (s *Service) AddComment(ctx context.Context, hikerID, outingID uuid.UUID, b
 	}
 	v := validator.New()
 	v.Required("body", body)
-	v.MaxLength("body", body, 2000)
+	v.MaxLength("body", body, maxCommentChars)
 	verr := v.Errors()
 	if verr != nil {
 		return nil, verr
 	}
-
 	var parent *Comment
 	if parentID != nil {
 		parent, err = s.store.GetComment(ctx, *parentID)

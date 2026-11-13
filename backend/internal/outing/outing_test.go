@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -577,5 +578,57 @@ func Test_ListUpcoming_Pages(t *testing.T) {
 		if !seen[o.ID] {
 			t.Errorf("outing %d (%s) never appeared on any page", i, o.ID)
 		}
+	}
+}
+
+// Outing fields have upper limits (v1 audit): max_size 50, title 255
+// characters, notes 10,000 characters. Each limit gets two rows, at the limit
+// (accepted) and one over (refused), so an off-by-one in either direction
+// fails. The strings are built from "ş", which is one character and two
+// bytes: the at-limit rows only pass if the service counts characters.
+func Test_Create_FieldCeilings(t *testing.T) {
+	svc, _, _, _ := newTestService(t)
+	host := uuid.New()
+
+	notes := func(n int) *string {
+		s := strings.Repeat("ş", n)
+		return &s
+	}
+
+	cases := []struct {
+		name    string
+		change  func(in *CreateInput)
+		wantErr bool
+	}{
+		{"size 50 accepted", func(in *CreateInput) { in.MaxSize = 50 }, false},
+		{"size 51 refused", func(in *CreateInput) { in.MaxSize = 51 }, true},
+		{"title 255 accepted", func(in *CreateInput) { in.Title = strings.Repeat("ş", 255) }, false},
+		{"title 256 refused", func(in *CreateInput) { in.Title = strings.Repeat("ş", 256) }, true},
+		{"notes 10000 accepted", func(in *CreateInput) { in.Notes = notes(10_000) }, false},
+		{"notes 10001 refused", func(in *CreateInput) { in.Notes = notes(10_001) }, true},
+	}
+
+	for _, cc := range cases {
+		t.Run(cc.name, func(t *testing.T) {
+			in := CreateInput{
+				Title:            "test",
+				Destination:      "test",
+				MeetLabel:        "test",
+				HostSeats:        4,
+				CostPerSeatCents: 100,
+				StartsAt:         time.Now().Add(50 * time.Hour),
+				MaxSize:          8,
+				Difficulty:       DifficultyHard,
+				Pace:             PaceRelaxed,
+			}
+			cc.change(&in)
+
+			_, err := svc.Create(context.Background(), host, in)
+			if cc.wantErr {
+				wantStatus(t, err, apperr.CodeBadRequest)
+			} else if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+		})
 	}
 }
