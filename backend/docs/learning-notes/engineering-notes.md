@@ -558,3 +558,76 @@ Not from Muster. The chat interface received the same message twice. Refresh and
 **`useInfiniteQuery` is the client's version of the same loop.** `initialPageParam: null`, `getNextPageParam: page => page.next_cursor`, and `data.pages.flatMap(p => p.items)` for rendering. The key is still `['outings']`, so every existing invalidation kept working. `?after=${after}` with a null cursor sends the text "null"; build the URL only when there is a cursor.
 
 **The pagination style chooses the UI.** Numbered pages need `OFFSET` and a total count. A cursor can only continue, so the control is Load more. For a soonest-first list that is also what a hiker wants; finding a specific outing is a job for filters.
+## Lessons from the v1 audit (PR #59, #60)
+
+**Test-first kept the audit short where tests reach.** About forty service rules refuse someone; all but two already had a test, because each rule was written red first. The findings were all in places a Go test against a fake cannot see.
+
+**A fake store has no query planner.** Three per-hiker queries were full table scans and passed every test. `REFERENCES` creates a foreign key, not an index; Postgres only builds an index for `PRIMARY KEY` and `UNIQUE`. Every "rows for this hiker" lookup needs its own.
+
+**An index is sorted by its first column.** `uq_outing_hiker (outing_id, hiker_id)` could not find rows by `hiker_id` alone: a phone book sorted by surname does not help you find everyone named Safa.
+
+**An index removes a sort only on the same table and in the same order.** `(host_id, starts_at)` can hand back one host's outings already sorted. The index on `join_requests (hiker_id)` cannot help a sort by `outings.starts_at`.
+
+**The planner picks by estimated cost, and can keep the sort anyway.** For 21 rows it chose a bitmap scan plus a sort (estimated 235.90, measured 0.23 ms) over an ordered index scan (estimated 251.00, measured 0.16 ms). `SET enable_bitmapscan = off` in a session shows the other plan. The mentor predicted the sort would vanish and was wrong; at this size neither plan matters. Cost is an estimate, not a measurement.
+
+**Tests check the rules you wrote down.** Nobody had decided that 100,000 was too many people, so nothing tested it. Ceilings are a spec gap, found by asking of every input "what is the largest value this accepts?"
+
+**A ceiling has two sides.** One row at the limit (accepted) and one over (refused). Without the accepted row, `>=` in place of `>` passes every test while refusing the legal maximum.
+
+**Count characters, not bytes.** `len(s)` counts bytes; "ş" is two. The ceiling rows are built from "ş" so a byte count fails the at-limit row.
+
+**Pick a ceiling for the most diligent user, not the average one.** Notes went from a proposed 2,500 to 10,000 characters when Safa pointed out that hosts of multi-day trips write a plan per day. A limit is a guard against abuse, not an editor.
+
+**One rule for status codes: 400 the input is malformed, 403 you are not allowed, 409 the thing is in the wrong state.** Each feature's tests agreed with that feature; the inconsistency only showed when features were laid side by side. A new start time under 12 hours away stays a 400 while editing an outing that starts in 6 hours is a 409: one is the input, the other is the outing.
+
+**Two cases that must look the same need a test that compares them to each other.** Login returned "invalid login credentials" for an unknown email and "Invalid login credentials" for a wrong password. Each was tested against its own string. The capital letter told a caller which emails had accounts.
+
+**When a shared code replaces two different ones, a table row can lose its meaning.** A row that proved "cancelled wins over the closed chat window" by expecting 403 instead of 409 proves nothing once both are 409.
+
+**The audit was wrong once.** It reported comments as having no length limit; there was one at 2,000 that a search pattern missed. A test was written for a rule that already existed. Read the function before reporting an absence.
+
+**The mentor rewrote an error message and broke a spec that asserted the old text.** Copy changes go through the suites like code changes.
+
+**The API suite ran against a stale server.** `air` was not running the branch, so the specs passed against old code. A green tally means nothing unless the server under test is the code under review.
+
+## Lessons from moving the database (PR #61)
+
+**A usage-metered database and a polling worker do not mix.** The notification dispatcher queries every 30 seconds. On Neon's free tier that meant the database never suspended and ran 24 hours a day until the allowance was gone and every connection was refused. The cause was in the code, not the dashboard: grep for tickers.
+
+**The comments list polls too.** `refetchInterval: 30_000` on every open outing page. Same shape of load, and the last part of the page not yet on SSE.
+
+**A locked provider means no dump.** With the project over quota not even `SELECT version()` got through. Having no users made the choice easy: rebuild the schema from migrations. With users it would have meant paying to get the data out.
+
+**A database that listens on localhost needs a tunnel, not an open port.** `ssh -N -L 5433:localhost:5432` makes the droplet's Postgres appear on a local port. The deploy workflow does the same from the runner. `sslmode=disable` is fine inside it.
+
+**The deploy key must exist before the step that uses it.** Migrating through a tunnel moved "write deploy key" ahead of "migrate".
+
+**A workflow change does not trigger a workflow filtered by path.** `deploy.yml` runs on changes under `backend/`; it had to be started by hand.
+
+**Backups on day one, even with no users.** A cron `pg_dump` and a retention `find`. In a crontab `%` is a line break and must be written `\%`. A backup job counts as working when you have seen its file.
+
+**Read "available", not "free".** Linux lends spare memory to the disk cache and gives it back on demand.
+
+## Lessons from the expired session on a public route (PR #62)
+
+**One symptom, three causes.** "The page thinks I'm logged out" was a shared refresh row (#57), a refresh race (#57), and this. The mentor called the symptom fixed after the first two without checking the one route that behaves differently. Close a bug by its reproduction, not by its description.
+
+**A route that works with or without login must tell a stranger from an expired session.** Treating both as anonymous returns the wrong page with a success code. No client can detect a wrong 200.
+
+**If the access cookie expires with its token, expiry looks like absence.** The refresh cookie is the only evidence that a session existed, so its presence is what the server keys on.
+
+**`HttpOnly` cookies make the page blind to its own session.** Safa's first instinct was to check the tokens in the client and refresh early. That works when the client holds the tokens (an `Authorization` header, a mobile app's secure storage). With `HttpOnly` cookies only the server can see them, and a 401 is how it says so. The price of the safer cookie is that coordination.
+
+**Presence is checked where it is needed; validity has one home.** The detail route only notices that a refresh cookie exists. Looking it up and rotating it stays in the refresh endpoint.
+
+**A fix can create its own lockout.** Answering 401 to "refresh cookie, no access token" meant a visitor with a dead refresh cookie could never open a public outing again. A credential the server refuses must be removed from the client in the same response.
+
+**Clear credentials on a refusal, never on a server error.** The first version cleared cookies on any error from `Refresh`, including a database blip.
+
+**`r.Cookie` returns nil and an error when the cookie is absent.** Discarding the error and reading `.Value` panics for exactly the visitor with no cookies. The same nil dereference as `wantStatus` in #57.
+
+**Requests in flight together do not share a repair.** Four requests left without an access cookie; three got 401 and were retried after one refresh; the fourth got 200 and was never retried. The session was fresh and the page was stale.
+
+**Ask what a change does to the races you already have.** Clearing cookies on a refused refresh turns "the third tab is bounced to login" into "every tab is logged out" when three tabs refresh at once. Found by reading the grace-window SQL after the fix was green, not before.
+
+**For every authenticated feature, ask what happens the moment the token expires with the page already open.**

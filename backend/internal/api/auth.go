@@ -136,6 +136,9 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	// v0 is web only
 	sess, err := s.hikers.Refresh(r.Context(), c.Value, hiker.PlatformWeb)
 	if err != nil {
+		if se, ok := apperr.AsStatusErr(err); ok && se.Status == apperr.CodeInvalidCredentials {
+			s.clearSessionCookies(w)
+		}
 		logger.Error(r.Context(), "error capture session", "err", err)
 		responder.Error(w, err, correlationID)
 		return

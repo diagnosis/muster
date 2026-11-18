@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/diagnosis/go-toolkit/v3/apperr"
 	"github.com/diagnosis/go-toolkit/v3/logger"
 	"github.com/diagnosis/go-toolkit/v3/middleware"
 	"github.com/diagnosis/go-toolkit/v3/responder"
@@ -84,7 +85,7 @@ func (s *Server) Routes() http.Handler {
 
 	// public outing routes
 	mux.HandleFunc("GET /api/outings", s.handleListUpcoming)
-	mux.Handle("GET /api/outings/{id}", optionalAuth(http.HandlerFunc(s.handleDetail)))
+	mux.Handle("GET /api/outings/{id}", optionalAuth(s.refreshIfSessionExpired(http.HandlerFunc(s.handleDetail))))
 	// protected outing routes
 	mux.Handle("POST /api/outings", requireAuth(http.HandlerFunc(s.handleCreateOuting)))
 	mux.Handle("POST /api/outings/{id}/requests", requireAuth(http.HandlerFunc(s.handleRequestJoin)))
@@ -161,6 +162,24 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	responder.JSON(w, http.StatusOK, map[string]string{
 		"status": "ok",
 	}, correlationID)
+}
+
+func (s *Server) refreshIfSessionExpired(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		correlationID, _ := logger.GetCorrelationID(r.Context())
+		id, err := getAuthenticatedUserID(r)
+		if err == nil && id != uuid.Nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+		cookie, err := r.Cookie("refresh_token")
+		if err != nil || cookie.Value == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		responder.Error(w, apperr.TokenError("unauthorized", "unauthorized"), correlationID)
+
+	})
 }
 
 var _ messageService = (*message.Service)(nil)
