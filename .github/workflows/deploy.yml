@@ -18,20 +18,28 @@ jobs:
         with: { go-version-file: backend/go.mod }
       - run: go install github.com/pressly/goose/v3/cmd/goose@latest
 
-        # Runs against prod BEFORE the new binary ships. Every migration must
-        # therefore be safe under the currently-running binary (expand-only;
-        # contract in a later release).
-      - name: Migrate
-        run: goose -dir ./migrations postgres "${{ secrets.NEON_PROD_URL }}" up
-
-      - name: Build
-        run: GOOS=linux GOARCH=amd64 go build -o muster ./cmd/muster
-
       - name: Write deploy key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+
+        # Postgres on the droplet listens on localhost only. The runner reaches
+        # it through an SSH tunnel: local port 5433 -> the droplet's 5432.
+      - name: Open tunnel to the database
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            -o ExitOnForwardFailure=yes -f -N -L 5433:localhost:5432 \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+
+        # Runs against prod BEFORE the new binary ships. Every migration must
+        # therefore be safe under the currently-running binary (expand-only;
+        # contract in a later release).
+      - name: Migrate
+        run: goose -dir ./migrations postgres "${{ secrets.PROD_DATABASE_URL }}" up
+
+      - name: Build
+        run: GOOS=linux GOARCH=amd64 go build -o muster ./cmd/muster
 
       - name: Ship binary
         run: scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new muster ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/muster/backend/muster.new
