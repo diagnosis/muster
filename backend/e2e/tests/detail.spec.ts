@@ -1,6 +1,6 @@
 import {expect, request, test} from '@playwright/test'
 import {asUser, BASE} from "../fixtures";
-import {accept, createOuting, getDetail, requestJoin, updateOuting, withdraw} from "../api";
+import {accept, createOuting, getDetail, logout, refresh, requestJoin, updateOuting, withdraw} from "../api";
 import {DetailResponse, JoinRequestResponse, OutingResponse} from "../types";
 import {unwrap} from "../envelope";
 
@@ -92,5 +92,50 @@ test.describe("detail", ()=>{
 
         const asHost = await unwrap<DetailResponse>(getDetail(host.ctx, o.id), 200)
         expect(asHost.waiting.map(w => w.is_me)).toEqual([false, false])
+    })
+
+    test("host->creates outing->member joins->host accepts-> get detail with no cookies", async ()=>{
+        const host = await asUser(BASE)
+        const hiker = await asUser(BASE)
+        const outing = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+        const joinRequest = await unwrap<JoinRequestResponse>(requestJoin(hiker.ctx, outing.id), 201)
+        await unwrap(accept(host.ctx, joinRequest.id), 200)
+        const ctxAnonymous = await request.newContext({baseURL:BASE})
+        const anonymousDetail = await unwrap<DetailResponse>(getDetail(ctxAnonymous, outing.id), 200)
+        expect(anonymousDetail.my_request).toBe(undefined)
+        const hikerDetail = await unwrap<DetailResponse>(getDetail(hiker.ctx, outing.id), 200)
+        expect(hikerDetail.my_request?.status).toBe("accepted")
+
+        const state = await hiker.ctx.storageState()
+        const refreshOnly = await request.newContext({
+            baseURL:BASE,
+            storageState: {
+                cookies: state.cookies.filter(c => c.name !== 'access_token'),
+                origins:[],
+            }
+        })
+
+        const refreshOnlyDetails = await unwrap<DetailResponse>(getDetail(refreshOnly, outing.id), 401)
+
+    })
+
+    test("member->login->join->logout->refresh", async () => {
+        const host = await asUser(BASE)
+        const hiker = await asUser(BASE)
+        const outing = await unwrap<OutingResponse>(createOuting(host.ctx), 201)
+        const joinRequest = await unwrap<JoinRequestResponse>(requestJoin(hiker.ctx, outing.id), 201)
+        await unwrap(accept(host.ctx, joinRequest.id), 200)
+        const state = await hiker.ctx.storageState()
+        const refreshOnly = await request.newContext({
+            baseURL:BASE,
+            storageState: {
+                cookies: state.cookies.filter(c => c.name !== 'access_token'),
+                origins:[],
+            }
+        })
+        await unwrap(logout(hiker.ctx), 200)
+        await unwrap<DetailResponse>(getDetail(refreshOnly, outing.id), 401)
+        await unwrap(refresh(refreshOnly), 401)
+        await unwrap<DetailResponse>(getDetail(refreshOnly, outing.id), 200)
     })
 })
