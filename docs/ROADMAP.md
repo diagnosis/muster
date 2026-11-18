@@ -1,6 +1,6 @@
 # Muster — Roadmap
 
-*As of 2026-11-12 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #57 merged) and the `feat/pagination` branch, confirmed by Safa. Replaces the 2026-08-07 roadmap.*
+*As of 2026-11-17 · repo: github.com/diagnosis/muster · written from the code on `main` (PR #61 merged) and the `fix/expired-session-on-public-routes` branch, confirmed by Safa. Replaces the 2026-08-07 roadmap.*
 
 *Doc hierarchy: roadmap = why and when · spec = what · engineering notes = how.*
 
@@ -10,7 +10,9 @@
 
 Muster is live at muster.safadev.app. Backend and frontend are on `main`, gated by CI (`ci.yml`) and deployed by `deploy.yml`. Migrations run before the new binary, so schema changes are expand-only.
 
-Test suites: Go unit tests against a fake store, a Playwright API suite (14 spec files) that proves the real SQL and JSON, and a Playwright browser suite (23 spec files). CI runs both against a throwaway Postgres service container; nothing in CI touches the hosted database.
+Production's database is PostgreSQL 16 on the same droplet as the API, listening on localhost only (moved off Neon on 2026-11-17). `deploy.yml` reaches it through an SSH tunnel to run migrations. Backups are a nightly `pg_dump` kept 14 days on the droplet. Operations notes: `docs/ops/production-database.md`.
+
+Test suites: Go unit tests against a fake store, a Playwright API suite (14 spec files) that proves the real SQL and JSON, and a Playwright browser suite (24 spec files). CI runs both against a throwaway Postgres service container; nothing in CI touches the production database.
 
 ### Shipped
 
@@ -37,6 +39,10 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (14 spec
 | Hiker card (PR #56) | `/hikers/:id`, reached from every name on an outing (host row, roster, waiting summary and modal, the host's request history and decision modal, comment authors, the DM header). `GET /api/hikers/{id}` now requires auth and returns `hiker.PublicProfile` — name, experience, home area, bio, hosted/went-on counts over past non-cancelled outings, member-since — plus `can_dm`, composed in the handler from `message.Service.CanDM` so the Message button only shows when it would work. Never email, gender or verification; the API spec asserts their absence. Own card shows "Edit profile". The profile form gains Home area and About you (the PATCH existed since v0; nothing called it). `ListedHiker` now carries `hiker_id` on the wire. Signup accepted no `home_area` until this PR: `RegisterInput` had no JSON tags behind `DisallowUnknownFields` |
 | Sessions per device (PR #57) | `user_refresh_tokens` held one row per hiker per platform (`UNIQUE (hiker_id, platform)`), so logging in on a second browser or a phone deleted the first one's token and it was signed out on its next refresh. Now one row per login; rotation is one `UPDATE … WHERE token_hash = $old AND platform = $p AND expires_at > now() RETURNING …`, atomic by construction; a token rotated in the last 10 s still refreshes (`previous_hash`, `rotated_at`), covering a browser whose refresh response was lost. Logout revokes only the presenting session; password reset still signs out everywhere. Design and a sequence diagram of the grace path in `backend/docs/login/refresh-rotation.md` |
 | Browse pagination (PR #58) | `GET /api/outings` returns one page: `{items, next_cursor}`, 20 by default, 50 at most (a limit outside the range is clamped, never refused). Keyset, not offset: the cursor is the `(starts_at, id)` of the last row returned, sent as an opaque base64url string in `?after=`; a cursor the server can't read is a 400. The service asks the store for one row more than the page to learn whether a next page exists. New index `outings (starts_at, id)`: the first page went from a sequential scan and sort of ~10,800 rows (3.3 ms) to an index scan of the rows returned (0.1 ms), and stays there at any depth. The browse page uses `useInfiniteQuery` with a Load more button; `outing.changed` refetches the pages already loaded. First feature whose query was written and `EXPLAIN`ed in DataGrip before it was a Go string. Design in `backend/docs/outing/pagination.md` |
+| Audit: error codes (PR #59) | One rule for status codes: 400 malformed input, 403 not allowed, 409 wrong state. `Update` and `Cancel` on a started outing and `Update` inside the 12-hour cutoff moved from 400 to 409; `PostMessage` on a cancelled outing from 403 to 409; `DeleteComment` with another outing's comment from 409 to 400. Login returned differently capitalised messages for an unknown email and a wrong password, which revealed whether an email had an account; both are now identical and a test holds them equal |
+| Audit: lists and limits (PR #60) | Three indexes for per-hiker queries that were full table scans: `join_requests (hiker_id)`, `outings (host_id, starts_at)`, `notification_events (hiker_id, created_at)`; each went from about 3 ms to about 0.15 ms on the dev database. Upper limits on outing input: group size 50, title 255 characters, notes 10,000 characters, counted in characters not bytes |
+| Database on the droplet (PR #61) | Neon's free allowance ran out and locked the project: the notification dispatcher queries every 30 seconds, so the database never suspended. Production now runs PostgreSQL 16 on the API's droplet, localhost only. `deploy.yml` writes the deploy key, opens an SSH tunnel and migrates through it. Nightly `pg_dump`, 14 days kept. No data was carried over; there were no users |
+| Expired session on a public route (PR #62) | The outing page showed the logged-out view to a logged-in member after the access token expired with the tab open. The detail route allows anonymous viewers, so a request without an access token got a 200 with the public view, and the client refreshes only on 401. Now a request with no valid access token but a `refresh_token` cookie gets a 401, and the client's refresh-and-retry does the rest. A refresh the server refuses also clears both cookies, so a dead cookie can't keep a visitor off public pages. Design in `backend/docs/login/expired-session.md` |
 
 ---
 
@@ -44,9 +50,11 @@ Test suites: Go unit tests against a fake store, a Playwright API suite (14 spec
 
 In this order. Items can be added.
 
-1. **Pagination, the rest.** Browse shipped in #58. Still open: chat (the messaging design's D5 makes it a v2 trigger at 100 messages per conversation; decide whether it stays in v1) and server-side phase filtering. My outings' Past tab is v3+; until then it gets a safety `LIMIT` in the audit.
-2. **Audit.** After the items above: every list endpoint checked for limits, every permission rule checked against its test, error codes made consistent.
-3. **One real hike organized through Muster.** v1 is done when boots hit dirt.
+1. **Audit, last pass: permissions.** Two tests: a non-host is refused on accept, decline, remove and restore (one table); one hiker can't mark another's notification read. The lists pass (#60) and the error-code pass (#59) are done.
+2. **One refresh at a time across tabs.** Three or more tabs refreshing at the same instant (a laptop waking) present the same token; the third is refused, and since #62 a refusal clears the cookies. Wrap the client's refresh in a Web Locks lock so tabs take turns.
+3. **Comments over SSE.** The comments list is the last part of the outing page still polling (`refetchInterval: 30_000`). A `comment.changed` poke with the outing id, the page invalidates `['comments', id]`, and the interval goes.
+4. **Polish batch.** A fixed pick from the ledger, chosen once: things a first-time hiker or host would notice on the real hike.
+5. **One real hike organized through Muster.** v1 is done when boots hit dirt.
 
 ### Known bugs
 
@@ -148,9 +156,22 @@ In this order. Items can be added.
 
 ---
 
+- Off-droplet copies of the database backups, and one tested restore, before real users. Today the dumps sit on the same disk as the database.
+- The droplet has 1 GB of memory shared by the API, Postgres and the other apps. Watch `free -h`; "available" under about 100 MB or swap in the hundreds of megabytes means it is too small. Managed PostgreSQL is a dump and restore away.
+- Delete the `NEON_PROD_URL` secret; nothing reads it. Reboot the droplet for the pending kernel update.
+- The notification dispatcher polls `ListUnsent` every 30 seconds. Harmless on a fixed-price database; wake it on notification creation with a slow fallback tick if polling ever matters again.
+- No browser spec for the expired-session fix: the API spec pins the 401 and the manual check passed. A browser version has to fake a tab refocus after deleting the access cookie.
+- `refreshIfSessionExpired` has no doc comment; `handleRefresh` clears cookies on a refused token without a comment saying why.
+- The create form validates "at least 2" for group size and has no upper limit; a host entering 60 gets the server's message.
+- `wantErrMessage` in the hiker tests calls `t.Errorf` and then dereferences a nil error; make it `t.Fatalf`.
+- Browse and My outings select `o.notes` for every card. With notes up to 10,000 characters a page of 20 can carry a lot of unused text; stop sending notes in lists if the card doesn't show them.
+- No rate limiting on the auth endpoints; not looked at in the audit. Neither was the frontend.
+
 ## v2 — the map, on the web
 
 - Trail and meeting-point map on the outing page and on browse.
+- Chat pagination (keyset, the same pattern as browse) when a conversation passes the messaging design's D5 trigger of 100 messages.
+- A structured itinerary for multi-day outings: one entry per day, in place of one long notes field.
 - Trail picker on create: choose a trail and pre-fill distance, elevation gain and difficulty. Needs a trail data source (OpenStreetMap has geometry; no public API is known for AllTrails or WTA). Only if hosts say typing two numbers is a problem.
 - No-shows: after a hike the host marks who did not come; counts appear on public stats, for riders as well as drivers. The frozen roster from v1 is what this is recorded against.
 - Add-to-home-screen remains the phone story.
