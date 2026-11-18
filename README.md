@@ -2,78 +2,123 @@
 [![deploy.yml](https://github.com/diagnosis/muster/actions/workflows/deploy.yml/badge.svg)](https://github.com/diagnosis/muster/actions/workflows/deploy.yml)
 # Muster
 
-Group hiking outings with built-in carpool coordination. Hosts schedule hikes, hikers request to join as drivers or riders, and seat math is enforced at acceptance — nobody gets stranded in the parking lot.
+Group hiking outings with built-in carpool coordination. Hosts schedule hikes, hikers ask to join as drivers or riders, and seat math is enforced when the host accepts, so nobody is stranded in the parking lot.
 
-**Status: v1 live at [muster.safadev.app](https://muster.safadev.app).** Go REST API with cookie-based auth and capacity-checked membership, a React frontend, and a CI-gated test suite that runs every PR against a disposable Neon database branch. **Next:** v2 with a mobile app.
+**Status: v1 live at [muster.safadev.app](https://muster.safadev.app).** A Go REST API, a React web app, and three test suites that gate every pull request. **Next:** v2 with a mobile app.
+
+## What it does
+
+- **Outings:** create, edit and cancel a hike with a meeting point, group size, pace, terrain and cost per seat. The browse list is public and paginated.
+- **Joining:** hikers ask to join as a rider or a driver, with guests and seats offered. The host accepts, declines, removes or restores. Capacity is checked at acceptance.
+- **Live pages:** the outing page, browse and My outings update over server-sent events when a roster or an outing changes.
+- **Talking:** a discussion thread on each outing, a group chat for its members, and direct messages that the other hiker has to accept.
+- **Notifications:** an in-app bell and email for the events that concern you.
+- **Accounts:** email verification, password or emailed-code login, password reset, a profile, and a public hiker card with hosted and attended counts.
 
 ## Stack
 
-- **Go** (net/http, stdlib mux) — no framework
-- **PostgreSQL** on [Neon](https://neon.tech), via `pgx`; migrations with `goose`
-- **[go-toolkit/v2](https://github.com/diagnosis/go-toolkit)** — shared error vocabulary, JSON envelope, structured logging, middleware (correlation IDs, rate limiting, auth), Argon2id + JWT
-- **Playwright** (TypeScript) — 31-test e2e suite against the real HTTP surface
-- **GitHub Actions** — lint + unit tests, then the e2e suite against a per-run disposable Neon branch
+- **Go 1.26** (`net/http`, standard-library mux), no framework
+- **PostgreSQL 16** via `pgx`; migrations with `goose`
+- **[go-toolkit/v3](https://github.com/diagnosis/go-toolkit)**: shared error vocabulary, JSON envelope, structured logging, middleware (correlation IDs, rate limiting, auth), Argon2id and JWT
+- **React 19, TypeScript, Vite**, TanStack Router and TanStack Query, CSS Modules
+- **Server-sent events** for live updates; **Resend** for email
+- **Playwright** (TypeScript) for an API suite and a browser suite
+- **GitHub Actions** for CI and deploy
 
 ## Architecture
 
 ```
-cmd/muster         wires everything
-internal/api       HTTP handlers → hiker.Service, outing.Service (never postgres)
-internal/hiker     auth + profile domain: rules, Storage interface
-internal/outing    outings, join requests, capacity: rules, Storage interface
-internal/postgres  implements both Storage interfaces; owns all error translation
-internal/config    env-driven config, loud validation
+backend/
+  cmd/muster             wires everything
+  internal/api           HTTP handlers and middleware; calls services, never postgres
+  internal/hiker         accounts, sessions, profile, public hiker card
+  internal/outing        outings, join requests, capacity, comments
+  internal/message       outing chat and direct messages
+  internal/notification  in-app notifications and the email dispatcher
+  internal/events        the SSE hub
+  internal/authtoken     one-time tokens: email verification, login codes, password reset
+  internal/email         the mail sender
+  internal/postgres      implements every Storage interface; owns error translation
+  internal/config        env-driven config, loud validation
+  migrations             goose SQL migrations
+  e2e                    Playwright API suite
+frontend/
+  src                    routes, queries, components
+  e2e                    Playwright browser suite
 ```
 
-Domain packages import only the toolkit — never each other (IDs, not imports). Services define the `Storage` interfaces they consume; postgres implements them. Business rules live in services and are unit-tested against in-memory fakes; SQL is exercised by the e2e suite.
+Domain packages import only the toolkit, never each other (IDs, not imports). Each service defines the `Storage` interface it consumes and `postgres` implements it. Business rules live in services and are unit-tested against in-memory fakes. The real SQL is exercised by the API suite.
 
-## API surface (v0)
+## API surface
 
 | Area | Endpoints |
 |---|---|
-| Health | `GET /api/health` |
-| Auth | signup · login · refresh (rotating) · logout · `GET /api/auth/me` |
+| Health | `GET /health` |
+| Auth | signup · verify email · resend verification · login · login by emailed code · refresh · logout · forgot and reset password · `GET /api/auth/me` |
 | Profile | `PATCH /api/me/profile` · `GET /api/hikers/{id}` (public card, no email) |
-| Outings | list upcoming · `GET /api/outings/{id}` (public, viewer-aware) · create · `PATCH` · cancel |
-| Membership | request join · withdraw · accept · decline · remove member · host inbox · `GET /api/me/outings` |
+| Outings | `GET /api/outings` (public, paginated) · `GET /api/outings/{id}` (public, viewer-aware) · create · `PATCH` · cancel |
+| Membership | ask to join · edit own request · withdraw · accept · decline · remove member · restore · host's request lists · `GET /api/me/outings` |
+| Comments | list · add · delete · like · unlike |
+| Messaging | conversations · messages · mark read · start a DM · accept, decline and reopen a DM |
+| Notifications | list · mark one read · mark all read |
+| Live updates | `GET /api/events` (SSE) |
 
 Design notes worth knowing:
 
-- **Reads are public, writes are authed.** `GET /api/outings/{id}` works anonymously; logged-in viewers additionally get `my_request` (their own standing on the outing).
-- **Capacity gates acceptance, not asking.** Anyone can request; the host's accept fails with `409` if the person (plus guests) doesn't fit — checked atomically in SQL, so concurrent accepts can't oversell.
-- **Seat math is derived, never stored:** `people_count`, `seat_capacity`, `seats_short`, `spots_left` are computed per read. Hosts may shrink capacity below commitments; the shortage surfaces in the detail view and a human resolves it.
-- **Cookie sessions** (HttpOnly access + rotating refresh), one session per platform.
-- Responses use a uniform envelope: `{data, correlation_id, timestamp}` / `{error: {...}}`.
+- **Reads are public, writes are authed.** `GET /api/outings/{id}` works anonymously. A logged-in viewer also gets `my_request`, their own standing on the outing.
+- **Capacity gates acceptance, not asking.** Anyone can ask. The host's accept fails with `409` if the person and their guests don't fit, checked atomically in SQL so concurrent accepts can't oversell.
+- **Seat math is derived, never stored.** `people_count`, `seat_capacity`, `seats_short` and `spots_left` are computed per read. A host may shrink capacity below commitments; the shortage shows in the detail view and a human resolves it.
+- **Keyset pagination.** The browse list returns `{items, next_cursor}`, 20 per page and 50 at most. The cursor is opaque and encodes the `(starts_at, id)` of the last row, so every page is one index scan.
+- **Outing changes are pokes.** The `outing.changed` event carries only the outing's id. The page refetches through the normal endpoint, so permissions are checked in one place.
+- **Cookie sessions.** An `HttpOnly` access token and an `HttpOnly` rotating refresh token, one session per login, so two browsers don't sign each other out. A refresh token one rotation old is accepted for 10 seconds to absorb races.
+- **An expired session is not a stranger.** On the public outing route, a request with a refresh cookie and no valid access token gets `401`, and the client refreshes and retries. A refresh the server refuses clears both cookies.
+- **Status codes follow one rule.** `400` the input is malformed, `403` you are not allowed, `409` the thing is in the wrong state.
+- Responses use a uniform envelope: `{data, correlation_id, timestamp}` or `{error: {...}}`.
 
 ## Running locally
 
-Requirements: Go 1.24+, a Postgres URL (Neon works), `goose`, Node 20+ (for e2e).
+Requirements: Go 1.26+, PostgreSQL 16, `goose`, Node LTS.
 
 ```bash
 # backend/.env
 DATABASE_URL=postgres://...
 JWT_ACCESS_SECRET=...        # openssl rand -base64 48
-JWT_REFRESH_SECRET=...       # must differ from access secret
+JWT_REFRESH_SECRET=...       # must differ from the access secret
 APP_ENV=dev
 APP_PORT=8088
 ```
 
 ```bash
 cd backend
-make check        # gofmt + golangci-lint + build + unit tests
-make run          # boots on :8088
-make e2e          # Playwright suite (server must be running)
-make e2e-branch   # fresh 24h-TTL Neon branch + migrations; prints its DATABASE_URL
+make migrate-up   # apply migrations to DATABASE_URL
+make check        # gofmt + golangci-lint + build + unit tests (race detector on)
+make run          # boots on :8088 (make dev runs it under air, with reload)
+make e2e          # Playwright API suite; the server must be running
 ```
 
-Optional env: `RATE_LIMIT_RPS` / `RATE_LIMIT_BURST` (defaults 10/20), JWT expiries, DB pool tuning — see `internal/config`.
+```bash
+cd frontend
+npm install
+npm run dev       # Vite dev server on :5173
+npm run e2e       # Playwright browser suite; API and dev server must be running
+```
+
+Optional backend env: `RATE_LIMIT_RPS` and `RATE_LIMIT_BURST` (defaults 10 and 20), JWT expiries, `DB_*` pool tuning, `APP_DISPATCHER_INTERVAL`, `CORS_ORIGINS`, and `RESEND_API_KEY` (required only in production). See `backend/internal/config`. The frontend reads `VITE_API_URL`.
 
 ## Testing
 
-- **Unit** (`go test ./...`): 43 tests over the service layer against in-memory fakes — the state machine, capacity table, and validation rules.
-- **e2e** (`backend/e2e`): 31 Playwright tests speaking real HTTP to a real database. Per-test actors with unique emails — no shared state, no cleanup, parallel-safe by construction. Conventions live in [`backend/e2e/TEST-DESIGN.md`](backend/e2e/TEST-DESIGN.md).
-- **CI**: every PR to `main` runs lint + unit tests, then creates a disposable Neon branch, migrates it, boots the server, runs the full e2e suite, and deletes the branch. Green gates the merge.
+Three suites, each proving what the others can't:
 
-## Roadmap
+- **Unit** (`go test ./... -race`): 236 tests over the service layer against in-memory fakes: the request state machine, the capacity table, visibility, validation, pagination, sessions. Rules are written test-first.
+- **API** (`backend/e2e`): 116 Playwright tests speaking real HTTP to a real database. This is where the SQL and the JSON are proven. Each test creates its own actors with unique emails, so there is no shared state and no cleanup.
+- **Browser** (`frontend/e2e`): 70 Playwright tests, each run on a desktop viewport and a phone-sized one.
 
-v1 candidates (in rough order): editable join requests, host notifications, outing group chat, post-hike contact exchange, trail-conditions/wildlife notes, mobile header-auth. See commit history for design rulings — most carry their reasoning.
+**CI:** every pull request to `main` runs lint and unit tests, then starts a throwaway PostgreSQL container, migrates it, boots the server and runs both Playwright suites. Nothing in CI touches production. Green gates the merge.
+
+**Deploy:** a push to `main` that changes `backend/` runs the migrations against production through an SSH tunnel, ships the new binary, restarts the service and checks `/health`. Migrations run before the new binary, so they are expand-only.
+
+## Docs
+
+- [`docs/ROADMAP.md`](docs/ROADMAP.md): what shipped, what is left, and the ledger of known gaps
+- [`docs/ops/production-database.md`](docs/ops/production-database.md): where production's database lives, backups, restore
+- [`backend/docs/`](backend/docs): one design note per feature, with numbered decisions, and the engineering notes
