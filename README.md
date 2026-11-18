@@ -1,8 +1,10 @@
+[![CI](https://github.com/diagnosis/muster/actions/workflows/ci.yml/badge.svg)](https://github.com/diagnosis/muster/actions/workflows/ci.yml)
+[![deploy.yml](https://github.com/diagnosis/muster/actions/workflows/deploy.yml/badge.svg)](https://github.com/diagnosis/muster/actions/workflows/deploy.yml)
 # Muster
 
 Group hiking outings with built-in carpool coordination. Hosts schedule hikes, hikers request to join as drivers or riders, and seat math is enforced at acceptance — nobody gets stranded in the parking lot.
 
-**Status: v0 backend complete.** REST API with cookie-based auth, capacity-checked membership, and a CI-gated test suite. Frontend (React) in progress.
+**Status: v1 live at [muster.safadev.app](https://muster.safadev.app).** Go REST API with cookie-based auth and capacity-checked membership, a React frontend, and a CI-gated test suite that runs every PR against a disposable Neon database branch. **Next:** v2 with a mobile app.
 
 ## Stack
 
