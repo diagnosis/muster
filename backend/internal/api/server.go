@@ -73,6 +73,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/auth/refresh", s.handleRefresh)
 	mux.HandleFunc("POST /api/auth/forgot-password", s.handleForgotPassword)
 	mux.HandleFunc("POST /api/auth/reset-password", s.handleResetPassword)
+	mux.HandleFunc("POST /api/auth/reset-password/check", s.handleCheckResetPassword)
 	// optionalAuth
 	optionalAuth := middleware.OptionalAuth(s.authFromCookie)
 

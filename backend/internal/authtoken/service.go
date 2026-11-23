@@ -58,31 +58,55 @@ func (s *Service) Mint(ctx context.Context, hikerID uuid.UUID, purpose Purpose, 
 
 // Consume validates purpose, single-use, and expiry, then burns the token; a token never consumes twice (the contract the four tests pin)
 func (s *Service) Consume(ctx context.Context, raw string, purpose Purpose) (uuid.UUID, error) {
-	if !purpose.Valid() {
-		return uuid.Nil, apperr.BadRequest("invalid purpose", "invalid purpose")
-	}
-
-	hash := secure.HashRefreshToken(raw)
-	t, err := s.store.GetByHash(ctx, hash)
+	t, err := s.lookup(ctx, raw, purpose)
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if t.Purpose != purpose {
-		return uuid.Nil, apperr.Conflict("purpose mismatch", "purpose mismatch")
-	}
-
-	if t.UsedAt != nil {
-		return uuid.Nil, apperr.Conflict("token is used", "token is used")
-	}
-	if t.ExpiresAt.Before(time.Now()) {
-		return uuid.Nil, apperr.Conflict("token is expired", "token is expired")
-	}
-
 	if err = s.store.MarkUsed(ctx, t.ID); err != nil {
 		return uuid.Nil, err
 	}
 
 	return t.HikerID, nil
+}
+
+// Check reports whether raw is a token that Consume would accept for purpose
+// right now: issued, for this purpose, unused and unexpired. It does not burn
+// the token, so it can be called any number of times. A page uses it to decide
+// whether to show a form; the action itself must still call Consume, because a
+// token can expire or be used between the check and the submit.
+func (s *Service) Check(ctx context.Context, raw string, purpose Purpose) error {
+	if _, err := s.lookup(ctx, raw, purpose); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// lookup is the one home of the validity rule shared by Check and Consume. It
+// finds the token by the hash of raw and refuses one that was issued for a
+// different purpose, has already been used, or has expired. The returned token
+// is valid at the moment of the call; nothing is written.
+func (s *Service) lookup(ctx context.Context, raw string, purpose Purpose) (*Token, error) {
+	if !purpose.Valid() {
+		return nil, apperr.BadRequest("invalid purpose", "invalid purpose")
+	}
+
+	hash := secure.HashRefreshToken(raw)
+	t, err := s.store.GetByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	if t.Purpose != purpose {
+		return nil, apperr.Conflict("purpose mismatch", "purpose mismatch")
+	}
+
+	if t.UsedAt != nil {
+		return nil, apperr.Conflict("token is used", "token is used")
+	}
+	if t.ExpiresAt.Before(s.now()) {
+		return nil, apperr.Conflict("token is expired", "token is expired")
+	}
+	return t, nil
 }
 
 // ErrTooSoon is returned by MintCode when the hiker already holds a login

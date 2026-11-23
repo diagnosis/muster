@@ -548,3 +548,11 @@ func (s *Service) PublicProfile(ctx context.Context, hikerID uuid.UUID) (*Public
 	}
 	return pb, nil
 }
+
+// CheckResetToken reports whether raw is a password-reset token that
+// ResetPassword would accept right now, without consuming it. The reset page
+// calls it on load so a dead link is reported before the hiker types a new
+// password.
+func (s *Service) CheckResetToken(ctx context.Context, raw string) error {
+	return s.tokens.Check(ctx, raw, authtoken.PurposeForgotPassword)
+}

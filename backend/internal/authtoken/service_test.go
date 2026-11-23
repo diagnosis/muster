@@ -311,3 +311,103 @@ func Test_RequestCodesBackToBack(t *testing.T) {
 		t.Errorf("expected 2 tokens got %d", len(f.tokens))
 	}
 }
+
+func Test_Check_ForgotPasswordToken(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hiker := uuid.New()
+
+	raw, err := svc.Mint(context.Background(), hiker, PurposeForgotPassword, 10*time.Minute)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+
+	err = svc.Check(context.Background(), raw, PurposeForgotPassword)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+}
+
+func Test_Check_ForgotPasswordRejections_NeverIssued(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	raw := "garbage-token"
+	err := svc.Check(context.Background(), raw, PurposeForgotPassword)
+
+	wantStatus(t, err, apperr.CodeNotFound)
+
+}
+
+func Test_Check_ForgotPasswordRejections_WrongPurpose(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hiker := uuid.New()
+
+	raw, err := svc.Mint(context.Background(), hiker, PurposeEmailVerification, 10*time.Minute)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	err = svc.Check(context.Background(), raw, PurposeForgotPassword)
+	wantStatus(t, err, apperr.CodeConflict)
+}
+
+func Test_Check_ForgotPasswordRejections_AlreadyUsed(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hiker := uuid.New()
+	raw, err := svc.Mint(context.Background(), hiker, PurposeForgotPassword, 10*time.Minute)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	_, err = svc.Consume(context.Background(), raw, PurposeForgotPassword)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	err = svc.Check(context.Background(), raw, PurposeForgotPassword)
+	wantStatus(t, err, apperr.CodeConflict)
+
+}
+
+func Test_Check_ForgotPasswordRejections_Expired(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hiker := uuid.New()
+
+	mintedAt := time.Now()
+	clock := mintedAt
+	svc.now = func() time.Time {
+		return clock
+	}
+	raw, err := svc.Mint(context.Background(), hiker, PurposeForgotPassword, 10*time.Minute)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	clock = mintedAt.Add(11 * time.Minute)
+	err = svc.Check(context.Background(), raw, PurposeForgotPassword)
+	wantStatus(t, err, apperr.CodeConflict)
+
+}
+
+func Test_Check_And_Consume(t *testing.T) {
+	f := newFakeStore()
+	svc := NewService(f)
+	hiker := uuid.New()
+
+	raw, err := svc.Mint(context.Background(), hiker, PurposeForgotPassword, 10*time.Minute)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+
+	err = svc.Check(context.Background(), raw, PurposeForgotPassword)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+
+	id, err := svc.Consume(context.Background(), raw, PurposeForgotPassword)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	if id != hiker {
+		t.Errorf("expected returns %v got %v", hiker, id)
+	}
+}
