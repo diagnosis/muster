@@ -1,6 +1,6 @@
 // src/queries/auth.ts
 
-import { useMutation, useQueryClient} from "@tanstack/react-query";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {apiClient, ApiRequestError} from "@/lib/api.ts";
 import type {ForgotPasswordResponse, MeResponse, RequestLoginCodeResponse, ResendEmailResponse} from "@/types.ts";
 import {forgetUserData} from "@/queries.ts";
@@ -75,5 +75,20 @@ export function useResendMutation(){
             }
             throw new ApiRequestError(res.error, res.httpStatus)
         }
+    })
+}
+
+export function useCheckResetPassword(token: string) {
+    return useQuery({
+        queryKey: ['reset-token', token],
+        queryFn: async () => {
+            const res = await apiClient.post(`/api/auth/reset-password/check`, {token})
+            if (!res.ok) {
+                throw new ApiRequestError(res.error, res.httpStatus)
+            }
+            return res.data
+        },
+        enabled: !!token,
+        retry: false,
     })
 }

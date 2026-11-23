@@ -122,6 +122,8 @@ export const forgotPassword = (ctx:APIRequestContext, email:string) =>
 
 export const resetPassword = (ctx:APIRequestContext, new_password:string, token:string) =>
     ctx.post("/api/auth/reset-password", {data:{new_password, token}})
+export const checkResetToken = (ctx:APIRequestContext, token: string)=>
+    ctx.post("/api/auth/reset-password/check", {data:{token}})
 
 export const getNotifications = (ctx: APIRequestContext) =>
     ctx.get('/api/notifications')

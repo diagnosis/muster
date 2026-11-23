@@ -33,13 +33,13 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	responder.JSON(w, http.StatusCreated, h, correlationID)
 }
 
-type verifyEmailInput struct {
+type tokenInput struct {
 	Token string `json:"token"`
 }
 
 func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	correlationID, _ := logger.GetCorrelationID(r.Context())
-	var in verifyEmailInput
+	var in tokenInput
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&in); err != nil {
@@ -310,7 +310,7 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 
 	err = s.hikers.ResetPassword(r.Context(), token, in.NewPassword)
 	if err != nil {
-		logger.Error(r.Context(), "failed to reset password", "err", err)
+		logger.Warn(r.Context(), "failed to reset password", "err", err)
 		responder.Error(w, err, correlationID)
 		return
 	}
@@ -318,6 +318,33 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	responder.JSON(w, http.StatusOK, map[string]string{
 		"message": "Password was changed successfully!",
 	}, correlationID)
+}
+
+func (s *Server) handleCheckResetPassword(w http.ResponseWriter, r *http.Request) {
+	correlationID, _ := logger.GetCorrelationID(r.Context())
+	var in tokenInput
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		logger.Warn(r.Context(), "invalid body", "err", err)
+		responder.Error(w, apperr.BadRequest("invalid request body", "json decode failed", err), correlationID)
+		return
+	}
+	token := strings.TrimSpace(in.Token)
+	if token == "" {
+		responder.Error(w, apperr.BadRequest("empty token", "empty token"), correlationID)
+		return
+	}
+
+	if err := s.hikers.CheckResetToken(r.Context(), token); err != nil {
+		logger.Warn(r.Context(), "reset token check failed", "err", err)
+		responder.Error(w, err, correlationID)
+		return
+	}
+	responder.JSON(w, http.StatusOK, map[string]string{
+		"message": "Token is valid",
+	}, correlationID)
+
 }
 
 func (s *Server) handleRequestLoginCode(w http.ResponseWriter, r *http.Request) {
