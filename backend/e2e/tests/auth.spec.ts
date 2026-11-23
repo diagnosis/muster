@@ -2,6 +2,7 @@ import {test, expect, request} from '@playwright/test';
 import {asUnverifiedUser, asUser, BASE} from '../fixtures'
 import {unwrap, unwrapError} from "../envelope";
 import {
+  checkResetToken,
   forgotPassword,
   getMe,
   login,
@@ -169,9 +170,10 @@ test.describe('auth', ()=>{
     const res =  await unwrap<ForgotPasswordResponse>(await forgotPassword(ctx, "test@unknow.com"), 200)
     expect(res.message).toBe(FORGOT_SENTENCE)
   })
-  test("mint_forgot_password -> reset-password -> 200-> login with new password -> 200 -> login with old -> 401", async()=>{
+  test("mint_forgot_password -> check -> reset-password -> 200-> login with new password -> 200 -> login with old -> 401", async()=>{
     const {ctx, user, id} = await asUser(BASE)
     const raw = await mintVerificationToken(id, {purpose:"forgot_password"})
+    await unwrap(checkResetToken(ctx, raw), 200)
     await unwrap<ResetPasswordResponse>(await resetPassword(ctx, "Secure123", raw), 200)
     await unwrap(await login(ctx, {email:user.email, password:"Secure123"}),200)
     await unwrap(await login(ctx, {email:user.email, password:user.password}), 401)
@@ -180,11 +182,13 @@ test.describe('auth', ()=>{
     const {ctx, user, id} = await asUser(BASE)
     const raw = await mintVerificationToken(id, {purpose:"forgot_password"})
     await unwrap<ResetPasswordResponse>(await resetPassword(ctx, "Secure123", raw), 200)
+    await unwrap(checkResetToken(ctx, raw), 409)
     await unwrap<ResetPasswordResponse>(await resetPassword(ctx, "Secure456", raw), 409)
   })
   test("mint_garbage -> reset-password -> 404", async ()=> {
     const {ctx} = await asUser(BASE)
     const garbage = "iwilldoitoneday"
+    await unwrap(checkResetToken(ctx, garbage), 404)
     await unwrap<ResetPasswordResponse>(await resetPassword(ctx, "Secure123", garbage),404)
   })
   test("mint_forgot_password -> reset-password with weak password -> 400", async ()=> {

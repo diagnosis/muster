@@ -44,3 +44,5 @@ export const RESET_EMAIL_TEXT = 'If email provided matches our record, you will 
 export const PASS_CHANGE_SUCCESS = 'Password was changed successfully!'
 
 export const COMMENT_REMOVED = '[comment removed]'
+
+export const RESET_LINK_INVALID = 'This reset link is invalid or has expired.'
