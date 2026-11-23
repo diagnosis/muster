@@ -32,7 +32,7 @@ export function ResetPasswordPage() {
     }
     if (!token){
         return <div className={styles.form}>
-            <p className={styles.error}>Invalid Token</p>
+            <p role={'alert'} className={styles.error}>Invalid Token</p>
         </div>
     }
     if (resetPasswordMutation.isSuccess){
@@ -40,7 +40,7 @@ export function ResetPasswordPage() {
             {resetPasswordMutation.isSuccess&&
                 <div className={styles.form}>
                     <h1>Reset Password</h1>
-                    <p className={styles.readOnlyLabel}>{resetPasswordMutation.data.message}</p>
+                    <p role='status' className={styles.readOnlyLabel}>{resetPasswordMutation.data.message}</p>
                     <Link className={'btn btn-primary'} to={'/login'}>Go to login</Link>
                 </div>
             }
@@ -66,7 +66,7 @@ export function ResetPasswordPage() {
 
       <button className="btn-primary"
               type="submit" disabled={resetPasswordMutation.isPending || newPassword.trim() == "" || newPassword !== confirmPassword}>Reset password</button>
-      {resetPasswordMutation.error&&<p className={styles.error}>{resetPasswordMutation.error.message}</p>}
+      {resetPasswordMutation.error&&<p role={'alert'} className={styles.error}>{resetPasswordMutation.error.message}</p>}
 
   </form>
 }

@@ -113,12 +113,12 @@ export function LoginPage(){
 
         <div className={styles.messageContainer}>
             {active.error &&
-                <p className={styles.error}>{active.error.message}</p>}
+                <p className={styles.error} role="alert">{active.error.message}</p>}
             {active.error instanceof ApiRequestError && active.error.apiError.code === CODE_EMAIL_NOT_VERIFIED &&
                 <button className={styles.quietBtn} disabled={resendMutation.isPending}
                         onClick={() => resendMutation.mutate({email})}>Resend verification</button>}
             {resendMutation.error && <p className={styles.error}>{resendMutation.error.message}</p>}
-            {resendMutation.isSuccess && <p>{resendMutation.data.message}</p>}
+            {resendMutation.isSuccess && <p role={"status"}>{resendMutation.data.message}</p>}
 
             <div className={styles.doors}>
                 <button type="button" className={styles.quietBtn}
@@ -130,8 +130,8 @@ export function LoginPage(){
                             disabled={forgotPasswordMutation.isPending || email.trim() === ""}
                             onClick={() => forgotPasswordMutation.mutate({email})}>Forgot password</button>}
             </div>
-            {forgotPasswordMutation.error && <p className={styles.error}>{forgotPasswordMutation.error.message}</p>}
-            {forgotPasswordMutation.isSuccess && <p className={styles.readOnlyRow}>{forgotPasswordMutation.data.message}</p>}
+            {forgotPasswordMutation.error && <p role="alert" className={styles.error}>{forgotPasswordMutation.error.message}</p>}
+            {forgotPasswordMutation.isSuccess && <p role="status" className={styles.readOnlyRow}>{forgotPasswordMutation.data.message}</p>}
         </div>
     </>
 }
