@@ -42,7 +42,7 @@ export function SignupPage() {
         e.preventDefault()
         signup.mutate({email, password, name, experience})
     }
-    const details =signup.error instanceof ApiRequestError ? signup.error.apiError.details : undefined
+    const errDetails =signup.error instanceof ApiRequestError ? signup.error.apiError.details : undefined
     return <>
 
         <form className={styles.form} onSubmit={handleSubmit}>
@@ -61,14 +61,21 @@ export function SignupPage() {
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
+                    aria-invalid={!!errDetails?.email}
+                    aria-describedby={errDetails?.email ? 'signup-email-error' : undefined}
                 />
             </label>
-            {details?.email && <p className={styles.fieldError}>{details.email}</p>}
+            {errDetails?.email && <p id={"signup-email-error"} className={styles.fieldError}>{errDetails.email}</p>}
             <label className={styles.label}>
                 Password
-                <PasswordInput value={password} onChange={e => setPassword(e.target.value)}/>
+                <PasswordInput
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    aria-invalid={!!errDetails?.password}
+                    aria-describedby={errDetails?.password ? 'signup-password-error': undefined}
+                />
             </label>
-            {details?.password && <p className={styles.fieldError}>{details.password}</p>}
+            {errDetails?.password && <p id={"signup-password-error"} className={styles.fieldError}>{errDetails.password}</p>}
             <fieldset className={styles.fieldset}>
                 <legend className={styles.legend}>Experience</legend>
                     <div className={styles.radioRow}>
@@ -103,7 +110,7 @@ export function SignupPage() {
 
             </fieldset>
 
-            {signup.error && <p className={styles.error}>{signup.error.message}</p>}
+            {signup.error && <p role={'alert'} className={styles.error}>{signup.error.message}</p>}
             <button className="btn-primary" type="submit" disabled={signup.isPending || name==="" || password.length <=3 || email===""}>Sign up</button>
         </form>
     </>
