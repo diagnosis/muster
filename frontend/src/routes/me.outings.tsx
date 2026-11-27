@@ -1,113 +1,153 @@
-import {createFileRoute, Link} from '@tanstack/react-router'
-import {requireAuth} from "@/queries.ts";
-import {OutingCard} from "@/components/OutingCard.tsx";
-import styles from "@/routes/me.outings.module.css"
-import type {MyRequestType, Phase} from "@/types.ts";
-import {useEffect, useState} from "react";
-import {useMyOutings} from "@/queries/outing.ts";
-import {useQueryClient} from "@tanstack/react-query";
-import {useEvents} from "@/events/EventProvider.tsx";
-
-
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { requireAuth } from '@/queries.ts'
+import { OutingCard } from '@/components/OutingCard.tsx'
+import styles from '@/routes/me.outings.module.css'
+import type { MyRequestType, Phase } from '@/types.ts'
+import { useEffect, useState } from 'react'
+import { useMyOutings } from '@/queries/outing.ts'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEvents } from '@/events/EventProvider.tsx'
 
 export const Route = createFileRoute('/me/outings')({
-    beforeLoad: async ({context}) => requireAuth(context.queryClient),
+  beforeLoad: async ({ context }) => requireAuth(context.queryClient),
   component: MeOutingsPage,
 })
 
 export function MeOutingsPage() {
-    const {data, isPending, error} = useMyOutings()
-    const [tab, setTab] = useState<Phase>("upcoming")
-    const qc = useQueryClient()
-    const { subscribe } = useEvents()
-    useEffect(()=> {
-        return subscribe('outing.changed', ()=>{
-            qc.invalidateQueries({ queryKey: ['my-outings'] })
-        })
-    }, [subscribe, qc])
-    if (isPending) return <div>Outings loading...</div>
-    if (error) return <div>{error.message}</div>
+  const { data, isPending, error } = useMyOutings()
+  const [tab, setTab] = useState<Phase>('upcoming')
+  const qc = useQueryClient()
+  const { subscribe } = useEvents()
+  useEffect(() => {
+    return subscribe('outing.changed', () => {
+      qc.invalidateQueries({ queryKey: ['my-outings'] })
+    })
+  }, [subscribe, qc])
+  if (isPending) return <div>Outings loading...</div>
+  if (error) return <div>{error.message}</div>
 
+  const all = [
+    ...data.hosting.map((outing) => ({
+      outing,
+      requestType: 'hosting' as const,
+    })),
+    ...data.joined.map((outing) => ({
+      outing,
+      requestType: 'joined' as const,
+    })),
+    ...data.requested.map((outing) => ({
+      outing,
+      requestType: 'requested' as const,
+    })),
+  ]
+  const visible = all
+    .filter((item) => item.outing.phase === tab)
+    .sort((a, b) => {
+      const diff = new Date(a.outing.starts_at).getTime() - new Date(b.outing.starts_at).getTime()
+      return tab === 'past' ? -diff : diff
+    })
+  const counts: Record<Phase, number> = {
+    upcoming: 0,
+    in_progress: 0,
+    past: 0,
+  }
 
+  for (const item of all) counts[item.outing.phase]++
+  return (
+    <div className={styles.page}>
+      <h1 className={styles.heading}>My outings</h1>
 
-    const all = [
-        ...data.hosting.map(outing => ({outing, requestType:'hosting' as const})),
-        ...data.joined.map(outing => ({outing, requestType:'joined' as const })),
-        ...data.requested.map(outing => ({outing, requestType:'requested' as const})),
-    ]
-    const visible = all
-        .filter(item => item.outing.phase === tab)
-        .sort((a, b) => {
-            const diff = new Date(a.outing.starts_at).getTime() - new Date(b.outing.starts_at).getTime()
-            return tab === "past" ? -diff : diff
-        })
-    const counts: Record<Phase, number> = {upcoming: 0, in_progress: 0, past: 0}
-
-    for (const item of all) counts[item.outing.phase]++
-    return <div className={styles.page}>
-        <h1 className={styles.heading}>My outings</h1>
-
-        <div className={styles.tabs} role="tablist" aria-label="Outings by time">
-            {TABS.map(t => (
-                <button key={t.phase} type="button" role="tab" className={styles.tab}
-                        aria-selected={tab === t.phase} onClick={() => setTab(t.phase)}>
-                    {t.label}
-                    <span className={`${styles.count} ${t.phase === "in_progress" && counts[t.phase] > 0 ? styles.countLive : ""}`}>
-                {counts[t.phase]}
+      <div className={styles.tabs} role="tablist" aria-label="Outings by time">
+        {TABS.map((t) => (
+          <button
+            key={t.phase}
+            type="button"
+            role="tab"
+            className={styles.tab}
+            aria-selected={tab === t.phase}
+            onClick={() => setTab(t.phase)}
+          >
+            {t.label}
+            <span
+              className={`${styles.count} ${t.phase === 'in_progress' && counts[t.phase] > 0 ? styles.countLive : ''}`}
+            >
+              {counts[t.phase]}
             </span>
-                </button>
-            ))}
+          </button>
+        ))}
+      </div>
+
+      {visible.length === 0 ? (
+        <div className={styles.empty}>
+          <p>{EMPTY[tab]}</p>
+          {tab === 'upcoming' && (
+            <Link className="btn-primary btn" to="/outings/new">
+              Create outing
+            </Link>
+          )}
         </div>
-
-        {visible.length === 0
-            ? <div className={styles.empty}>
-                <p>{EMPTY[tab]}</p>
-                {tab === "upcoming" && <Link className="btn-primary btn" to="/outings/new">Create outing</Link>}
-            </div>
-            : <div className={styles.list} role="tabpanel">
-                {visible.map(({outing, requestType}) => (
-                    <Link className={styles.cardLink} key={outing.id} to="/outings/$id" params={{id: outing.id}}>
-                        <OutingCard outing={outing} label={roleLabel(requestType, outing.phase)}/>
-                    </Link>
-                ))}
-                {tab === "in_progress" && <p className={styles.note}>
-                    Once an outing starts, the group is locked: no new requests, changes or withdrawals. Comments and chat stay open.
-                </p>}
-            </div>
-        }
+      ) : (
+        <div className={styles.list} role="tabpanel">
+          {visible.map(({ outing, requestType }) => (
+            <Link
+              className={styles.cardLink}
+              key={outing.id}
+              to="/outings/$id"
+              params={{ id: outing.id }}
+            >
+              <OutingCard outing={outing} label={roleLabel(requestType, outing.phase)} />
+            </Link>
+          ))}
+          {tab === 'in_progress' && (
+            <p className={styles.note}>
+              Once an outing starts, the group is locked: no new requests, changes or withdrawals.
+              Comments and chat stay open.
+            </p>
+          )}
+        </div>
+      )}
     </div>
-
+  )
 }
 
-
-
-const TABS: {phase: Phase, label: string}[] = [
-    {phase: "upcoming", label: "Upcoming"},
-    {phase: "in_progress", label: "In progress"},
-    {phase: "past", label: "Past"},
+const TABS: { phase: Phase; label: string }[] = [
+  { phase: 'upcoming', label: 'Upcoming' },
+  { phase: 'in_progress', label: 'In progress' },
+  { phase: 'past', label: 'Past' },
 ]
 
 const EMPTY: Record<Phase, string> = {
-    upcoming: "Nothing coming up. Host a hike or find one to join.",
-    in_progress: "Nothing is happening right now. Outings show up here from their start time until they end.",
-    past: "No past outings yet. The ones you host or join will be kept here.",
+  upcoming: 'Nothing coming up. Host a hike or find one to join.',
+  in_progress:
+    'Nothing is happening right now. Outings show up here from their start time until they end.',
+  past: 'No past outings yet. The ones you host or join will be kept here.',
 }
 
 function roleLabel(requestType: MyRequestType, phase: Phase): string {
-    if (phase === "past") {
-        let m  = "" ;
-        switch (requestType){
-            case "requested": m = "You asked"; break;
-            case "hosting": m = "You hosted" ; break;
-            case "joined": m = "You went";
-        }
-        return m
-    }
-    let m = ""
-    switch (requestType){
-        case "requested": m = "You asked"; break;
-        case "hosting": m = "You're hosting"; break;
-        case "joined": m = "You're going"
+  if (phase === 'past') {
+    let m = ''
+    switch (requestType) {
+      case 'requested':
+        m = 'You asked'
+        break
+      case 'hosting':
+        m = 'You hosted'
+        break
+      case 'joined':
+        m = 'You went'
     }
     return m
+  }
+  let m = ''
+  switch (requestType) {
+    case 'requested':
+      m = 'You asked'
+      break
+    case 'hosting':
+      m = "You're hosting"
+      break
+    case 'joined':
+      m = "You're going"
+  }
+  return m
 }

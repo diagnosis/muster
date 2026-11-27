@@ -1,291 +1,306 @@
 /* src/components/Header.module.css */
 
-.nav{
-    padding-block: var(--space-2);
-    border-bottom: 1px solid var(--border-subtle);
-    position: relative;
+.nav {
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
 }
-.inner{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    max-width: var(--width-shell);
-    margin-inline: auto;
-    padding-inline: var(--space-4);
+.inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: var(--width-shell);
+  margin-inline: auto;
+  padding-inline: var(--space-4);
 }
-.logo{
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: var(--text-title);
-    line-height: 44px;
-    letter-spacing: -0.01em;
+.logo {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-title);
+  line-height: 44px;
+  letter-spacing: -0.01em;
 }
 
-.navLink{
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    white-space: nowrap;
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  white-space: nowrap;
 }
-.navLink:hover{
-    color: var(--color-primary);
+.navLink:hover {
+  color: var(--color-primary);
 }
-.navLink[data-status="active"]{
-    color: var(--color-primary);
-    font-weight: 600;
+.navLink[data-status='active'] {
+  color: var(--color-primary);
+  font-weight: 600;
 }
 
 /* "Create outing": the one filled button in the header */
-.navCta{
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
+.navCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 /* profile: initial in a circle + the name */
-.profileLink{
-    position: relative;
-    gap: var(--space-2);
+.profileLink {
+  position: relative;
+  gap: var(--space-2);
 }
-.avatar{
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: var(--radius-pill);
-    background: var(--surface-sunken);
-    border: 1px solid var(--border-subtle);
-    color: var(--color-text);
-    font-size: var(--text-label);
-    font-weight: 600;
-    line-height: 1;
+.avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  color: var(--color-text);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: 1;
 }
-.profileLink[data-status="active"] .avatar{
-    border-color: var(--color-primary);
-    color: var(--color-primary);
+.profileLink[data-status='active'] .avatar {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 /* ---- the menu panel (a dropdown on phones, inline on desktop) ---- */
 
-.panel{
-    display: none;
+.panel {
+  display: none;
 }
-.panelOpen{
-    display: flex;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    padding: 0 var(--space-4) var(--space-4);
-    background: var(--surface-raised);
-    border-bottom: 1px solid var(--border-subtle);
-    box-shadow: 0 8px 16px -12px rgb(59 54 43 / 0.4);
-    z-index: 20;
+.panelOpen {
+  display: flex;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  padding: 0 var(--space-4) var(--space-4);
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 8px 16px -12px rgb(59 54 43 / 0.4);
+  z-index: 20;
 }
 .userOutings,
-.loginSignup{
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
+.loginSignup {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
 }
-.headerActions{
-    display: flex;
-    align-items: center;
+.headerActions {
+  display: flex;
+  align-items: center;
 }
 
 /* nav links get row treatment; buttons don't */
-.panelOpen .navLink{
-    padding-block: var(--space-1);
-    border-bottom: 1px solid var(--border-subtle);
+.panelOpen .navLink {
+  padding-block: var(--space-1);
+  border-bottom: 1px solid var(--border-subtle);
 }
 /* :global(.btn) because "btn" is a global class; a bare .btn here would be renamed by the module */
 .panelOpen button,
 .panelOpen :global(.btn),
-.panelOpen .navCta{
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    margin-top: var(--space-3);
+.panelOpen .navCta {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: var(--space-3);
 }
 
-.hamburgerBtn{
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    line-height: 1;
-    background: none;
-    border: 0;
-    border-radius: var(--radius-control);
-    color: var(--color-text);
+.hamburgerBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  line-height: 1;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--color-text);
 }
-.hamburgerBtn:hover{
-    background: var(--surface-raised);
+.hamburgerBtn:hover {
+  background: var(--surface-raised);
 }
 
-.panel .bell{ display: none; }
+.panel .bell {
+  display: none;
+}
 
-.desktopBell { display: none; }         /* phone: hide desktop bell */
-.mobileBell  { display: inline-flex; }  /* phone: show mobile bell */
+.desktopBell {
+  display: none;
+} /* phone: hide desktop bell */
+.mobileBell {
+  display: inline-flex;
+} /* phone: show mobile bell */
 
 /* ---- phone only: the logged-in menu ---- */
 
-@media (max-width: 39.99em){
-    /* who you are comes first */
-    .inboxText{
-        display: none;
-    }
-    .panelOpen .profileLink{
-        order: -1;
-        padding-block: var(--space-2);
-        font-weight: 600;
-    }
-    .panelOpen .navLink{
-        min-height: 48px;
-    }
-    /* the one primary action, set apart from the links */
-    .panelOpen .navCta{
-        margin-top: var(--space-4);
-    }
-    /* log out: quiet text, not a second big button */
-    .panelOpen .logoutBtn{
-        margin-top: var(--space-2);
-        border: 0;
-        background: none;
-        color: var(--color-text-muted);
-    }
-    .panelOpen .logoutBtn:hover{
-        background: none;
-        color: var(--color-text);
-        text-decoration: underline;
-    }
-}
-.unread{
-    flex: none;
-    min-width: 22px;
-    padding: 0 7px;
-    border-radius: var(--radius-pill);
-    background: var(--color-primary);
-    color: var(--color-on-primary);
-    font-size: var(--text-meta);
+@media (max-width: 39.99em) {
+  /* who you are comes first */
+  .inboxText {
+    display: none;
+  }
+  .panelOpen .profileLink {
+    order: -1;
+    padding-block: var(--space-2);
     font-weight: 600;
-    line-height: 22px;
-    text-align: center;
-    margin-left: var(--space-2)
+  }
+  .panelOpen .navLink {
+    min-height: 48px;
+  }
+  /* the one primary action, set apart from the links */
+  .panelOpen .navCta {
+    margin-top: var(--space-4);
+  }
+  /* log out: quiet text, not a second big button */
+  .panelOpen .logoutBtn {
+    margin-top: var(--space-2);
+    border: 0;
+    background: none;
+    color: var(--color-text-muted);
+  }
+  .panelOpen .logoutBtn:hover {
+    background: none;
+    color: var(--color-text);
+    text-decoration: underline;
+  }
+}
+.unread {
+  flex: none;
+  min-width: 22px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-meta);
+  font-weight: 600;
+  line-height: 22px;
+  text-align: center;
+  margin-left: var(--space-2);
 }
 
-.inboxIcon{
-    position: relative;
-    display: inline-flex;
+.inboxIcon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+}
+.iconBadge {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* ---- 640px and up ---- */
+
+@media (min-width: 40em) {
+  .toggle {
+    display: none;
+  }
+  .panel,
+  .panelOpen {
+    display: flex;
+    position: static;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+  .userOutings,
+  .loginSignup {
+    flex-direction: row;
     align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    border-radius: var(--radius-control);
-    color: var(--color-text);
-}
-.iconBadge{
-    position: absolute;
-    top: 4px;
-    right: 2px;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    border-radius: var(--radius-pill);
-    background: var(--color-primary);
-    color: var(--color-on-primary);
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 18px;
-    text-align: center;
-}
-.srOnly{
+    gap: var(--space-2);
+    width: auto;
+  }
+  .userOutings {
+    gap: var(--space-4);
+  }
+  .panelOpen .navLink {
+    padding-block: 0;
+    border-bottom: 0;
+  }
+  .panelOpen button,
+  .panelOpen :global(.btn),
+  .panelOpen .navCta {
+    display: inline-flex;
+    width: auto;
+    margin-top: 0;
+  }
+  .navCta {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  /* the name stays in the DOM for screen readers and tests; only the initial shows */
+  .profileName {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* log out: quiet text, not a boxed button */
+  .logoutBtn {
+    min-height: 44px;
+    padding: 0 var(--space-1);
+    border: 0;
+    background: none;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+  .logoutBtn:hover {
+    background: none;
+    color: var(--color-text);
+    text-decoration: underline;
+  }
+
+  .inner {
+    gap: var(--space-4);
+  }
+  .panel,
+  .panelOpen {
+    margin-left: auto;
+  }
+  .headerActions {
+    display: none;
+  }
+  .panel .bell {
+    display: inline-flex;
+  }
+  .desktopBell {
+    display: inline-flex;
+  }
+  .mobileBell {
+    display: none;
+  }
 }
-/* ---- 640px and up ---- */
-
-
-@media (min-width: 40em){
-    .toggle{
-        display: none;
-    }
-    .panel,
-    .panelOpen{
-        display: flex;
-        position: static;
-        padding: 0;
-        background: none;
-        border: 0;
-        box-shadow: none;
-    }
-    .userOutings,
-    .loginSignup{
-        flex-direction: row;
-        align-items: center;
-        gap: var(--space-2);
-        width: auto;
-    }
-    .userOutings{
-        gap: var(--space-4);
-    }
-    .panelOpen .navLink{
-        padding-block: 0;
-        border-bottom: 0;
-    }
-    .panelOpen button,
-    .panelOpen :global(.btn),
-    .panelOpen .navCta{
-        display: inline-flex;
-        width: auto;
-        margin-top: 0;
-    }
-    .navCta{
-        padding: var(--space-2) var(--space-3);
-    }
-
-    /* the name stays in the DOM for screen readers and tests; only the initial shows */
-    .profileName{
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
-    }
-
-    /* log out: quiet text, not a boxed button */
-    .logoutBtn{
-        min-height: 44px;
-        padding: 0 var(--space-1);
-        border: 0;
-        background: none;
-        color: var(--color-text-muted);
-        white-space: nowrap;
-    }
-    .logoutBtn:hover{
-        background: none;
-        color: var(--color-text);
-        text-decoration: underline;
-    }
-
-    .inner { gap: var(--space-4); }
-    .panel, .panelOpen { margin-left: auto; }
-    .headerActions { display: none; }
-    .panel .bell{ display: inline-flex; }
-    .desktopBell { display: inline-flex; }
-    .mobileBell  { display: none; }
-
-}
-
-

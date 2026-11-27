@@ -22,7 +22,7 @@ paths are relative. CORS is a deploy-day problem, deliberately deferred.
    hosting). Mirrors the API: reads public, writes authed.
 2. **One page per resource, rendered per viewer.** `/outings/:id` serves
    stranger, member, and host from one route and one fetch — sections and the
-   action slot swap by viewer state. Viewer never forks pages; *task*
+   action slot swap by viewer state. Viewer never forks pages; _task_
    sometimes does.
 3. **Pages and buttons are state renderers.** The UI gives faces to states the
    API already defines and the e2e suite already proves. Debugging is "which
@@ -38,6 +38,7 @@ paths are relative. CORS is a deploy-day problem, deliberately deferred.
 ## Screens
 
 ### 1. Outing list — `/` (public)
+
 - List of **cards**, soonest-first (ListUpcoming's own order — no client sort).
 - v0 shows all upcoming outings. ("Nearby" is parked: needs coords on create,
   a distance query param, and geolocation UX — three layers, v1.)
@@ -55,6 +56,7 @@ paths are relative. CORS is a deploy-day problem, deliberately deferred.
   architecture. Mobile-first: full-width stacked.
 
 ### 2. Outing detail — `/outings/:id` (public, viewer-aware)
+
 One page, one fetch (`GET /api/outings/{id}`), sections in order:
 title/meta → **action slot** → seat-math strip → host card → roster → notes.
 
@@ -66,7 +68,7 @@ title/meta → **action slot** → seat-math strip → host card → roster → 
 **The action slot — eight states, one component** (`my_request` + viewer):
 
 | viewer state            | slot renders                                   |
-|-------------------------|------------------------------------------------|
+| ----------------------- | ---------------------------------------------- |
 | anonymous               | **Request to join** → auth with context        |
 | logged in, no request   | **Request to join** → join form                |
 | `requested`             | "Requested — waiting on host" + Withdraw       |
@@ -80,6 +82,7 @@ v0 note: withdrawn → re-request silently keeps the ORIGINAL role/seats
 (backend v0 spec, scheduled to change v1-early). UI asks fresh; API decides.
 
 ### 3. Join form (reached from the slot; modal or route — decide at build)
+
 Single form. **No wizard** — four fields don't earn one; the forcing function
 is the submit gate, not Next buttons.
 
@@ -95,6 +98,7 @@ is the submit gate, not Next buttons.
   "Requested" IS the receipt; no toast needed.
 
 ### 4. Host view (detail page, host slot + inbox)
+
 - **Slot controls:** Edit · Cancel · Requests entry. The seats_short alarm
   speaks loudest here ("recruit a driver or shrink the party").
 - **Cancel:** confirm modal stating stakes ("Members will see it as
@@ -112,14 +116,17 @@ is the submit gate, not Next buttons.
   task frequency decides real estate.
 
 ### 5. My outings — `/me/outings` (authed — one of only two guarded routes)
+
 Hosting / joined buckets from `GET /api/me/outings`. Design at build time.
 
 ### 6. Auth screens
+
 Login / signup as modals-or-routes reached **from intent** (join tap, host
 tap, header button) — never as a lobby. Cookie flow; silent refresh arrives
 in the auth chapter when a 401 is first felt.
 
 ### 7. Profile
+
 `PATCH /api/me/profile` form + public hiker card. Design at build time.
 
 ---
@@ -127,7 +134,7 @@ in the auth chapter when a 401 is first felt.
 ## Architecture rulings
 
 - **Client:** `src/lib/api.ts` — `ApiResponse<T> = {ok:true; data} |
-  {ok:false; httpStatus; error}`. Never throws; unwraps the envelope;
+{ok:false; httpStatus; error}`. Never throws; unwraps the envelope;
   `httpStatus` (HTTP) and `error.status` (app code) are different numbers,
   deliberately both kept. Refresh/retry machinery arrives in the auth
   chapter, WHEN its failure is felt — not before.
@@ -158,6 +165,7 @@ in the auth chapter when a 401 is first felt.
 10. Polish pass, deploy chapter (CORS decision lives here)
 
 ## Parked (with triggers)
+
 - Tailwind — when flex/grid feels like boilerplate
 - test.extend fixtures — if teardown/shared-singleton need appears
 - Nearby/geolocation — v1, three layers
@@ -165,18 +173,20 @@ in the auth chapter when a 401 is first felt.
 - Frontend e2e (Playwright component/browser tests) — after screens exist
 
 ---
+
 ---
 
 # Part II — The Design System (as built)
-*Transcribed from source at `feat/ui-ship` @ `03b60df` (2026-08-12). Part I ruled the screens before code; Part II records the visual system that emerged. Arguments settle here, once.*
+
+_Transcribed from source at `feat/ui-ship` @ `03b60df` (2026-08-12). Part I ruled the screens before code; Part II records the visual system that emerged. Arguments settle here, once._
 
 ## 1. The three layers
 
-| Layer | File | Owns |
-|---|---|---|
-| **Tokens** | `src/index.css` `:root` | Every color, space, type, radius, width value. No raw values below this layer. |
-| **Base** | `src/styles/base.css` | Element defaults for `button`, `input`, `textarea`, `select` + the `.btn-primary` global variant. Reset lives in index.css (`box-sizing: border-box`, `* { margin: 0 }`). |
-| **Modules** | `*.module.css` beside each component/route | Everything scoped: layout, one-offs. camelCase class names, always. |
+| Layer       | File                                       | Owns                                                                                                                                                                      |
+| ----------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tokens**  | `src/index.css` `:root`                    | Every color, space, type, radius, width value. No raw values below this layer.                                                                                            |
+| **Base**    | `src/styles/base.css`                      | Element defaults for `button`, `input`, `textarea`, `select` + the `.btn-primary` global variant. Reset lives in index.css (`box-sizing: border-box`, `* { margin: 0 }`). |
+| **Modules** | `*.module.css` beside each component/route | Everything scoped: layout, one-offs. camelCase class names, always.                                                                                                       |
 
 **Rule:** components style themselves; containers arrange. A component never imports another's module or a global page stylesheet.
 
@@ -214,6 +224,7 @@ The set is `--space-1, -2, -3, -4, -6, -8` = 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2 rem
 --radius-card 12px · --radius-control 8px · --radius-pill 999px
 --width-shell 44rem (page shell) · --width-modal 26rem
 ```
+
 Mobile-first: 375px base, a single breakpoint at `min-width: 40em` (640px).
 
 **Header/nav (amended — reality overruled the founding "no hamburger" lean):**
@@ -227,14 +238,14 @@ panel on tap.
 
 - **Base `button`/`.btn`**: neutral — transparent bg, subtle border, control radius. Hover = raised surface.
 - **`.btn-primary`**: the only global variant. Teal, white text, weight 600. Hover darkens.
-- **Disabled**: page-surface bg behind a **dashed** border, muted text — reads as *"waiting on you"*, not faded-out. Source order matters: disabled rules sit **below** hover (equal specificity; order stops hover repainting a disabled button).
-- Buttons say what they do ("Create outing", not "Submit"). Disabled submits get a *why* hint.
+- **Disabled**: page-surface bg behind a **dashed** border, muted text — reads as _"waiting on you"_, not faded-out. Source order matters: disabled rules sit **below** hover (equal specificity; order stops hover repainting a disabled button).
+- Buttons say what they do ("Create outing", not "Submit"). Disabled submits get a _why_ hint.
 
 ## 7. Forms
 
 - Controlled inputs, always. State lives in the form component; parents pass identity down (`outingId`) and receive events up (`onClose`).
 - **Button-radios**: the real `<input type="radio">` stays in the accessibility tree, visually hidden (position: absolute, 1px box, clip-path: inset(50%)) — never display: none, which strips it from the tree and kills arrow-key navigation within the group. The label is the visible segment; selected wears primary. Every group is a `<fieldset>` with a `<legend>` caption and a shared name on all its inputs, so the browser treats them as one control. Focus ring lands on the label via :has(input:focus-visible), with a negative outline-offset because .radioRow clips overflow.
-- **No default on choice fields** — choosing is the gate (`Role | null`, submit disabled until chosen). Role-change resets role-owned fields (seats → 0) on *every* radio's onChange.
+- **No default on choice fields** — choosing is the gate (`Role | null`, submit disabled until chosen). Role-change resets role-owned fields (seats → 0) on _every_ radio's onChange.
 - `type="email"` / `type="password"` / `datetime-local` → `toISOString()` at submit; money edited in dollars, wired in cents (`Math.round(d*100)`).
 - Errors render in `--color-danger` near the action; the server's message is the copy. Client checks are courtesy; **the server is the law**.
 
@@ -242,7 +253,7 @@ panel on tap.
 
 - The action slot is a state renderer (`renderSlot`): cancelled override → anonymous → status ladder → default. One frame, swapping faces; never two truths at once.
 - Capacity copy distinguishes **full (cap-bound)** from **seat-bound** ("a driver could open more spots").
-- Modal: backdrop click closes, panel stops propagation, `z-index: 10`. Modal owns the shell only — content chrome (the ✕, headers, actions) belongs to the caller; HostControls renders its own `.modalHeader` with the ✕. Decisions keep evidence visible: inbox math restated in-modal; 409s render *inside* the modal (warn-and-allow — the client warning is courtesy, Accept stays tappable, `AcceptIfCapacity` referees).
+- Modal: backdrop click closes, panel stops propagation, `z-index: 10`. Modal owns the shell only — content chrome (the ✕, headers, actions) belongs to the caller; HostControls renders its own `.modalHeader` with the ✕. Decisions keep evidence visible: inbox math restated in-modal; 409s render _inside_ the modal (warn-and-allow — the client warning is courtesy, Accept stays tappable, `AcceptIfCapacity` referees).
 - `:focus-visible`: 2px primary outline, 2px offset.
 
 ## 9. Conventions

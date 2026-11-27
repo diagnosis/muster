@@ -1,38 +1,37 @@
-
 /*/src/styles/base.css*/
 /*scope will be button, input, textarea, select*/
 
 button,
-.btn{
-    padding: var(--space-3) var(--space-4);
-    border: solid 1px var(--border-subtle);
-    border-radius: var(--radius-control);
-    background: transparent;
-    font-family: inherit;
-    font-size: var(--text-body);
-    line-height: var(--leading-body);
-    cursor: pointer;
+.btn {
+  padding: var(--space-3) var(--space-4);
+  border: solid 1px var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  cursor: pointer;
 }
 button:hover,
-.btn:hover{
-    background: var(--surface-raised);
+.btn:hover {
+  background: var(--surface-raised);
 }
-.btn-primary{
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: var(--color-on-primary);
-    font-weight: 600;
+.btn-primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 600;
 }
-.btn-primary:hover{
-    background: var(--color-primary-dark);
+.btn-primary:hover {
+  background: var(--color-primary-dark);
 }
-.btn-danger{
-    border-color: var(--color-danger);
-    color:var(--color-danger);
+.btn-danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
-.btn-quite{
-    background: transparent;
-    color: var(--color-text);
+.btn-quite {
+  background: transparent;
+  color: var(--color-text);
 }
 
 /* Disabled sits on the page surface behind a dashed edge, so it reads as
@@ -40,73 +39,74 @@ button:hover,
    :hover rules — button:disabled and button:hover have equal specificity,
    so source order is what keeps hover from repainting a disabled button. */
 button:disabled,
-.btn-primary:disabled{
-    background: var(--surface-page);
-    border: 1px dashed var(--border-subtle);
-    color: var(--color-text-muted);
-    cursor: not-allowed;
+.btn-primary:disabled {
+  background: var(--surface-page);
+  border: 1px dashed var(--border-subtle);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
 }
 
-input:not([type="radio"]):not([type="checkbox"]),
-textarea, select {
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-control);
-    background: var(--surface-raised);
-    font-family: inherit;
-    font-size: var(--text-body);
-    font-weight: 400;
-    line-height: var(--leading-body);
+input:not([type='radio']):not([type='checkbox']),
+textarea,
+select {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  font-family: inherit;
+  font-size: var(--text-body);
+  font-weight: 400;
+  line-height: var(--leading-body);
 }
-textarea{
-    resize: vertical;
-    min-height: 5rem;
+textarea {
+  resize: vertical;
+  min-height: 5rem;
 }
 
 /* icon-only button: 44px target, no border */
-.icon-btn{
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: none;
-    color: var(--color-text-muted);
+.icon-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--color-text-muted);
 }
-.icon-btn:hover{
-    background: var(--surface-sunken);
-    color: var(--color-text);
+.icon-btn:hover {
+  background: var(--surface-sunken);
+  color: var(--color-text);
 }
-.icon-btn:disabled{
-    border: 0;
-    background: none;
-    opacity: 0.5;
+.icon-btn:disabled {
+  border: 0;
+  background: none;
+  opacity: 0.5;
 }
-.top-margin{
-    margin-top: var(--space-6);
+.top-margin {
+  margin-top: var(--space-6);
 }
 
-.btn-outline{
-    border: 1px solid var(--color-primary);
-    background: transparent;
-    color: var(--color-primary);
+.btn-outline {
+  border: 1px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
 }
-.btn-outline:hover{
-    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-    color: var(--color-primary-dark);
-    border-color: var(--color-primary-dark);
+.btn-outline:hover {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
 }
 
 /* a person's name that opens their card: looks like text, reveals itself on hover */
-.name-link{
-    color: inherit;
-    text-decoration: none;
+.name-link {
+  color: inherit;
+  text-decoration: none;
 }
 .name-link:hover,
-.name-link:focus-visible{
-    text-decoration: underline;
+.name-link:focus-visible {
+  text-decoration: underline;
 }

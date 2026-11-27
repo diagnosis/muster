@@ -1,88 +1,87 @@
 /*src/components/OutingCard.module.css*/
 
 .card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-card);
-    padding: var(--space-4);
-    background: var(--surface-raised);
-    transition: border-color 140ms ease, transform 140ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease;
 }
-.card:hover{
-    border-color: var(--color-text-muted);
-    transform: translateY(-1px);
-}
-
-.title{
-    font-family: var(--font-display);
-    font-size: var(--text-title);
-    line-height: var(--leading-title);
-    font-weight: 600;
-    letter-spacing: -0.01em;
+.card:hover {
+  border-color: var(--color-text-muted);
+  transform: translateY(-1px);
 }
 
-.meta{
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    color: var(--color-text-muted);
-}
-.metaItem{
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-}
-.metaItem svg{
-    flex: none;
-}
-.metaStrong{
-    color: var(--color-text);
-    font-weight: 600;
+.title {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  line-height: var(--leading-title);
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
-.topRow{
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-1) var(--space-3);
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-muted);
 }
-.label{
-    font-size: var(--text-meta);
-    line-height: var(--leading-meta);
-    font-weight: 600;
-    color: var(--color-text-muted);
+.metaItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
-.live{
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: var(--text-meta);
-    line-height: var(--leading-meta);
-    font-weight: 600;
-    color: var(--color-primary);
+.metaItem svg {
+  flex: none;
 }
-.live::before{
-    content: "";
-    width: 8px;
-    height: 8px;
-    border-radius: var(--radius-pill);
-    background: currentColor;
-}
-.cardLive{
-    border-color: var(--color-primary);
-}
-.cardPast{
-    background: var(--surface-sunken);
-}
-.cardPast:hover{
-    transform: none;
+.metaStrong {
+  color: var(--color-text);
+  font-weight: 600;
 }
 
-
-
+.topRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+.label {
+  font-size: var(--text-meta);
+  line-height: var(--leading-meta);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-meta);
+  line-height: var(--leading-meta);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+.live::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.cardLive {
+  border-color: var(--color-primary);
+}
+.cardPast {
+  background: var(--surface-sunken);
+}
+.cardPast:hover {
+  transform: none;
+}

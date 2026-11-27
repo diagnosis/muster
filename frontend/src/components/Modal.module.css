@@ -1,45 +1,52 @@
 /*src/components/Modal.module.css*/
-.backdrop{
-    position: fixed; inset: 0;z-index: 10;
-    background: rgb(0 0 0 / 0.5);
-    display: flex; align-items: center; justify-content: center;
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgb(0 0 0 / 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.panel{
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    background: var(--surface-raised); border-radius: var(--radius-card);
-    padding: var(--space-4); max-width: var(--width-modal); width: 90%;
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface-raised);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  max-width: var(--width-modal);
+  width: 90%;
 }
 
-.subheading{
-    font-family: var(--font-display);
-    font-size: var(--text-title);
-    line-height: var(--leading-title);
-    font-weight: 600;
-    letter-spacing: -0.01em;
+.subheading {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  line-height: var(--leading-title);
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
-.closeBtn{
-    border:0;
-    padding: var(--space-1) var(--space-2);
-    font-size: 1.25rem;
-    line-height: 1;
-    color: var(--color-text-muted);
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.closeBtn {
+  border: 0;
+  padding: var(--space-1) var(--space-2);
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.closeBtn:hover{
-    color: var(--color-text);
-    background: var(--surface-page);
+.closeBtn:hover {
+  color: var(--color-text);
+  background: var(--surface-page);
 }
-.modalHeader{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3)
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }

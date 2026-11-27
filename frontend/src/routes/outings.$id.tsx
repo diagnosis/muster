@@ -1,281 +1,463 @@
-import {createFileRoute, Link, useNavigate} from '@tanstack/react-router'
-import type {Detail, JoinRequest, Member} from "@/types.ts";
-import {useQueryClient} from "@tanstack/react-query";
-import {useMeQuery} from "@/queries.ts";
-import {useEffect, useState} from "react";
-import {JoinForm} from "@/components/JoinForm.tsx";
-import {HostControls} from "@/components/HostControls.tsx";
-import styles from "@/routes/outings.$id.module.css"
-import formStyles from "@/routes/form.module.css"
-import {Badges} from "@/components/Badges.tsx";
-import {Modal} from "@/components/Modal.tsx";
-import {Comments} from "@/components/Comments.tsx";
-import {useEvents} from "@/events/EventProvider.tsx";
-import {useStartDM} from "@/queries/conversation.ts";
-import {CalendarIcon, FlagIcon, MessageIcon, PinIcon, TrashIcon} from "@/components/Icons.tsx";
-import {outingRange} from "@/utils/date.ts";
-import {useOuting, useRemoveMemberMutation, useWithdrawMutation} from "@/queries/outing.ts";
-import {initial, ordinal, plural} from "@/lib/format.ts";
-import {WaitingListModal} from "@/components/WaitingListModal.tsx";
-
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import type { Detail, JoinRequest, Member } from '@/types.ts'
+import { useQueryClient } from '@tanstack/react-query'
+import { useMeQuery } from '@/queries.ts'
+import { useEffect, useState } from 'react'
+import { JoinForm } from '@/components/JoinForm.tsx'
+import { HostControls } from '@/components/HostControls.tsx'
+import styles from '@/routes/outings.$id.module.css'
+import formStyles from '@/routes/form.module.css'
+import { Badges } from '@/components/Badges.tsx'
+import { Modal } from '@/components/Modal.tsx'
+import { Comments } from '@/components/Comments.tsx'
+import { useEvents } from '@/events/EventProvider.tsx'
+import { useStartDM } from '@/queries/conversation.ts'
+import { CalendarIcon, FlagIcon, MessageIcon, PinIcon, TrashIcon } from '@/components/Icons.tsx'
+import { outingRange } from '@/utils/date.ts'
+import { useOuting, useRemoveMemberMutation, useWithdrawMutation } from '@/queries/outing.ts'
+import { initial, ordinal, plural } from '@/lib/format.ts'
+import { WaitingListModal } from '@/components/WaitingListModal.tsx'
+import * as React from 'react'
 
 export const Route = createFileRoute('/outings/$id')({
   component: OutingDetailPage,
 })
 
 export function OutingDetailPage() {
-    const {id} = Route.useParams()
-    const navigate = useNavigate()
-    const qc = useQueryClient()
-    const [showForm, setShowForm] = useState(false)
-    const {data: me} = useMeQuery()
-    const {data:detail, isPending, error} = useOuting(id)
-    const startDM = useStartDM()
-    const [memberToRemove, setMemberToRemove] = useState<Member|null>(null)
-    const [showWaiting, setShowWaiting] = useState(false)
-    const { subscribe } = useEvents()
-    useEffect(()=> {
-        return subscribe('outing.changed', (data)=>{
-            const poke = JSON.parse(data)
-            if(poke.outing_id === id){
-                qc.invalidateQueries({ queryKey: ['outing', id] })
-                qc.invalidateQueries({ queryKey: ['outing-join-requests', id] })
-            }
-        })
-    }, [subscribe, qc, id])
+  const { id } = Route.useParams()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [showForm, setShowForm] = useState(false)
+  const { data: me } = useMeQuery()
+  const { data: detail, isPending, error } = useOuting(id)
+  const startDM = useStartDM()
+  const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
+  const [showWaiting, setShowWaiting] = useState(false)
+  const { subscribe } = useEvents()
+  useEffect(() => {
+    return subscribe('outing.changed', (data) => {
+      const poke = JSON.parse(data)
+      if (poke.outing_id === id) {
+        qc.invalidateQueries({ queryKey: ['outing', id] })
+        qc.invalidateQueries({ queryKey: ['outing-join-requests', id] })
+      }
+    })
+  }, [subscribe, qc, id])
 
-    const withdrawMutation = useWithdrawMutation(id)
-    const removeMemberMutation = useRemoveMemberMutation(id)
+  const withdrawMutation = useWithdrawMutation(id)
+  const removeMemberMutation = useRemoveMemberMutation(id)
 
-    function handleOnClose(){
-        setShowForm(false)
-    }
+  function handleOnClose() {
+    setShowForm(false)
+  }
 
-    function renderSlot(detail: Detail){
-        if (detail.outing.status === 'cancelled')
-            return <div className={styles.slot}>
-                <p>This outing was cancelled</p>
-            </div>
-        if (!me)
-            return rosterLocked
-                ? <div className={styles.slot}><p>This outing has already started.</p></div>
-                : <div className={`${styles.slot} ${styles.slotActive}`}>
-                    <Link className={'btn-primary btn'} to="/login">Request to join</Link>
-                </div>
-
-        if (me.id === detail.outing.host_id) return <div className={`${styles.slot} ${styles.slotColumn}`}>
-            <div className={styles.slotHead}>
-                <p>You're hosting</p>
-                {chatLink}
-            </div>
-            <HostControls outingId={id} detail={detail}/>
+  function renderSlot(detail: Detail) {
+    if (detail.outing.status === 'cancelled')
+      return (
+        <div className={styles.slot}>
+          <SlotMessage>This outing was cancelled</SlotMessage>
         </div>
-
-        const st = detail.my_request?.status
-        if (st === 'requested')
-            return showForm
-                    ? <JoinForm outingId={id} initial={detail.my_request} onClose={handleOnClose}/>
-                    : <div className={styles.slot}>
-                        <div className={styles.slotText}>
-                            <p>Requested — waiting on host</p>
-                            <p className={styles.slotSub}>{requestSummary(detail.my_request!)}</p>
-                            <p className={styles.slotSub}>Drivers go first, then in the order people asked. Asking for more later moves you to the back.</p>
-                        </div>
-                        {!rosterLocked && <div className={styles.slotActions}>
-                            <button className="btn-outline" onClick={() => setShowForm(true)}>Edit request</button>
-                            <button className="btn" onClick={() => withdrawMutation.mutate()}>Withdraw</button>
-                        </div>}
-           </div>
-
-        if (st === 'accepted')
-            return <div className={`${styles.slot} ${styles.slotActive}`}>
-                <p>You're going! 🎉</p>
-                <div className={styles.slotActions}>
-                    {chatLink}
-                    {!rosterLocked && <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>}
-                </div>
-            </div>
-
-        if (st === 'declined')
-            return <div className={styles.slot}>
-                <p>The host declined this request.</p>
-            </div>
-        if (st === 'removed')
-            return <div className={styles.slot}>
-                <p>The host removed you from this outing.</p>
-            </div>
-        if (rosterLocked) return <div className={styles.slot}>
-            <p>This outing has already started.</p>
+      )
+    if (!me)
+      return rosterLocked ? (
+        <div className={styles.slot}>
+          <SlotMessage>This outing has already started.</SlotMessage>
         </div>
-        return <>
-            {showForm
-                ? <>
-                    {isFull && <p className={styles.warning}>⚠️This outing is full — you can still request in case a spot opens.</p>}
-                    <JoinForm outingId={id} onClose={handleOnClose}/>
-                </>
-                : <>
-                    {isFull && <p className={styles.warning}>⚠️This outing is full — you can still request in case a spot opens.</p>}
-                    <button className={'btn btn-primary'} onClick={() => setShowForm(true)}>Request to join</button>
-                </>}
-        </>
-    }
+      ) : (
+        <div className={`${styles.slot} ${styles.slotActive}`}>
+          <Link className={'btn-primary btn'} to="/login">
+            Request to join
+          </Link>
+        </div>
+      )
 
+    if (me.id === detail.outing.host_id)
+      return (
+        <div className={`${styles.slot} ${styles.slotColumn}`}>
+          <div className={styles.slotHead}>
+            <SlotMessage>You're hosting</SlotMessage>
+            {chatLink}
+          </div>
+          <HostControls outingId={id} detail={detail} />
+        </div>
+      )
 
-    // Handle loading and error states before rendering
-    if (isPending) return <div>Loading...</div>
-    if (error) return <div>Error: {error.message}</div>
+    const st = detail.my_request?.status
+    if (st === 'requested')
+      return showForm ? (
+        <JoinForm outingId={id} initial={detail.my_request} onClose={handleOnClose} />
+      ) : (
+        <div className={styles.slot}>
+          <div className={styles.slotText}>
+            <SlotMessage>Requested — waiting on host</SlotMessage>
+            <p data-testid={'slot-request-summary'} className={styles.slotSub}>
+              {requestSummary(detail.my_request!)}
+            </p>
+            <p className={styles.slotSub}>
+              Drivers go first, then in the order people asked. Asking for more later moves you to
+              the back.
+            </p>
+          </div>
+          {!rosterLocked && (
+            <div className={styles.slotActions}>
+              <button className="btn-outline" onClick={() => setShowForm(true)}>
+                Edit request
+              </button>
+              <button className="btn" onClick={() => withdrawMutation.mutate()}>
+                Withdraw
+              </button>
+            </div>
+          )}
+          {withdrawMutation.isError && (
+            <WithdrawError>{withdrawMutation.error.message}</WithdrawError>
+          )}
+        </div>
+      )
 
-    const effectiveCap = Math.min(detail.seat_capacity, detail.outing.max_size)
-    const isFull = detail.people_count >= detail.outing.max_size
-    const canSeeComments = !!me && (
-        me.id === detail.outing.host_id ||
-            detail.my_request?.status === 'accepted' ||
-            detail.my_request?.status === 'requested'
-    )
-    const canComment = detail.outing.status !== 'cancelled' && detail.outing.is_discussion_open
-    const canSeeStartDmBtn = me && (me.id === detail.host.hiker_id || detail.roster.some(r => r.hiker_id === me.id))
-    const canSeeChat =canSeeStartDmBtn && !!detail.outing.conversation_id
-    const isHost = me?.id === detail.outing.host_id
-    const totalSpots = detail.people_count + detail.spots_left
-    const filledPct = totalSpots > 0 ? Math.round((detail.people_count / totalSpots) * 100) : 0
-    const chatLink = canSeeChat &&
-        <Link className={'btn btn-primary'} to={'/conversations/$id'} params={{id: detail.outing.conversation_id}}>Outing chat</Link>
-    const rosterLocked = detail.outing.phase !== 'upcoming'
-    const othersGoing = detail.people_count - 1
-    const myWaitingIndex = detail.waiting.findIndex(w => w.is_me)
-    const waitingPreview = detail.waiting.slice(0,3)
-    const messageBtn = (hikerId: string, name: string) => (
-        <button className="icon-btn"
-                aria-label={`Message ${name}`}
-                disabled={startDM.isPending}
-                onClick={() => startDM.mutate(hikerId, {
-                    onSuccess: (conv) => navigate({to: '/conversations/$id', params: {id: conv.id}})
-                })}>
-            <MessageIcon/>
-        </button>
-    )
+    if (st === 'accepted')
+      return (
+        <div className={`${styles.slot} ${styles.slotActive}`}>
+          <SlotMessage>You're going! 🎉</SlotMessage>
+          <div className={styles.slotActions}>
+            {chatLink}
+            {!rosterLocked && <button onClick={() => withdrawMutation.mutate()}>Withdraw</button>}
+          </div>
+          {withdrawMutation.isError && (
+            <WithdrawError>{withdrawMutation.error.message}</WithdrawError>
+          )}
+        </div>
+      )
+
+    if (st === 'declined')
+      return (
+        <div className={styles.slot}>
+          <SlotMessage>The host declined this request.</SlotMessage>
+        </div>
+      )
+    if (st === 'removed')
+      return (
+        <div className={styles.slot}>
+          <SlotMessage>The host removed you from this outing.</SlotMessage>
+        </div>
+      )
+    if (rosterLocked)
+      return (
+        <div className={styles.slot}>
+          <SlotMessage>This outing has already started.</SlotMessage>
+        </div>
+      )
     return (
-        <div className={styles.container}>
-            <section className={styles.section}>
-                <h1 className={styles.heading}>{detail.outing.title}</h1>
-                <ul className={styles.meta}>
-                    <li className={`${styles.metaItem} ${styles.metaStrong}`}><CalendarIcon/> {outingRange(detail.outing.starts_at, detail.outing.ends_at)}</li>
-                    <li className={styles.metaItem}><PinIcon/> {detail.outing.destination}</li>
-                    <li className={styles.metaItem}><FlagIcon/> {detail.outing.meet_label}</li>
-                </ul>
-                <Badges outing={detail.outing}/>
-            </section>
-
-            <section className={styles.section}>
-                {renderSlot(detail)}
-            </section>
-
-            <section className={styles.section}>
-                <p>{detail.people_count} going · {detail.spots_left} of {effectiveCap} spots left</p>
-                <div className={styles.bar} aria-hidden="true">
-                    <div className={styles.barFill} style={{width: `${filledPct}%`}}/>
-                </div>
-                {isFull && <p className={styles.warning}>This outing is full.</p>}
-                {!isFull && detail.seats_short > 0 && <p>⚠️ {detail.seats_short} more seats needed — join as a driver?</p>}
-                {!isFull && detail.seats_short === 0 && detail.spots_left === 0 && <p>No seats left — a driver could open more spots. 🚗</p>}
-            </section>
-
-            <section className={styles.section}>
-                <h2 className={styles.subheading}>
-                    Who's going{me ? ` (${detail.roster.length + 1})` : ''}
-                </h2>
-                <div className={styles.card}>
-                    <div className={styles.memberRow}>
-                        <span className={styles.avatar} aria-hidden="true">{initial(detail.host.name)}</span>
-                        <p className={styles.hostRow}>
-                            {detail.host.hiker_id
-                                ? <Link className={"name-link"} to="/hikers/$id" params={{id: detail.host.hiker_id}}>{detail.host.name}</Link>
-                                : detail.host.name} · {detail.host.experience}
-                        </p>
-                        <span className={styles.hostTag}>Host</span>
-                        <span className={styles.rowActions}>
-            {canSeeStartDmBtn && detail.host.hiker_id && detail.host.hiker_id !== me?.id
-                && messageBtn(detail.host.hiker_id, detail.host.name)}
-        </span>
-                    </div>
-
-                    {detail.roster.map((m, i) => <div className={styles.memberRow} key={m.hiker_id ?? i}>
-                        <span className={styles.avatar} aria-hidden="true">{initial(m.name)}</span>
-                        {m.hiker_id
-                            ? <Link className={"name-link"} to="/hikers/$id" params={{id: m.hiker_id}}>{m.name}</Link>
-                            : m.name} · {m.experience}
-                        <span className={styles.rowActions}>
-            {canSeeStartDmBtn && m.hiker_id && m.hiker_id !== me?.id
-                && messageBtn(m.hiker_id, m.name)}
-                            {isHost && !rosterLocked &&
-                                <button aria-label={'Remove'} className={`icon-btn ${styles.removeIcon}`}
-                                        onClick={() => setMemberToRemove(m)}><TrashIcon/></button>}
-        </span>
-                    </div>)}
-
-                    {!me && othersGoing > 0 && <p className={styles.moreRow}>
-                        {othersGoing} more going. <Link to="/login">Log in</Link> to see who.
-                    </p>}
-
-                    {detail.waiting.length > 0 && <>
-                        <h3 className={styles.groupLabel}>Waiting ({detail.waiting.length})</h3>
-                        <div className={styles.waitingBlock}>
-                            <div className={styles.waitingSummary}>
-                                <div className={styles.avatarStack} aria-hidden="true">
-                                    {waitingPreview.map((w, i) => <span className={styles.chipAvatar} key={i}>{initial(w.name)}</span>)}
-                                </div>
-                                <p className={styles.waitingNames}>
-                                    {waitingPreview.map((w, i) => <span key={w.hiker_id}>
-        {i > 0 && (i === waitingPreview.length - 1 && detail.waiting.length <= 3 ? ' and ' : ', ')}
-                                        <Link className={"name-link"} to="/hikers/$id" params={{id: w.hiker_id}}>{w.name}</Link>
-    </span>)}
-                                    {detail.waiting.length > 3 && <> and <strong>{detail.waiting.length - 3} more</strong></>}
-                                </p>
-                                {detail.waiting.length > 3 &&
-                                    <button type="button" className="btn-outline" onClick={() => setShowWaiting(true)}>See all</button>}
-                            </div>
-                            {myWaitingIndex >= 0 &&
-                                <p className={formStyles.notice} role="status">
-                                    You're <strong>{ordinal(myWaitingIndex + 1)} of {detail.waiting.length}</strong> — drivers go first, then in the order people asked.
-                                </p>}
-                        </div>
-                    </>}
-                    {showWaiting && <WaitingListModal waiting={detail.waiting} onClose={() => setShowWaiting(false)}/>}
-                    {detail.withdrawn.length > 0 && <>
-                        <h3 className={styles.groupLabel}>Withdrew ({detail.withdrawn.length})</h3>
-                        <p className={styles.withdrawn}>{detail.withdrawn.map(w => w.name).join(', ')}</p>
-                    </>}
-                </div>
-                {startDM.isError && <p className={styles.error}>{startDM.error.message}</p>}
-                {memberToRemove && <Modal title={`Remove ${memberToRemove.name}`} onClose={() => setMemberToRemove(null)}>
-                    <p>This removes them from the roster and frees their seats. They won't be able to request again.</p>
-                    <div className={styles.actions}>
-                        <button className="btn-danger"
-                                onClick={() => memberToRemove.request_id && removeMemberMutation.mutate(memberToRemove.request_id, {onSuccess:()=>{
-                                        setMemberToRemove(null)
-                                    }})}>Yes, remove</button>
-                        <button className={formStyles.quietBtn}
-                                onClick={() => setMemberToRemove(null)}>Never mind</button>
-                    </div>
-                    {removeMemberMutation.error && <p className={formStyles.error}>{removeMemberMutation.error.message}</p>}
-                </Modal>}
-            </section>
-
-            {detail.outing.notes && <section className={styles.section}>
-                <h2 className={styles.subheading}>Notes</h2>
-                <p>{detail.outing.notes}</p>
-            </section>}
-
-            {canSeeComments && (
-                <Comments outingId={id} hostId={detail.outing.host_id} canComment={canComment}/>
+      <>
+        {showForm ? (
+          <>
+            {isFull && (
+              <p data-testid={'slot-full-warning'} className={styles.warning}>
+                ⚠️This outing is full — you can still request in case a spot opens.
+              </p>
             )}
-        </div>
+            <JoinForm outingId={id} onClose={handleOnClose} />
+          </>
+        ) : (
+          <>
+            {isFull && (
+              <p data-testid={'slot-full-warning'} className={styles.warning}>
+                ⚠️This outing is full — you can still request in case a spot opens.
+              </p>
+            )}
+            <button className={'btn btn-primary'} onClick={() => setShowForm(true)}>
+              Request to join
+            </button>
+          </>
+        )}
+      </>
     )
+  }
+
+  // Handle loading and error states before rendering
+  if (isPending) return <div>Loading...</div>
+  if (error) return <div>Error: {error.message}</div>
+
+  const effectiveCap = Math.min(detail.seat_capacity, detail.outing.max_size)
+  const isFull = detail.people_count >= detail.outing.max_size
+  const canSeeComments =
+    !!me &&
+    (me.id === detail.outing.host_id ||
+      detail.my_request?.status === 'accepted' ||
+      detail.my_request?.status === 'requested')
+  const canComment = detail.outing.status !== 'cancelled' && detail.outing.is_discussion_open
+  const canSeeStartDmBtn =
+    me && (me.id === detail.host.hiker_id || detail.roster.some((r) => r.hiker_id === me.id))
+  const canSeeChat = canSeeStartDmBtn && !!detail.outing.conversation_id
+  const isHost = me?.id === detail.outing.host_id
+  const totalSpots = detail.people_count + detail.spots_left
+  const filledPct = totalSpots > 0 ? Math.round((detail.people_count / totalSpots) * 100) : 0
+  const chatLink = canSeeChat && (
+    <Link
+      className={'btn btn-primary'}
+      to={'/conversations/$id'}
+      params={{ id: detail.outing.conversation_id }}
+    >
+      Outing chat
+    </Link>
+  )
+  const rosterLocked = detail.outing.phase !== 'upcoming'
+  const othersGoing = detail.people_count - 1
+  const myWaitingIndex = detail.waiting.findIndex((w) => w.is_me)
+  const waitingPreview = detail.waiting.slice(0, 3)
+  const messageBtn = (hikerId: string, name: string) => (
+    <button
+      className="icon-btn"
+      aria-label={`Message ${name}`}
+      disabled={startDM.isPending}
+      onClick={() =>
+        startDM.mutate(hikerId, {
+          onSuccess: (conv) => navigate({ to: '/conversations/$id', params: { id: conv.id } }),
+        })
+      }
+    >
+      <MessageIcon />
+    </button>
+  )
+  return (
+    <div className={styles.container}>
+      <section aria-labelledby="outing-title" className={styles.section}>
+        <h1 id="outing-title" className={styles.heading}>
+          {detail.outing.title}
+        </h1>
+        <ul className={styles.meta}>
+          <li data-testid={'outing-date'} className={`${styles.metaItem} ${styles.metaStrong}`}>
+            <CalendarIcon /> {outingRange(detail.outing.starts_at, detail.outing.ends_at)}
+          </li>
+          <li data-testid={'outing-destination'} className={styles.metaItem}>
+            <PinIcon /> {detail.outing.destination}
+          </li>
+          <li data-testid={'outing-meet'} className={styles.metaItem}>
+            <FlagIcon /> {detail.outing.meet_label}
+          </li>
+        </ul>
+        <Badges outing={detail.outing} />
+      </section>
+
+      <section aria-label={'Slot'} className={styles.section}>
+        {renderSlot(detail)}
+      </section>
+
+      <section aria-label={'Capacity'} className={styles.section}>
+        <p data-testid="outing-capacity">
+          {detail.people_count} going · {detail.spots_left} of {effectiveCap} spots left
+        </p>
+        <div className={styles.bar} aria-hidden="true">
+          <div className={styles.barFill} style={{ width: `${filledPct}%` }} />
+        </div>
+        {isFull && (
+          <p role={'status'} className={styles.warning}>
+            This outing is full.
+          </p>
+        )}
+        {!isFull && detail.seats_short > 0 && (
+          <p role="status">⚠️ {detail.seats_short} more seats needed — join as a driver?</p>
+        )}
+        {!isFull && detail.seats_short === 0 && detail.spots_left === 0 && (
+          <p role={'status'}>No seats left — a driver could open more spots. 🚗</p>
+        )}
+      </section>
+
+      <section aria-labelledby={'roster-heading'} className={styles.section}>
+        <h2 id={'roster-heading'} className={styles.subheading}>
+          Who's going{me ? ` (${detail.roster.length + 1})` : ''}
+        </h2>
+        <div className={styles.card}>
+          <div data-testid={'roster-host'} className={styles.memberRow}>
+            <span className={styles.avatar} aria-hidden="true">
+              {initial(detail.host.name)}
+            </span>
+            <p className={styles.hostRow}>
+              {detail.host.hiker_id ? (
+                <Link
+                  className={'name-link'}
+                  to="/hikers/$id"
+                  params={{ id: detail.host.hiker_id }}
+                >
+                  {detail.host.name}
+                </Link>
+              ) : (
+                detail.host.name
+              )}{' '}
+              · {detail.host.experience}
+            </p>
+            <span className={styles.hostTag}>Host</span>
+            <span className={styles.rowActions}>
+              {canSeeStartDmBtn &&
+                detail.host.hiker_id &&
+                detail.host.hiker_id !== me?.id &&
+                messageBtn(detail.host.hiker_id, detail.host.name)}
+            </span>
+          </div>
+
+          {detail.roster.map((m, i) => (
+            <div data-testid={'roster-member'} className={styles.memberRow} key={m.hiker_id ?? i}>
+              <span className={styles.avatar} aria-hidden="true">
+                {initial(m.name)}
+              </span>
+              {m.hiker_id ? (
+                <Link className={'name-link'} to="/hikers/$id" params={{ id: m.hiker_id }}>
+                  {m.name}
+                </Link>
+              ) : (
+                m.name
+              )}{' '}
+              · {m.experience}
+              <span className={styles.rowActions}>
+                {canSeeStartDmBtn &&
+                  m.hiker_id &&
+                  m.hiker_id !== me?.id &&
+                  messageBtn(m.hiker_id, m.name)}
+                {isHost && !rosterLocked && (
+                  <button
+                    aria-label={`Remove ${m.name}`}
+                    className={`icon-btn ${styles.removeIcon}`}
+                    onClick={() => setMemberToRemove(m)}
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
+              </span>
+            </div>
+          ))}
+
+          {!me && othersGoing > 0 && (
+            <p data-testid={'roster-more'} className={styles.moreRow}>
+              {othersGoing} more going. <Link to="/login">Log in</Link> to see who.
+            </p>
+          )}
+
+          {detail.waiting.length > 0 && (
+            <>
+              <h3 className={styles.groupLabel}>Waiting ({detail.waiting.length})</h3>
+              <div className={styles.waitingBlock}>
+                <div className={styles.waitingSummary}>
+                  <div className={styles.avatarStack} aria-hidden="true">
+                    {waitingPreview.map((w, i) => (
+                      <span className={styles.chipAvatar} key={i}>
+                        {initial(w.name)}
+                      </span>
+                    ))}
+                  </div>
+                  <p data-testid={'waiting-names'} className={styles.waitingNames}>
+                    {waitingPreview.map((w, i) => (
+                      <span key={w.hiker_id}>
+                        {i > 0 &&
+                          (i === waitingPreview.length - 1 && detail.waiting.length <= 3
+                            ? ' and '
+                            : ', ')}
+                        <Link className={'name-link'} to="/hikers/$id" params={{ id: w.hiker_id }}>
+                          {w.name}
+                        </Link>
+                      </span>
+                    ))}
+                    {detail.waiting.length > 3 && (
+                      <>
+                        {' '}
+                        and <strong>{detail.waiting.length - 3} more</strong>
+                      </>
+                    )}
+                  </p>
+                  {detail.waiting.length > 3 && (
+                    <button
+                      type="button"
+                      className="btn-outline"
+                      onClick={() => setShowWaiting(true)}
+                    >
+                      See all
+                    </button>
+                  )}
+                </div>
+                {myWaitingIndex >= 0 && (
+                  <p className={formStyles.notice} role="status">
+                    You're{' '}
+                    <strong>
+                      {ordinal(myWaitingIndex + 1)} of {detail.waiting.length}
+                    </strong>{' '}
+                    — drivers go first, then in the order people asked.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+          {showWaiting && (
+            <WaitingListModal waiting={detail.waiting} onClose={() => setShowWaiting(false)} />
+          )}
+          {detail.withdrawn.length > 0 && (
+            <>
+              <h3 className={styles.groupLabel}>Withdrew ({detail.withdrawn.length})</h3>
+              <p data-testid={'roster-withdrawn'} className={styles.withdrawn}>
+                {detail.withdrawn.map((w) => w.name).join(', ')}
+              </p>
+            </>
+          )}
+        </div>
+        {startDM.isError && (
+          <p role={'alert'} className={styles.error}>
+            {startDM.error.message}
+          </p>
+        )}
+        {memberToRemove && (
+          <Modal title={`Remove ${memberToRemove.name}`} onClose={() => setMemberToRemove(null)}>
+            <p>
+              This removes them from the roster and frees their seats. They won't be able to request
+              again.
+            </p>
+            <div className={styles.actions}>
+              <button
+                className="btn-danger"
+                onClick={() =>
+                  memberToRemove.request_id &&
+                  removeMemberMutation.mutate(memberToRemove.request_id, {
+                    onSuccess: () => {
+                      setMemberToRemove(null)
+                    },
+                  })
+                }
+              >
+                Yes, remove
+              </button>
+              <button className={formStyles.quietBtn} onClick={() => setMemberToRemove(null)}>
+                Never mind
+              </button>
+            </div>
+            {removeMemberMutation.error && (
+              <p className={formStyles.error}>{removeMemberMutation.error.message}</p>
+            )}
+          </Modal>
+        )}
+      </section>
+
+      {detail.outing.notes && (
+        <section aria-labelledby={'outing-notes'} className={styles.section}>
+          <h2 id={'outing-notes'} className={styles.subheading}>
+            Notes
+          </h2>
+          <p data-testid={'outing-notes'}>{detail.outing.notes}</p>
+        </section>
+      )}
+
+      {canSeeComments && (
+        <Comments outingId={id} hostId={detail.outing.host_id} canComment={canComment} />
+      )}
+    </div>
+  )
 }
 
-
 function requestSummary(req: JoinRequest): string {
-    const seats  = req.role === 'driver' ? ` with ${plural(req.seats_offered, 'seat')}` : ''
-    const guests = req.guests === 0 ? 'no guests' : plural(req.guests, 'guest')
-    return `You asked as a ${req.role}${seats}, bringing ${guests}`
+  const seats = req.role === 'driver' ? ` with ${plural(req.seats_offered, 'seat')}` : ''
+  const guests = req.guests === 0 ? 'no guests' : plural(req.guests, 'guest')
+  return `You asked as a ${req.role}${seats}, bringing ${guests}`
+}
+
+const SlotMessage = ({ children }: { children: React.ReactNode }) => {
+  return <p data-testid={'slot-message'}>{children}</p>
+}
+
+const WithdrawError = ({ children }: { children: React.ReactNode }) => {
+  return <p role={'alert'}>{children}</p>
 }

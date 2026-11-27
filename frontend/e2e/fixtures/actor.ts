@@ -1,85 +1,79 @@
-import { request, type APIRequestContext, type BrowserContext} from '@playwright/test'
-import type {Hiker, RegisterRequest} from "./types.ts";
-import {BASE_URL} from "./config.ts";
-import {tag} from "./mint.ts";
-import {unwrap} from "./api.ts";
-import {mintVerificationToken} from "./db.ts";
+import { request, type APIRequestContext, type BrowserContext } from '@playwright/test'
+import type { Hiker, RegisterRequest } from './types.ts'
+import { BASE_URL } from './config.ts'
+import { tag } from './mint.ts'
+import { unwrap } from './api.ts'
+import { mintVerificationToken } from './db.ts'
 
-
-export interface Actor{
-    api: APIRequestContext
-    user: RegisterRequest
-    hikerID: string
-    dispose: () => Promise<void>
+export interface Actor {
+  api: APIRequestContext
+  user: RegisterRequest
+  hikerID: string
+  dispose: () => Promise<void>
 }
 
-export async function createUnverifiedActor(overrides: Partial<RegisterRequest> = {}):Promise<Actor>{
-    const { name, email } = uniqueIdentity()
-    const user : RegisterRequest = {
-        email: email,
-        password: 'Passw0rd!123',
-        name: name,
-        experience: 'beginner',
-        ...overrides,
-    }
+export async function createUnverifiedActor(
+  overrides: Partial<RegisterRequest> = {},
+): Promise<Actor> {
+  const { name, email } = uniqueIdentity()
+  const user: RegisterRequest = {
+    email: email,
+    password: 'Passw0rd!123',
+    name: name,
+    experience: 'beginner',
+    ...overrides,
+  }
 
-    const api  = await request.newContext({baseURL:BASE_URL})
+  const api = await request.newContext({ baseURL: BASE_URL })
 
-    let res = await api.post('/api/auth/signup', {data:user})
-    if (!res.ok()){
-        throw new Error(`signup failed: ${res.status()} ${await res.text()}`)
-    }
-    const hiker = await unwrap<Hiker>(res, "hiker")
-    return {api,user, hikerID:hiker.id , dispose: ()=> api.dispose()}
+  let res = await api.post('/api/auth/signup', { data: user })
+  if (!res.ok()) {
+    throw new Error(`signup failed: ${res.status()} ${await res.text()}`)
+  }
+  const hiker = await unwrap<Hiker>(res, 'hiker')
+  return { api, user, hikerID: hiker.id, dispose: () => api.dispose() }
 }
 
-export async function createActor(overrides: Partial<RegisterRequest> = {}): Promise<Actor>{
-    const actor = await createUnverifiedActor(overrides)
-    const raw = await mintVerificationToken(actor.hikerID)
-    let res = await actor.api.post('/api/auth/verify-email', {data: {token: raw}})
-    if (!res.ok()){
-        throw new Error(`email verification failed: ${res.status()} ${await res.text()}`)
-    }
+export async function createActor(overrides: Partial<RegisterRequest> = {}): Promise<Actor> {
+  const actor = await createUnverifiedActor(overrides)
+  const raw = await mintVerificationToken(actor.hikerID)
+  let res = await actor.api.post('/api/auth/verify-email', {
+    data: { token: raw },
+  })
+  if (!res.ok()) {
+    throw new Error(`email verification failed: ${res.status()} ${await res.text()}`)
+  }
 
-    res = await actor.api.post('/api/auth/login', {
-        data: { email: actor.user.email, password: actor.user.password },
-    })
-    if (!res.ok()) throw new Error(`login failed: ${res.status()} ${await res.text()}`)
-    return actor
+  res = await actor.api.post('/api/auth/login', {
+    data: { email: actor.user.email, password: actor.user.password },
+  })
+  if (!res.ok()) throw new Error(`login failed: ${res.status()} ${await res.text()}`)
+  return actor
 }
 
-export async function actorInBrowser(actor: Actor, context: BrowserContext){
-    const state = await actor.api.storageState()
-    await context.addCookies(state.cookies)
+export async function actorInBrowser(actor: Actor, context: BrowserContext) {
+  const state = await actor.api.storageState()
+  await context.addCookies(state.cookies)
 }
-
-
-
-
-
 
 const ADJ = ['brisk', 'sunny', 'quiet', 'amber', 'swift', 'rustic', 'clever', 'stormy']
 const NOUN = ['otter', 'falcon', 'cedar', 'harbor', 'lark', 'meadow', 'pebble', 'summit']
 
-
-
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
-const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)]
+const pick = <T>(a: T[]) => a[Math.floor(Math.random() * a.length)]
 
 const HOST = 'test.dev'
 
-
-
 export function uniqueIdentity(): { name: string; email: string } {
-    const adj = pick(ADJ)
-    const noun = pick(NOUN)
-    const t = tag()
-    return {
-        name: `${cap(adj)} ${cap(noun)} ${t}`,
-        email: `${adj}.${noun}.${t}@${HOST}`,
-    }
+  const adj = pick(ADJ)
+  const noun = pick(NOUN)
+  const t = tag()
+  return {
+    name: `${cap(adj)} ${cap(noun)} ${t}`,
+    email: `${adj}.${noun}.${t}@${HOST}`,
+  }
 }
 
 export function uniqueName(): string {
-    return uniqueIdentity().name
+  return uniqueIdentity().name
 }
